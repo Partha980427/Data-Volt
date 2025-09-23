@@ -3,24 +3,7 @@ import pandas as pd
 import openpyxl
 from fractions import Fraction
 import math
-import os
-
-# ======================================================
-# 📂 Load Database from GitHub
-# ======================================================
-url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
-
-@st.cache_data
-def load_data(url):
-    return pd.read_excel(url)
-
-df = load_data(url)
-
-st.title("🔩 Bolt & Rod Search + Weight Calculator")
-
-if df.empty:
-    st.warning("No data available.")
-    st.stop()
+from io import BytesIO
 
 # ======================================================
 # 🔹 Fractional size parser
@@ -59,101 +42,64 @@ def calculate_weight(product, size_str, length_mm):
     return round(vol * density / 1000, 3)  # kg
 
 # ======================================================
-# 🔹 Sidebar Filters for Database
-# ======================================================
-st.sidebar.header("Search Filters")
-
-standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
-standard = st.sidebar.selectbox("Select Standard", standards_options)
-
-size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=parse_size_in_inches)
-size = st.sidebar.selectbox("Select Size", size_options)
-
-product_options = ["All"] + sorted(df['Product'].dropna().unique())
-product = st.sidebar.selectbox("Select Product", product_options)
-
-# Filter database
-filtered_df = df.copy()
-if standard != "All":
-    filtered_df = filtered_df[filtered_df["Standards"] == standard]
-if size != "All":
-    filtered_df = filtered_df[filtered_df["Size"] == size]
-if product != "All":
-    filtered_df = filtered_df[filtered_df["Product"] == product]
-
-st.subheader(f"Found {len(filtered_df)} matching items")
-st.dataframe(filtered_df)
-
-# ======================================================
 # ⚖️ Manual Weight Calculator
 # ======================================================
-st.header("⚖️ Manual Weight Calculator")
+st.title("🔩 Bolt & Rod Weight Calculator")
 
-calc_product = st.selectbox("Select Product for Weight", product_options[1:])
-calc_size = st.selectbox("Select Size for Weight", size_options[1:])
-calc_length = st.number_input("Enter Length (mm)", min_value=1, value=100)
-
-if st.button("Calculate Weight"):
-    result = calculate_weight(calc_product, calc_size, calc_length)
-    if result is not None:
-        st.success(f"Estimated Weight/pc: {result} kg")
-    else:
-        st.error("No formula available for this combination.")
-
-# ======================================================
-# 📂 Batch Excel Update by Folder Path
-# ======================================================
-st.header("📂 Batch Excel Update by Folder Path")
-
-folder_path = st.text_input("Enter folder path containing Excel file(s):")
 product_type = st.selectbox(
-    "Select Product Type for Batch Update",
+    "Select Product Type",
     ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
 )
 
-weight_col_name = st.text_input("Enter column name to write Weight/pc (Kg):", "Weight/pc (Kg)")
+weight_col_name = st.text_input("Enter column name for Weight/pc (Kg):", "Weight/pc (Kg)")
 weight_col_index = st.number_input(
-    "Enter column index to write Weight/pc (Kg) (if not exist, will be created at this position)",
+    "Enter column index to write Weight/pc (Kg) (numeric, e.g., 3 = C column)",
     min_value=1, value=3
 )
 
-if st.button("Update Weights in Excel Folder"):
-    if not os.path.exists(folder_path):
-        st.error("Folder path does not exist!")
-    else:
-        updated_files = []
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".xlsx"):
-                file_path = os.path.join(folder_path, filename)
-                wb = openpyxl.load_workbook(file_path)
-                ws = wb.active
+uploaded_files = st.file_uploader(
+    "Upload Excel file(s) to update weights",
+    type=["xlsx"],
+    accept_multiple_files=True
+)
 
-                # Auto-detect Size and Length columns
-                headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
-                size_cols = [name for name in headers if "size" in str(name).lower()]
-                length_cols = [name for name in headers if "length" in str(name).lower()]
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        wb = openpyxl.load_workbook(uploaded_file)
+        ws = wb.active
 
-                if not size_cols or not length_cols:
-                    st.warning(f"{filename} missing Size or Length column. Skipping.")
-                    continue
+        # Auto-detect Size and Length columns
+        headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
+        size_cols = [name for name in headers if "size" in str(name).lower()]
+        length_cols = [name for name in headers if "length" in str(name).lower()]
 
-                size_col_index_detected = headers[size_cols[0]]
-                length_col_index_detected = headers[length_cols[0]]
+        if not size_cols or not length_cols:
+            st.warning(f"{uploaded_file.name} missing Size or Length column. Skipping.")
+            continue
 
-                # Add weight column if not exist at specified index
-                if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
-                    ws.insert_cols(weight_col_index)
-                    ws.cell(row=1, column=weight_col_index, value=weight_col_name)
+        size_col_index_detected = headers[size_cols[0]]
+        length_col_index_detected = headers[length_cols[0]]
 
-                # Calculate weight row by row
-                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-                    size_val = row[size_col_index_detected - 1].value
-                    length_val = row[length_col_index_detected - 1].value
-                    if size_val is not None and length_val is not None:
-                        row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
+        # Add weight column if not exist at specified index
+        if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
+            ws.insert_cols(weight_col_index)
+            ws.cell(row=1, column=weight_col_index, value=weight_col_name)
 
-                # Save updated Excel back to same folder
-                wb.save(file_path)
-                updated_files.append(filename)
+        # Calculate weight row by row
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            size_val = row[size_col_index_detected - 1].value
+            length_val = row[length_col_index_detected - 1].value
+            if size_val is not None and length_val is not None:
+                row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
 
-        st.success(f"Updated weights in {len(updated_files)} file(s): {updated_files}")
+        # Save updated Excel to in-memory BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        st.download_button(
+            label=f"Download Updated {uploaded_file.name}",
+            data=output,
+            file_name=f"updated_{uploaded_file.name}",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
