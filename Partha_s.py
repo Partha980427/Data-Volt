@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import openpyxl
 from fractions import Fraction
 import math
@@ -42,27 +41,31 @@ def calculate_weight(product, size_str, length_mm):
     return round(vol * density / 1000, 3)  # kg
 
 # ======================================================
-# ⚖️ Manual Weight Calculator
+# Streamlit App
 # ======================================================
 st.title("🔩 Bolt & Rod Weight Calculator")
 
+# Select Product type for calculation
 product_type = st.selectbox(
     "Select Product Type",
     ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
 )
 
+# Input for Weight column name and index
 weight_col_name = st.text_input("Enter column name for Weight/pc (Kg):", "Weight/pc (Kg)")
 weight_col_index = st.number_input(
     "Enter column index to write Weight/pc (Kg) (numeric, e.g., 3 = C column)",
     min_value=1, value=3
 )
 
+# File uploader (single or multiple Excel files)
 uploaded_files = st.file_uploader(
     "Upload Excel file(s) to update weights",
     type=["xlsx"],
     accept_multiple_files=True
 )
 
+# Process uploaded files
 if uploaded_files:
     for uploaded_file in uploaded_files:
         wb = openpyxl.load_workbook(uploaded_file)
@@ -103,3 +106,14 @@ if uploaded_files:
             file_name=f"updated_{uploaded_file.name}",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+# Optional: Manual weight calculator preview
+st.header("⚖️ Manual Weight Calculator Preview")
+manual_size = st.text_input("Enter Size (e.g., 1-1/2)", "")
+manual_length = st.number_input("Enter Length (mm) for preview", min_value=1, value=100)
+if st.button("Preview Weight for Manual Input") and manual_size:
+    w = calculate_weight(product_type, manual_size, manual_length)
+    if w:
+        st.success(f"Estimated Weight: {w} kg")
+    else:
+        st.error("Cannot calculate weight for this input.")
