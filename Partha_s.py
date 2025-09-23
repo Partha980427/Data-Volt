@@ -5,13 +5,12 @@ from fractions import Fraction
 import math
 
 # ======================================================
-# 📂 Load Data
+# 📂 Load Database
 # ======================================================
-
-# Google Sheets direct download link
+# GitHub Excel direct download link
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 
-# Local path for backup Excel
+# Local Excel backup path
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
 @st.cache_data
@@ -30,14 +29,13 @@ if df.empty:
 # ======================================================
 # 🔍 Sidebar Filters
 # ======================================================
-
 st.sidebar.header("Search Filters")
 
-# --- Standards ---
+# Standards
 standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
 standard = st.sidebar.selectbox("Select Standard", standards_options)
 
-# --- Size (supports fractions like 1/2, 1-1/2) ---
+# Size (supports fractions like 1/2, 1-1/2)
 def size_to_float(size_str):
     try:
         if "-" in str(size_str):
@@ -51,14 +49,13 @@ def size_to_float(size_str):
 size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
 size = st.sidebar.selectbox("Select Size", size_options)
 
-# --- Product ---
+# Product
 product_options = ["All"] + sorted(df['Product'].dropna().unique())
 product = st.sidebar.selectbox("Select Product", product_options)
 
 # ======================================================
 # 📊 Filter & Display
 # ======================================================
-
 filtered_df = df.copy()
 if standard != "All":
     filtered_df = filtered_df[filtered_df["Standards"] == standard]
@@ -91,21 +88,19 @@ else:
     st.warning("Original Excel file not found at local path.")
 
 # ======================================================
-# ⚖️ Weight Calculator
+# ⚖️ Weight Calculator (Manual Input)
 # ======================================================
-
 st.header("⚖️ Weight Calculator")
 
-# --- Formula Function (replace with actual formulas later) ---
 def calculate_weight(product, size, length):
     try:
-        # Handle size conversion (fraction → float, inch → mm, metric M sizes)
+        # Convert size (fraction or metric)
         if isinstance(size, str):
             try:
-                dia = float(Fraction(size)) * 25.4  # inch → mm
+                dia = float(Fraction(size)) * 25.4  # inch -> mm
             except:
                 if size.startswith("M"):
-                    dia = float(size.replace("M", ""))  # metric
+                    dia = float(size.replace("M", ""))
                 else:
                     dia = float(size)
         else:
@@ -133,15 +128,64 @@ def calculate_weight(product, size, length):
     except Exception:
         return None
 
-# --- User Inputs ---
 calc_product = st.selectbox("Select Product for Weight", product_options[1:])
 calc_size = st.selectbox("Select Size for Weight", size_options[1:])
 calc_length = st.number_input("Enter Length (mm)", min_value=1, value=100)
 
-# --- Calculate & Show ---
 if st.button("Calculate Weight"):
     result = calculate_weight(calc_product, calc_size, calc_length)
     if result:
         st.success(f"Estimated Weight/pc: {result} kg")
     else:
         st.error("No formula available for this combination.")
+
+# ======================================================
+# 📥 Batch Excel Weight Calculation
+# ======================================================
+st.header("📥 Upload Excel for Batch Weight Calculation")
+
+uploaded_file = st.file_uploader("Upload Excel with columns: Size, Length", type=["xlsx"])
+
+if uploaded_file:
+    try:
+        upload_df = pd.read_excel(uploaded_file)
+    except Exception as e:
+        st.error(f"Error reading Excel file: {e}")
+        st.stop()
+
+    required_columns = ["Size", "Length"]
+    for col in required_columns:
+        if col not in upload_df.columns:
+            st.error(f"Uploaded file must contain column: {col}")
+            st.stop()
+
+    if "Weight/pc (Kg)" not in upload_df.columns:
+        upload_df["Weight/pc (Kg)"] = None
+
+    # Calculate weight row by row
+    def get_weight(row):
+        size = row["Size"]
+        length = row["Length"]
+
+        # Optional: use Product column if present
+        product = row.get("Product", "Hex Bolt") if "Product" in row else "Hex Bolt"
+
+        return calculate_weight(product, size, length)
+
+    upload_df["Weight/pc (Kg)"] = upload_df.apply(get_weight, axis=1)
+
+    st.write("### Processed Excel Preview", upload_df.head())
+
+    # Save and offer download
+    output_file = "processed_weights.xlsx"
+    upload_df.to_excel(output_file, index=False)
+
+    with open(output_file, "rb") as f:
+        st.download_button(
+            "📥 Download Processed Excel",
+            f,
+            file_name="processed_weights.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    st.success("Weights calculated successfully!")
