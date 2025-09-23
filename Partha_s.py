@@ -107,18 +107,18 @@ with tab2:
     size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    # Unit selection
-    size_unit = st.selectbox("Select Size Unit", ["inch", "mm"])
-    length_unit = st.selectbox("Select Length Unit", ["inch", "mm"])
+    # Unit selection (unique keys)
+    size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
+    length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
 
     if st.button("Calculate Weight"):
         size_in = size_to_float(size_str)
         length_in = float(length_val)
 
         # Convert to inches internally
-        if size_unit == "mm":
+        if size_unit_manual == "mm":
             size_in /= 25.4
-        if length_unit == "mm":
+        if length_unit_manual == "mm":
             length_in /= 25.4
 
         if size_in:
@@ -139,7 +139,7 @@ with tab3:
         st.write("📄 Uploaded File Preview:")
         st.dataframe(user_df.head())
 
-        # Detect columns
+        # Detect columns automatically
         size_col = next((c for c in user_df.columns if "size" in c.lower()), None)
         length_col = next((c for c in user_df.columns if "length" in c.lower()), None)
         product_col = next((c for c in user_df.columns if "product" in c.lower()), None)
@@ -150,9 +150,9 @@ with tab3:
             min_value=1, value=len(user_df.columns)+1
         )
 
-        # Unit selection
-        size_unit = st.selectbox("Select Size Unit", ["inch", "mm"])
-        length_unit = st.selectbox("Select Length Unit", ["inch", "mm"])
+        # Unit selection (unique keys)
+        size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
+        length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
 
         if size_col and length_col:
             st.info(f"Detected columns → Size: {size_col}, Length: {length_col}")
@@ -161,12 +161,17 @@ with tab3:
             if not product_col:
                 selected_product_type = st.selectbox(
                     "Select Product Type (for all rows)",
-                    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
+                    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"],
+                    key="product_batch"
                 )
 
             if st.button("Calculate Weights for All"):
-                # Use openpyxl directly to preserve formatting
-                wb = load_workbook(uploaded_file)
+                # Use a temporary file to preserve uploaded Excel
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                temp_file.write(uploaded_file.getbuffer())
+                temp_file.close()
+
+                wb = load_workbook(temp_file.name)
                 ws = wb.active
 
                 # Insert weight column if it doesn't exist at the desired index
@@ -183,10 +188,10 @@ with tab3:
                         size_in = size_to_float(size_val)
                         length_in_float = float(length_val)
 
-                        # Convert units
-                        if size_unit == "mm":
+                        # Convert units from mm to inch internally
+                        if size_unit_batch == "mm":
                             size_in /= 25.4
-                        if length_unit == "mm":
+                        if length_unit_batch == "mm":
                             length_in_float /= 25.4
 
                         ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in, length_in_float))
