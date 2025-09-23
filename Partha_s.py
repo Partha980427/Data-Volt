@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
-import os
+import openpyxl
 from fractions import Fraction
 import math
+import os
 
 # ======================================================
-# 📂 Load Database
+# 📂 Load Database from GitHub
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
@@ -16,23 +17,18 @@ def load_data(url):
 
 df = load_data(url)
 
-st.title("🔩 Bolt & Rod Search App")
-st.write("Search ASME B18.2.1 Hex Bolts and Heavy Hex Bolts by Standard, Size, and Product")
+st.title("🔩 Bolt & Rod Search + Weight Calculator")
 
 if df.empty:
     st.warning("No data available.")
     st.stop()
 
 # ======================================================
-# 🔹 Size Parser (Fractional sizes like '1-1/2')
+# 🔹 Fractional size parser
 # ======================================================
 def parse_size_in_inches(size):
-    """
-    Converts size string like '1-1/2', '1/2', or float to float inches
-    """
     if isinstance(size, (int, float)):
         return float(size)
-
     s = str(size).strip()
     try:
         if "-" in s:
@@ -40,64 +36,14 @@ def parse_size_in_inches(size):
             return float(whole) + float(Fraction(frac))
         else:
             return float(Fraction(s))
-    except Exception:
+    except:
         return None
 
 # ======================================================
-# 🔹 Sidebar Filters
+# 🔹 Weight calculation function
 # ======================================================
-st.sidebar.header("Search Filters")
-
-standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
-standard = st.sidebar.selectbox("Select Standard", standards_options)
-
-size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=parse_size_in_inches)
-size = st.sidebar.selectbox("Select Size", size_options)
-
-product_options = ["All"] + sorted(df['Product'].dropna().unique())
-product = st.sidebar.selectbox("Select Product", product_options)
-
-# ======================================================
-# 🔹 Filter & Display
-# ======================================================
-filtered_df = df.copy()
-if standard != "All":
-    filtered_df = filtered_df[filtered_df["Standards"] == standard]
-if size != "All":
-    filtered_df = filtered_df[filtered_df["Size"] == size]
-if product != "All":
-    filtered_df = filtered_df[filtered_df["Product"] == product]
-
-st.subheader(f"Found {len(filtered_df)} matching items")
-st.dataframe(filtered_df)
-
-# Download filtered data
-st.download_button(
-    "Download Filtered Results as CSV",
-    filtered_df.to_csv(index=False),
-    file_name="filtered_bolts.csv",
-    mime="text/csv"
-)
-
-# Download original Excel
-if os.path.exists(local_excel_path):
-    with open(local_excel_path, "rb") as f:
-        st.download_button(
-            "Download Original Excel",
-            f,
-            file_name="ASME_B18.2.1_Hex_Bolt_and_Heavy_Hex_Bolt.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-else:
-    st.warning("Original Excel file not found at local path.")
-
-# ======================================================
-# ⚖️ Manual Weight Calculator
-# ======================================================
-st.header("⚖️ Weight Calculator")
-
 def calculate_weight(product, size_str, length_mm):
-    dia_mm = parse_size_in_inches(size_str) * 25.4  # convert inches to mm
+    dia_mm = parse_size_in_inches(size_str) * 25.4  # inches -> mm
     density = 0.00785  # g/mm³ steel
 
     if product == "Hex Bolt":
@@ -113,6 +59,37 @@ def calculate_weight(product, size_str, length_mm):
 
     return round(vol * density / 1000, 3)  # kg
 
+# ======================================================
+# 🔹 Sidebar Filters for Database
+# ======================================================
+st.sidebar.header("Search Filters")
+
+standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
+standard = st.sidebar.selectbox("Select Standard", standards_options)
+
+size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=parse_size_in_inches)
+size = st.sidebar.selectbox("Select Size", size_options)
+
+product_options = ["All"] + sorted(df['Product'].dropna().unique())
+product = st.sidebar.selectbox("Select Product", product_options)
+
+# Filter database
+filtered_df = df.copy()
+if standard != "All":
+    filtered_df = filtered_df[filtered_df["Standards"] == standard]
+if size != "All":
+    filtered_df = filtered_df[filtered_df["Size"] == size]
+if product != "All":
+    filtered_df = filtered_df[filtered_df["Product"] == product]
+
+st.subheader(f"Found {len(filtered_df)} matching items")
+st.dataframe(filtered_df)
+
+# ======================================================
+# ⚖️ Manual Weight Calculator
+# ======================================================
+st.header("⚖️ Manual Weight Calculator")
+
 calc_product = st.selectbox("Select Product for Weight", product_options[1:])
 calc_size = st.selectbox("Select Size for Weight", size_options[1:])
 calc_length = st.number_input("Enter Length (mm)", min_value=1, value=100)
@@ -125,54 +102,58 @@ if st.button("Calculate Weight"):
         st.error("No formula available for this combination.")
 
 # ======================================================
-# 📥 Batch Excel Upload with Product Selection
+# 📂 Batch Excel Update by Folder Path (Auto-detect Size/Length)
 # ======================================================
-st.header("📥 Upload Excel for Batch Weight Calculation")
+st.header("📂 Batch Excel Update (Auto-detect Size & Length)")
 
-product_for_upload = st.selectbox(
-    "Select Product Type for Uploaded Excel",
+folder_path = st.text_input("Enter folder path containing Excel file(s):")
+product_type = st.selectbox(
+    "Select Product Type for Batch Update",
     ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
 )
 
-uploaded_file = st.file_uploader("Upload Excel with columns: Size, Length", type=["xlsx"])
+weight_col_name = st.text_input("Enter column name to write Weight/pc (Kg) (e.g., 'Weight/pc (Kg)'):")
+weight_col_index = st.number_input(
+    "Enter column index to write Weight/pc (Kg) (if not exist, will be created at this position)",
+    min_value=1, value=3
+)
 
-if uploaded_file:
-    try:
-        upload_df = pd.read_excel(uploaded_file)
-    except Exception as e:
-        st.error(f"Error reading Excel file: {e}")
-        st.stop()
+if st.button("Update Weights in Excel"):
+    if not os.path.exists(folder_path):
+        st.error("Folder path does not exist!")
+    else:
+        updated_files = []
+        for filename in os.listdir(folder_path):
+            if filename.endswith(".xlsx"):
+                file_path = os.path.join(folder_path, filename)
+                wb = openpyxl.load_workbook(file_path)
+                ws = wb.active
 
-    # Ensure required columns
-    required_columns = ["Size", "Length"]
-    for col in required_columns:
-        if col not in upload_df.columns:
-            st.error(f"Uploaded file must contain column: {col}")
-            st.stop()
+                # Auto-detect Size and Length columns
+                headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
+                size_cols = [name for name in headers if "size" in str(name).lower()]
+                length_cols = [name for name in headers if "length" in str(name).lower()]
 
-    if "Weight/pc (Kg)" not in upload_df.columns:
-        upload_df["Weight/pc (Kg)"] = None
+                if not size_cols or not length_cols:
+                    st.warning(f"{filename} does not contain Size or Length columns. Skipping.")
+                    continue
 
-    # Calculate weight row by row
-    def get_weight(row):
-        size = row["Size"]
-        length = row["Length"]
-        return calculate_weight(product_for_upload, size, length)
+                size_col_index_detected = headers[size_cols[0]]
+                length_col_index_detected = headers[length_cols[0]]
 
-    upload_df["Weight/pc (Kg)"] = upload_df.apply(get_weight, axis=1)
+                # Add weight column if not exist at the specified index
+                if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
+                    ws.insert_cols(weight_col_index)
+                    ws.cell(row=1, column=weight_col_index, value=weight_col_name)
 
-    st.write("### Processed Excel Preview", upload_df.head())
+                # Calculate weight row by row
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                    size_val = row[size_col_index_detected - 1].value
+                    length_val = row[length_col_index_detected - 1].value
+                    if size_val is not None and length_val is not None:
+                        row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
 
-    # Save and provide download
-    output_file = "processed_weights.xlsx"
-    upload_df.to_excel(output_file, index=False)
+                wb.save(file_path)
+                updated_files.append(filename)
 
-    with open(output_file, "rb") as f:
-        st.download_button(
-            "📥 Download Processed Excel",
-            f,
-            file_name="processed_weights.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-    st.success(f"Weights calculated successfully using product type: {product_for_upload}")
+        st.success(f"Updated weights in {len(updated_files)} file(s): {updated_files}")
