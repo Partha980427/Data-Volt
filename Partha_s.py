@@ -3,13 +3,11 @@ import pandas as pd
 import openpyxl
 from fractions import Fraction
 import math
-import os
 
 # ======================================================
 # 📂 Load Database from GitHub
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
-local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
 @st.cache_data
 def load_data(url):
@@ -102,58 +100,62 @@ if st.button("Calculate Weight"):
         st.error("No formula available for this combination.")
 
 # ======================================================
-# 📂 Batch Excel Update by Folder Path (Auto-detect Size/Length)
+# 📂 Batch Excel Update via File Upload
 # ======================================================
-st.header("📂 Batch Excel Update (Auto-detect Size & Length)")
+st.header("📂 Batch Excel Update via File Upload")
 
-folder_path = st.text_input("Enter folder path containing Excel file(s):")
 product_type = st.selectbox(
     "Select Product Type for Batch Update",
     ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
 )
 
-weight_col_name = st.text_input("Enter column name to write Weight/pc (Kg) (e.g., 'Weight/pc (Kg)'):")
+weight_col_name = st.text_input("Enter column name to write Weight/pc (Kg):", "Weight/pc (Kg)")
 weight_col_index = st.number_input(
     "Enter column index to write Weight/pc (Kg) (if not exist, will be created at this position)",
     min_value=1, value=3
 )
 
-if st.button("Update Weights in Excel"):
-    if not os.path.exists(folder_path):
-        st.error("Folder path does not exist!")
+uploaded_files = st.file_uploader(
+    "Upload Excel file(s) from folder",
+    type=["xlsx"],
+    accept_multiple_files=True
+)
+
+if st.button("Update Weights in Uploaded Excel"):
+    if not uploaded_files:
+        st.warning("Please upload at least one Excel file.")
     else:
         updated_files = []
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".xlsx"):
-                file_path = os.path.join(folder_path, filename)
-                wb = openpyxl.load_workbook(file_path)
-                ws = wb.active
+        for uploaded_file in uploaded_files:
+            wb = openpyxl.load_workbook(uploaded_file)
+            ws = wb.active
 
-                # Auto-detect Size and Length columns
-                headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
-                size_cols = [name for name in headers if "size" in str(name).lower()]
-                length_cols = [name for name in headers if "length" in str(name).lower()]
+            # Auto-detect Size and Length columns
+            headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
+            size_cols = [name for name in headers if "size" in str(name).lower()]
+            length_cols = [name for name in headers if "length" in str(name).lower()]
 
-                if not size_cols or not length_cols:
-                    st.warning(f"{filename} does not contain Size or Length columns. Skipping.")
-                    continue
+            if not size_cols or not length_cols:
+                st.warning(f"{uploaded_file.name} missing Size or Length column. Skipping.")
+                continue
 
-                size_col_index_detected = headers[size_cols[0]]
-                length_col_index_detected = headers[length_cols[0]]
+            size_col_index_detected = headers[size_cols[0]]
+            length_col_index_detected = headers[length_cols[0]]
 
-                # Add weight column if not exist at the specified index
-                if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
-                    ws.insert_cols(weight_col_index)
-                    ws.cell(row=1, column=weight_col_index, value=weight_col_name)
+            # Add weight column if not exist
+            if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
+                ws.insert_cols(weight_col_index)
+                ws.cell(row=1, column=weight_col_index, value=weight_col_name)
 
-                # Calculate weight row by row
-                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-                    size_val = row[size_col_index_detected - 1].value
-                    length_val = row[length_col_index_detected - 1].value
-                    if size_val is not None and length_val is not None:
-                        row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
+            # Calculate weight row by row
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                size_val = row[size_col_index_detected - 1].value
+                length_val = row[length_col_index_detected - 1].value
+                if size_val is not None and length_val is not None:
+                    row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
 
-                wb.save(file_path)
-                updated_files.append(filename)
+            # Save updated Excel (overwrite)
+            wb.save(uploaded_file.name)
+            updated_files.append(uploaded_file.name)
 
         st.success(f"Updated weights in {len(updated_files)} file(s): {updated_files}")
