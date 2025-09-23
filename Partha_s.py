@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import openpyxl
 from fractions import Fraction
 import math
@@ -41,31 +42,82 @@ def calculate_weight(product, size_str, length_mm):
     return round(vol * density / 1000, 3)  # kg
 
 # ======================================================
-# Streamlit App
+# 📂 Load Database from GitHub
 # ======================================================
-st.title("🔩 Bolt & Rod Weight Calculator")
+st.title("🔩 Bolt & Rod Search + Weight Calculator")
 
-# Select Product type for calculation
+url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+
+@st.cache_data
+def load_data(url):
+    return pd.read_excel(url)
+
+df = load_data(url)
+
+# ======================================================
+# 🔹 Sidebar: Database Filters
+# ======================================================
+st.sidebar.header("Database Filters")
+standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
+standard = st.sidebar.selectbox("Select Standard", standards_options)
+
+size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=parse_size_in_inches)
+size = st.sidebar.selectbox("Select Size", size_options)
+
+product_options = ["All"] + sorted(df['Product'].dropna().unique())
+product = st.sidebar.selectbox("Select Product", product_options)
+
+# Filter database
+filtered_df = df.copy()
+if standard != "All":
+    filtered_df = filtered_df[filtered_df["Standards"] == standard]
+if size != "All":
+    filtered_df = filtered_df[filtered_df["Size"] == size]
+if product != "All":
+    filtered_df = filtered_df[filtered_df["Product"] == product]
+
+st.subheader(f"Database: {len(filtered_df)} matching items")
+st.dataframe(filtered_df)
+
+# ======================================================
+# ⚖️ Manual Weight Calculator
+# ======================================================
+st.header("⚖️ Manual Weight Calculator / Preview")
+calc_product = st.selectbox("Select Product for Weight", product_options[1:], key="manual_product")
+calc_size = st.selectbox("Select Size for Weight", size_options[1:], key="manual_size")
+calc_length = st.number_input("Enter Length (mm)", min_value=1, value=100, key="manual_length")
+
+if st.button("Calculate Weight"):
+    w = calculate_weight(calc_product, calc_size, calc_length)
+    if w is not None:
+        st.success(f"Estimated Weight/pc: {w} kg")
+    else:
+        st.error("Cannot calculate weight for this input.")
+
+# ======================================================
+# 📂 Batch Excel Update via Upload + Download
+# ======================================================
+st.header("📂 Batch Excel Update (Upload & Download)")
+
 product_type = st.selectbox(
-    "Select Product Type",
-    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
+    "Select Product Type for Batch Update",
+    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"],
+    key="batch_product"
 )
-
-# Input for Weight column name and index
-weight_col_name = st.text_input("Enter column name for Weight/pc (Kg):", "Weight/pc (Kg)")
+weight_col_name = st.text_input("Enter column name for Weight/pc (Kg):", "Weight/pc (Kg)", key="batch_col_name")
 weight_col_index = st.number_input(
     "Enter column index to write Weight/pc (Kg) (numeric, e.g., 3 = C column)",
-    min_value=1, value=3
+    min_value=1, value=3,
+    key="batch_col_index"
 )
 
-# File uploader (single or multiple Excel files)
 uploaded_files = st.file_uploader(
     "Upload Excel file(s) to update weights",
     type=["xlsx"],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    key="batch_upload"
 )
 
-# Process uploaded files
 if uploaded_files:
     for uploaded_file in uploaded_files:
         wb = openpyxl.load_workbook(uploaded_file)
@@ -95,7 +147,7 @@ if uploaded_files:
             if size_val is not None and length_val is not None:
                 row[weight_col_index - 1].value = calculate_weight(product_type, size_val, length_val)
 
-        # Save updated Excel to in-memory BytesIO
+        # Save updated Excel to BytesIO
         output = BytesIO()
         wb.save(output)
         output.seek(0)
@@ -106,14 +158,3 @@ if uploaded_files:
             file_name=f"updated_{uploaded_file.name}",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
-# Optional: Manual weight calculator preview
-st.header("⚖️ Manual Weight Calculator Preview")
-manual_size = st.text_input("Enter Size (e.g., 1-1/2)", "")
-manual_length = st.number_input("Enter Length (mm) for preview", min_value=1, value=100)
-if st.button("Preview Weight for Manual Input") and manual_size:
-    w = calculate_weight(product_type, manual_size, manual_length)
-    if w:
-        st.success(f"Estimated Weight: {w} kg")
-    else:
-        st.error("Cannot calculate weight for this input.")
