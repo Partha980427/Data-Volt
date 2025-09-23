@@ -149,17 +149,16 @@ with tab3:
                 )
 
             if st.button("Calculate Weights for All"):
-                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                user_df.to_excel(tmp_file.name, index=False)
-                wb = load_workbook(tmp_file.name)
+                # Use openpyxl directly to preserve formatting
+                wb = load_workbook(uploaded_file)
                 ws = wb.active
 
-                # Insert weight column if necessary
+                # Insert weight column if it doesn't exist at the desired index
                 if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
                     ws.insert_cols(weight_col_index)
                     ws.cell(row=1, column=weight_col_index, value=weight_col_name)
 
-                for row_idx in range(2, ws.max_row+1):
+                for row_idx in range(2, ws.max_row + 1):
                     size_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(size_col)+1).value
                     length_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(length_col)+1).value
                     prod_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(product_col)+1).value if product_col else selected_product_type
