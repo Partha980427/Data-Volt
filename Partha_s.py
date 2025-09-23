@@ -7,10 +7,7 @@ import math
 # ======================================================
 # 📂 Load Database
 # ======================================================
-# GitHub Excel direct download link
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
-
-# Local Excel backup path
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
 @st.cache_data
@@ -27,35 +24,41 @@ if df.empty:
     st.stop()
 
 # ======================================================
-# 🔍 Sidebar Filters
+# 🔹 Size Parser (Fractional sizes like '1-1/2')
 # ======================================================
-st.sidebar.header("Search Filters")
+def parse_size_in_inches(size):
+    """
+    Converts size string like '1-1/2', '1/2', or float to float inches
+    """
+    if isinstance(size, (int, float)):
+        return float(size)
 
-# Standards
-standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
-standard = st.sidebar.selectbox("Select Standard", standards_options)
-
-# Size parser (fractional sizes like 1/2, 1-1/2, 1-3/4)
-def size_to_float(size_str):
+    s = str(size).strip()
     try:
-        s = str(size_str).replace("–", "-").replace(" ", "")  # normalize dash & spaces
         if "-" in s:
-            parts = s.split("-")
-            return float(parts[0]) + float(Fraction(parts[1]))
+            whole, frac = s.split("-")
+            return float(whole) + float(Fraction(frac))
         else:
             return float(Fraction(s))
     except Exception:
         return None
 
-size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
+# ======================================================
+# 🔹 Sidebar Filters
+# ======================================================
+st.sidebar.header("Search Filters")
+
+standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
+standard = st.sidebar.selectbox("Select Standard", standards_options)
+
+size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=parse_size_in_inches)
 size = st.sidebar.selectbox("Select Size", size_options)
 
-# Product
 product_options = ["All"] + sorted(df['Product'].dropna().unique())
 product = st.sidebar.selectbox("Select Product", product_options)
 
 # ======================================================
-# 📊 Filter & Display
+# 🔹 Filter & Display
 # ======================================================
 filtered_df = df.copy()
 if standard != "All":
@@ -68,66 +71,47 @@ if product != "All":
 st.subheader(f"Found {len(filtered_df)} matching items")
 st.dataframe(filtered_df)
 
-# Download Filtered Data
+# Download filtered data
 st.download_button(
     "Download Filtered Results as CSV",
     filtered_df.to_csv(index=False),
     file_name="filtered_bolts.csv",
-    mime="text/csv",
+    mime="text/csv"
 )
 
-# Download Original Excel
+# Download original Excel
 if os.path.exists(local_excel_path):
     with open(local_excel_path, "rb") as f:
         st.download_button(
             "Download Original Excel",
             f,
             file_name="ASME_B18.2.1_Hex_Bolt_and_Heavy_Hex_Bolt.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 else:
     st.warning("Original Excel file not found at local path.")
 
 # ======================================================
-# ⚖️ Weight Calculator (Manual Input)
+# ⚖️ Manual Weight Calculator
 # ======================================================
 st.header("⚖️ Weight Calculator")
 
-def calculate_weight(product, size, length):
-    try:
-        # Convert size (fraction or metric)
-        if isinstance(size, str):
-            s = size.replace("–", "-").replace(" ", "")
-            if "-" in s:
-                parts = s.split("-")
-                dia = float(parts[0]) + float(Fraction(parts[1]))
-            else:
-                dia = float(Fraction(s))
-            # convert inch to mm
-            dia_mm = dia * 25.4
-        else:
-            dia_mm = float(size)
+def calculate_weight(product, size_str, length_mm):
+    dia_mm = parse_size_in_inches(size_str) * 25.4  # convert inches to mm
+    density = 0.00785  # g/mm³ steel
 
-        density = 0.00785  # g/mm³ steel
-
-        if product == "Hex Bolt":
-            vol = math.pi * (dia_mm / 2) ** 2 * length
-            weight = vol * density / 1000
-        elif product == "Heavy Hex Bolt":
-            vol = math.pi * (dia_mm / 2) ** 2 * length * 1.05
-            weight = vol * density / 1000
-        elif product == "Hex Cap Screw":
-            vol = math.pi * (dia_mm / 2) ** 2 * length * 0.95
-            weight = vol * density / 1000
-        elif product == "Heavy Hex Screw":
-            vol = math.pi * (dia_mm / 2) ** 2 * length * 1.1
-            weight = vol * density / 1000
-        else:
-            weight = None
-
-        return round(weight, 3)
-    except Exception:
+    if product == "Hex Bolt":
+        vol = math.pi * (dia_mm / 2) ** 2 * length_mm
+    elif product == "Heavy Hex Bolt":
+        vol = math.pi * (dia_mm / 2) ** 2 * length_mm * 1.05
+    elif product == "Hex Cap Screw":
+        vol = math.pi * (dia_mm / 2) ** 2 * length_mm * 0.95
+    elif product == "Heavy Hex Screw":
+        vol = math.pi * (dia_mm / 2) ** 2 * length_mm * 1.1
+    else:
         return None
+
+    return round(vol * density / 1000, 3)  # kg
 
 calc_product = st.selectbox("Select Product for Weight", product_options[1:])
 calc_size = st.selectbox("Select Size for Weight", size_options[1:])
@@ -135,17 +119,16 @@ calc_length = st.number_input("Enter Length (mm)", min_value=1, value=100)
 
 if st.button("Calculate Weight"):
     result = calculate_weight(calc_product, calc_size, calc_length)
-    if result:
+    if result is not None:
         st.success(f"Estimated Weight/pc: {result} kg")
     else:
         st.error("No formula available for this combination.")
 
 # ======================================================
-# 📥 Batch Excel Weight Calculation with Product Selection
+# 📥 Batch Excel Upload with Product Selection
 # ======================================================
 st.header("📥 Upload Excel for Batch Weight Calculation")
 
-# Step 1: Select Product Type before uploading
 product_for_upload = st.selectbox(
     "Select Product Type for Uploaded Excel",
     ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
@@ -160,6 +143,7 @@ if uploaded_file:
         st.error(f"Error reading Excel file: {e}")
         st.stop()
 
+    # Ensure required columns
     required_columns = ["Size", "Length"]
     for col in required_columns:
         if col not in upload_df.columns:
@@ -169,7 +153,7 @@ if uploaded_file:
     if "Weight/pc (Kg)" not in upload_df.columns:
         upload_df["Weight/pc (Kg)"] = None
 
-    # Calculate weight row by row using selected product type
+    # Calculate weight row by row
     def get_weight(row):
         size = row["Size"]
         length = row["Length"]
@@ -179,7 +163,7 @@ if uploaded_file:
 
     st.write("### Processed Excel Preview", upload_df.head())
 
-    # Save and offer download
+    # Save and provide download
     output_file = "processed_weights.xlsx"
     upload_df.to_excel(output_file, index=False)
 
