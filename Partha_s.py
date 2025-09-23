@@ -35,16 +35,17 @@ st.sidebar.header("Search Filters")
 standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
 standard = st.sidebar.selectbox("Select Standard", standards_options)
 
-# Size (supports fractions like 1/2, 1-1/2)
+# Size parser (fractional sizes like 1/2, 1-1/2, 1-3/4)
 def size_to_float(size_str):
     try:
-        if "-" in str(size_str):
-            parts = str(size_str).split("-")
+        s = str(size_str).replace("–", "-").replace(" ", "")  # normalize dash & spaces
+        if "-" in s:
+            parts = s.split("-")
             return float(parts[0]) + float(Fraction(parts[1]))
         else:
-            return float(Fraction(str(size_str)))
-    except:
-        return float("inf")
+            return float(Fraction(s))
+    except Exception:
+        return None
 
 size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
 size = st.sidebar.selectbox("Select Size", size_options)
@@ -96,35 +97,35 @@ def calculate_weight(product, size, length):
     try:
         # Convert size (fraction or metric)
         if isinstance(size, str):
-            try:
-                dia = float(Fraction(size)) * 25.4  # inch -> mm
-            except:
-                if size.startswith("M"):
-                    dia = float(size.replace("M", ""))
-                else:
-                    dia = float(size)
+            s = size.replace("–", "-").replace(" ", "")
+            if "-" in s:
+                parts = s.split("-")
+                dia = float(parts[0]) + float(Fraction(parts[1]))
+            else:
+                dia = float(Fraction(s))
+            # convert inch to mm
+            dia_mm = dia * 25.4
         else:
-            dia = float(size)
+            dia_mm = float(size)
 
         density = 0.00785  # g/mm³ steel
 
         if product == "Hex Bolt":
-            vol = math.pi * (dia / 2) ** 2 * length
+            vol = math.pi * (dia_mm / 2) ** 2 * length
             weight = vol * density / 1000
         elif product == "Heavy Hex Bolt":
-            vol = math.pi * (dia / 2) ** 2 * length * 1.05
+            vol = math.pi * (dia_mm / 2) ** 2 * length * 1.05
             weight = vol * density / 1000
         elif product == "Hex Cap Screw":
-            vol = math.pi * (dia / 2) ** 2 * length * 0.95
+            vol = math.pi * (dia_mm / 2) ** 2 * length * 0.95
             weight = vol * density / 1000
         elif product == "Heavy Hex Screw":
-            vol = math.pi * (dia / 2) ** 2 * length * 1.1
+            vol = math.pi * (dia_mm / 2) ** 2 * length * 1.1
             weight = vol * density / 1000
         else:
             weight = None
 
         return round(weight, 3)
-
     except Exception:
         return None
 
@@ -140,9 +141,15 @@ if st.button("Calculate Weight"):
         st.error("No formula available for this combination.")
 
 # ======================================================
-# 📥 Batch Excel Weight Calculation
+# 📥 Batch Excel Weight Calculation with Product Selection
 # ======================================================
 st.header("📥 Upload Excel for Batch Weight Calculation")
+
+# Step 1: Select Product Type before uploading
+product_for_upload = st.selectbox(
+    "Select Product Type for Uploaded Excel",
+    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
+)
 
 uploaded_file = st.file_uploader("Upload Excel with columns: Size, Length", type=["xlsx"])
 
@@ -162,15 +169,11 @@ if uploaded_file:
     if "Weight/pc (Kg)" not in upload_df.columns:
         upload_df["Weight/pc (Kg)"] = None
 
-    # Calculate weight row by row
+    # Calculate weight row by row using selected product type
     def get_weight(row):
         size = row["Size"]
         length = row["Length"]
-
-        # Optional: use Product column if present
-        product = row.get("Product", "Hex Bolt") if "Product" in row else "Hex Bolt"
-
-        return calculate_weight(product, size, length)
+        return calculate_weight(product_for_upload, size, length)
 
     upload_df["Weight/pc (Kg)"] = upload_df.apply(get_weight, axis=1)
 
@@ -188,4 +191,4 @@ if uploaded_file:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    st.success("Weights calculated successfully!")
+    st.success(f"Weights calculated successfully using product type: {product_for_upload}")
