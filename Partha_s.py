@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from fractions import Fraction
 from openpyxl import load_workbook
+import tempfile
 
 # ======================================================
 # 🔹 Page Setup
@@ -102,33 +103,29 @@ with tab1:
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
-
-    # Let user choose Size and Length columns
-    size_col_manual = st.selectbox("Select Size Column", sorted(df.columns), index=df.columns.get_loc("Size") if "Size" in df.columns else 0)
-    length_col_manual = st.selectbox("Select Length Column", sorted(df.columns), index=df.columns.get_loc("Length") if "Length" in df.columns else 0)
+    product_type = st.selectbox("Select Product Type", sorted(df['Product'].dropna().unique()))
+    size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
+    length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
     # Unit selection
-    unit_size = st.selectbox("Select Size Unit", ["inch", "mm"])
-    unit_length = st.selectbox("Select Length Unit", ["inch", "mm"])
-
-    # Enter values manually
-    size_val = st.text_input(f"Enter {size_col_manual} value")
-    length_val = st.number_input(f"Enter {length_col_manual} value", min_value=0.1, step=0.1)
-
-    product_type_manual = st.selectbox("Select Product Type", sorted(df['Product'].dropna().unique()))
+    size_unit = st.selectbox("Select Size Unit", ["inch", "mm"])
+    length_unit = st.selectbox("Select Length Unit", ["inch", "mm"])
 
     if st.button("Calculate Weight"):
-        try:
-            size_in = size_to_float(size_val)
-            length_in = float(length_val)
-            if unit_size == "mm":
-                size_in /= 25.4
-            if unit_length == "mm":
-                length_in /= 25.4
-            weight = calculate_weight(product_type_manual, size_in, length_in)
+        size_in = size_to_float(size_str)
+        length_in = float(length_val)
+
+        # Convert to inches internally
+        if size_unit == "mm":
+            size_in /= 25.4
+        if length_unit == "mm":
+            length_in /= 25.4
+
+        if size_in:
+            weight = calculate_weight(product_type, size_in, length_in)
             st.success(f"Estimated Weight/pc: **{weight} Kg**")
-        except Exception as e:
-            st.error(f"Error in calculation: {e}")
+        else:
+            st.error("Invalid size format")
 
 # ======================================================
 # 📤 Tab 3 – Batch Excel Uploader
@@ -142,61 +139,70 @@ with tab3:
         st.write("📄 Uploaded File Preview:")
         st.dataframe(user_df.head())
 
-        # Let user select Size and Length columns
-        size_col = st.selectbox("Select Size Column", user_df.columns, index=user_df.columns.get_loc("Size") if "Size" in user_df.columns else 0)
-        length_col = st.selectbox("Select Length Column", user_df.columns, index=user_df.columns.get_loc("Length") if "Length" in user_df.columns else 0)
+        # Detect columns
+        size_col = next((c for c in user_df.columns if "size" in c.lower()), None)
+        length_col = next((c for c in user_df.columns if "length" in c.lower()), None)
         product_col = next((c for c in user_df.columns if "product" in c.lower()), None)
 
-        # Units
-        unit_size = st.selectbox("Select Size Unit", ["inch", "mm"])
-        unit_length = st.selectbox("Select Length Unit", ["inch", "mm"])
-
-        # Weight column
         weight_col_name = st.text_input("Enter column name for Weight/pc (Kg)", "Weight/pc (Kg)")
         weight_col_index = st.number_input(
             "Enter column index to write Weight/pc (numeric, e.g., 3 = C column)",
             min_value=1, value=len(user_df.columns)+1
         )
 
-        selected_product_type = None
-        if not product_col:
-            selected_product_type = st.selectbox(
-                "Select Product Type (for all rows)",
-                ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
-            )
+        # Unit selection
+        size_unit = st.selectbox("Select Size Unit", ["inch", "mm"])
+        length_unit = st.selectbox("Select Length Unit", ["inch", "mm"])
 
-        if st.button("Calculate Weights for All"):
-            wb = load_workbook(uploaded_file)
-            ws = wb.active
+        if size_col and length_col:
+            st.info(f"Detected columns → Size: {size_col}, Length: {length_col}")
 
-            if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
-                ws.insert_cols(weight_col_index)
-                ws.cell(row=1, column=weight_col_index, value=weight_col_name)
-
-            for row_idx in range(2, ws.max_row+1):
-                size_val_row = ws.cell(row=row_idx, column=user_df.columns.get_loc(size_col)+1).value
-                length_val_row = ws.cell(row=row_idx, column=user_df.columns.get_loc(length_col)+1).value
-                prod_val_row = ws.cell(row=row_idx, column=user_df.columns.get_loc(product_col)+1).value if product_col else selected_product_type
-
-                if size_val_row and length_val_row:
-                    size_in = size_to_float(size_val_row)
-                    length_in = float(length_val_row)
-                    if unit_size == "mm":
-                        size_in /= 25.4
-                    if unit_length == "mm":
-                        length_in /= 25.4
-                    ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val_row, size_in, length_in))
-
-            output_file = "updated_with_weights.xlsx"
-            wb.save(output_file)
-            st.success("✅ Weights calculated successfully!")
-            with open(output_file, "rb") as f:
-                st.download_button(
-                    "⬇️ Download Updated Excel",
-                    f,
-                    file_name=output_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            selected_product_type = None
+            if not product_col:
+                selected_product_type = st.selectbox(
+                    "Select Product Type (for all rows)",
+                    ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]
                 )
+
+            if st.button("Calculate Weights for All"):
+                # Use openpyxl directly to preserve formatting
+                wb = load_workbook(uploaded_file)
+                ws = wb.active
+
+                # Insert weight column if it doesn't exist at the desired index
+                if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
+                    ws.insert_cols(weight_col_index)
+                    ws.cell(row=1, column=weight_col_index, value=weight_col_name)
+
+                for row_idx in range(2, ws.max_row + 1):
+                    size_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(size_col)+1).value
+                    length_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(length_col)+1).value
+                    prod_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(product_col)+1).value if product_col else selected_product_type
+
+                    if size_val and length_val:
+                        size_in = size_to_float(size_val)
+                        length_in_float = float(length_val)
+
+                        # Convert units
+                        if size_unit == "mm":
+                            size_in /= 25.4
+                        if length_unit == "mm":
+                            length_in_float /= 25.4
+
+                        ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in, length_in_float))
+
+                output_file = "updated_with_weights.xlsx"
+                wb.save(output_file)
+                st.success("✅ Weights calculated successfully!")
+                with open(output_file, "rb") as f:
+                    st.download_button(
+                        "⬇️ Download Updated Excel",
+                        f,
+                        file_name=output_file,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+        else:
+            st.error("❌ Could not detect Size or Length columns. Please check your file.")
 
 # ======================================================
 # 🔹 Footer
