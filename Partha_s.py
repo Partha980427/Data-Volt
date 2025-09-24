@@ -4,6 +4,8 @@ import os
 from fractions import Fraction
 from openpyxl import load_workbook
 import tempfile
+import requests
+from io import BytesIO
 
 # ======================================================
 # 🔹 Page Setup
@@ -18,11 +20,11 @@ st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd |
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# Thread databases
+# Thread databases (GitHub raw URLs)
 thread_files = {
-    "ASME B1.1": "ASME B1.1.xlsx",
-    "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
-    "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
+    "ASME B1.1": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ASME%20B1.1%20New.xlsx",
+    "ISO 965-2-98 Coarse": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ISO_965-2-98_Coarse.xlsx",
+    "ISO 965-2-98 Fine": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ISO_965-2-98_Fine.xlsx"
 }
 
 @st.cache_data
@@ -66,17 +68,14 @@ def calculate_weight(product, size_in, length_in):
     weight_kg = vol * density / 1000
     return round(weight_kg, 3)
 
-def load_thread_file(file_path):
-    """Load thread Excel and remove Unnamed columns"""
-    if os.path.exists(file_path):
-        df_thread = pd.read_excel(file_path)
-        # Remove columns where all values are NaN
-        df_thread = df_thread.dropna(axis=1, how='all')
-        # Rename unnamed columns if any
-        df_thread.columns = [col if "Unnamed" not in str(col) else f"Column_{i}" 
-                             for i, col in enumerate(df_thread.columns)]
-        return df_thread
-    return pd.DataFrame()
+def fetch_thread_data(url):
+    """Fetch thread Excel from GitHub raw URL"""
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        return pd.read_excel(BytesIO(r.content))
+    except:
+        return pd.DataFrame()
 
 # ======================================================
 # 🔹 Tabs
@@ -146,17 +145,18 @@ with tab1:
         # Load and show thread data if selected
         df_thread = None
         if thread_standard != "All":
-            df_thread = load_thread_file(thread_files[thread_standard])
+            df_thread = fetch_thread_data(thread_files[thread_standard])
             if not df_thread.empty:
                 st.subheader(f"Thread Dimensions for: {thread_standard}")
                 st.dataframe(df_thread)
-                with open(thread_files[thread_standard], "rb") as f:
-                    st.download_button(
-                        f"⬇️ Download {thread_standard} Thread Data",
-                        f,
-                        file_name=thread_files[thread_standard],
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                st.download_button(
+                    f"⬇️ Download {thread_standard} Thread Data",
+                    df_thread.to_excel(index=False, engine='openpyxl'),
+                    file_name=f"{thread_standard.replace(' ', '_')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                st.warning("⚠️ Could not fetch thread data.")
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
