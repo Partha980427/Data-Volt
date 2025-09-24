@@ -18,6 +18,13 @@ st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd |
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
+# Thread databases
+thread_files = {
+    "ASME B1.1": "ASME B1.1.xlsx",
+    "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
+    "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
+}
+
 @st.cache_data
 def load_data(url):
     try:
@@ -91,6 +98,12 @@ with tab1:
                 st.sidebar.warning("⚠️ No 'Specification' column found in database.")
         standard = st.sidebar.selectbox("Select Standard", standards_options)
 
+        # Thread Standard filter
+        thread_standard = st.sidebar.selectbox(
+            "Select Thread Standard",
+            ["All"] + list(thread_files.keys())
+        )
+
         # Other filters
         size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
         size = st.sidebar.selectbox("Select Size", size_options)
@@ -117,6 +130,22 @@ with tab1:
             file_name="filtered_bolts.csv",
             mime="text/csv"
         )
+
+        # Load and show thread data if selected
+        df_thread = None
+        if thread_standard != "All":
+            thread_file = thread_files[thread_standard]
+            if os.path.exists(thread_file):
+                df_thread = pd.read_excel(thread_file)
+                st.subheader(f"Thread Dimensions for: {thread_standard}")
+                st.dataframe(df_thread)
+                with open(thread_file, "rb") as f:
+                    st.download_button(
+                        f"⬇️ Download {thread_standard} Thread Data",
+                        f,
+                        file_name=thread_file,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
@@ -238,4 +267,5 @@ st.markdown("""
     © JSC Industries Pvt Ltd | Born to Perform
 </div>
 """, unsafe_allow_html=True)
+
 
