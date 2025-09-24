@@ -66,9 +66,17 @@ def calculate_weight(product, size_in, length_in):
     weight_kg = vol * density / 1000
     return round(weight_kg, 3)
 
-def extract_nominal_size(size_str):
-    """Extracts the nominal size from thread size like '1/4-20' → '1/4'"""
-    return str(size_str).split('-')[0].strip()
+def load_thread_file(file_path):
+    """Load thread Excel and remove Unnamed columns"""
+    if os.path.exists(file_path):
+        df_thread = pd.read_excel(file_path)
+        # Remove columns where all values are NaN
+        df_thread = df_thread.dropna(axis=1, how='all')
+        # Rename unnamed columns if any
+        df_thread.columns = [col if "Unnamed" not in str(col) else f"Column_{i}" 
+                             for i, col in enumerate(df_thread.columns)]
+        return df_thread
+    return pd.DataFrame()
 
 # ======================================================
 # 🔹 Tabs
@@ -114,7 +122,7 @@ with tab1:
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic for Bolt DB
+        # Filtering logic
         filtered_df = df.copy()
         if specification != "All" and "Specification" in df.columns:
             filtered_df = filtered_df[filtered_df['Specification'] == specification]
@@ -125,7 +133,7 @@ with tab1:
         if product != "All":
             filtered_df = filtered_df[filtered_df['Product'] == product]
 
-        st.subheader(f"Found {len(filtered_df)} matching bolts")
+        st.subheader(f"Found {len(filtered_df)} matching items")
         st.dataframe(filtered_df)
 
         st.download_button(
@@ -135,31 +143,18 @@ with tab1:
             mime="text/csv"
         )
 
-        # ======================================================
-        # 🔹 Load and filter Thread DB
-        # ======================================================
+        # Load and show thread data if selected
         df_thread = None
         if thread_standard != "All":
-            thread_file = thread_files[thread_standard]
-            if os.path.exists(thread_file):
-                df_thread = pd.read_excel(thread_file)
-                # Normalize Thread DB sizes
-                df_thread['NominalSize'] = df_thread['Size'].apply(extract_nominal_size)
-
-                # Filter threads based on selected bolt size
-                if size != "All":
-                    df_thread_filtered = df_thread[df_thread['NominalSize'] == size]
-                else:
-                    df_thread_filtered = df_thread
-
+            df_thread = load_thread_file(thread_files[thread_standard])
+            if not df_thread.empty:
                 st.subheader(f"Thread Dimensions for: {thread_standard}")
-                st.dataframe(df_thread_filtered)
-
-                with open(thread_file, "rb") as f:
+                st.dataframe(df_thread)
+                with open(thread_files[thread_standard], "rb") as f:
                     st.download_button(
                         f"⬇️ Download {thread_standard} Thread Data",
                         f,
-                        file_name=thread_file,
+                        file_name=thread_files[thread_standard],
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
 
