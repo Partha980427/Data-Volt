@@ -15,18 +15,16 @@ st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd |
 # ======================================================
 # 🔹 Load Database
 # ======================================================
+# Main Bolt database
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# Thread databases
+# Thread databases (all dimensional specification)
 thread_files = {
     "ASME B1.1": "ASME B1.1 New.xlsx",
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
 }
-
-# Bolt standards linked with Dimensional specification
-dimensional_standards = ["ASME B18.2.1"] + list(thread_files.keys())
 
 @st.cache_data
 def load_data(url):
@@ -92,20 +90,24 @@ with tab1:
         standards_options = ["All"]
         if specification == "All":
             standards_options += sorted(df['Standards'].dropna().unique())
-        elif specification == "Dimensional":
-            # Link all dimensional standards including bolts and threads
-            standards_options += sorted(dimensional_standards)
         else:
-            if "Specification" in df.columns:
-                standards_options += sorted(
-                    df[df['Specification'] == specification]['Standards'].dropna().unique()
-                )
-            else:
-                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
+            # Link dimensional standards including thread standards
+            dim_standards = df[df['Specification'] == specification]['Standards'].dropna().unique().tolist() if "Specification" in df.columns else []
+            if specification == "Dimensional":
+                dim_standards += list(thread_files.keys())
+            standards_options += sorted(list(set(dim_standards)))
         standard = st.sidebar.selectbox("Select Standard", standards_options)
 
-        # Thread size input (new feature)
-        thread_size_input = st.sidebar.text_input("Enter Thread Size (Optional, e.g., 1/4-20)")
+        # Thread Standard filter (only if Dimensional selected)
+        thread_standard = None
+        if specification == "Dimensional":
+            thread_standard = st.sidebar.selectbox(
+                "Select Thread Standard",
+                ["All"] + list(thread_files.keys())
+            )
+
+        # Thread Size input
+        thread_size_input = st.sidebar.text_input("Thread Size (e.g., 1/4-20)")
 
         # Other filters
         size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
@@ -113,11 +115,11 @@ with tab1:
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic for bolts
+        # Filtering logic for Bolt database
         filtered_df = df.copy()
         if specification != "All" and "Specification" in df.columns:
             filtered_df = filtered_df[filtered_df['Specification'] == specification]
-        if standard != "All" and standard not in thread_files:
+        if standard != "All":
             filtered_df = filtered_df[filtered_df['Standards'] == standard]
         if size != "All":
             filtered_df = filtered_df[filtered_df['Size'] == size]
@@ -134,30 +136,27 @@ with tab1:
             mime="text/csv"
         )
 
-        # Show thread data if Dimensional or specific thread standard selected
-        df_thread = None
-        if specification == "Dimensional" or standard in thread_files:
-            selected_thread_files = []
-            if standard in thread_files:
-                selected_thread_files = [standard]
-            else:
-                selected_thread_files = list(thread_files.keys())
+        # Filtering logic for Thread database
+        df_thread_tmp = None
+        if specification == "Dimensional" and thread_standard and thread_standard != "All":
+            thread_file = thread_files[thread_standard]
+            if os.path.exists(thread_file):
+                df_thread_tmp = pd.read_excel(thread_file)
+                # Detect size column automatically
+                thread_size_col = next((c for c in df_thread_tmp.columns if "size" in c.lower()), None)
+                if thread_size_col and thread_size_input:
+                    df_thread_tmp = df_thread_tmp[df_thread_tmp[thread_size_col].astype(str) == thread_size_input]
 
-            for tfile in selected_thread_files:
-                thread_path = thread_files[tfile]
-                if os.path.exists(thread_path):
-                    df_thread_tmp = pd.read_excel(thread_path)
-                    if thread_size_input:
-                        df_thread_tmp = df_thread_tmp[df_thread_tmp['Size'].astype(str) == thread_size_input]
-                    st.subheader(f"Thread Dimensions for: {tfile}")
-                    st.dataframe(df_thread_tmp)
-                    with open(thread_path, "rb") as f:
-                        st.download_button(
-                            f"⬇️ Download {tfile} Thread Data",
-                            f,
-                            file_name=thread_path,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
+                st.subheader(f"Thread Dimensions for: {thread_standard}")
+                st.dataframe(df_thread_tmp)
+
+                with open(thread_file, "rb") as f:
+                    st.download_button(
+                        f"⬇️ Download {thread_standard} Thread Data",
+                        f,
+                        file_name=thread_file,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
@@ -168,7 +167,7 @@ with tab2:
     size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    # Unit selection
+    # Unit selection (unique keys)
     size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
     length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
 
@@ -176,6 +175,7 @@ with tab2:
         size_in = size_to_float(size_str)
         length_in = float(length_val)
 
+        # Convert to inches internally
         if size_unit_manual == "mm":
             size_in /= 25.4
         if length_unit_manual == "mm":
@@ -210,6 +210,7 @@ with tab3:
             min_value=1, value=len(user_df.columns)+1
         )
 
+        # Unit selection (unique keys)
         size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
         length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
 
@@ -225,6 +226,7 @@ with tab3:
                 )
 
             if st.button("Calculate Weights for All"):
+                # Use a temporary file to preserve uploaded Excel
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                 temp_file.write(uploaded_file.getbuffer())
                 temp_file.close()
@@ -232,6 +234,7 @@ with tab3:
                 wb = load_workbook(temp_file.name)
                 ws = wb.active
 
+                # Insert weight column if it doesn't exist at the desired index
                 if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
                     ws.insert_cols(weight_col_index)
                     ws.cell(row=1, column=weight_col_index, value=weight_col_name)
@@ -245,6 +248,7 @@ with tab3:
                         size_in = size_to_float(size_val)
                         length_in_float = float(length_val)
 
+                        # Convert units from mm to inch internally
                         if size_unit_batch == "mm":
                             size_in /= 25.4
                         if length_unit_batch == "mm":
