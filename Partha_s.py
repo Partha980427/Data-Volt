@@ -13,7 +13,7 @@ st.title("🔩 Bolt & Rod Search & Weight Calculator")
 st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd | Born to Perform</h4>", unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 Load Bolt Database
+# 🔹 Load Database
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
@@ -34,7 +34,7 @@ def load_data(path_or_url):
             return pd.read_excel(path_or_url)
         return pd.DataFrame()
 
-df_bolt = load_data(url)
+df = load_data(url)
 
 # ======================================================
 # 🔹 Helper Functions
@@ -76,8 +76,8 @@ tab1, tab2, tab3 = st.tabs(["📂 Database Search", "📝 Manual Weight Calculat
 # ======================================================
 with tab1:
     st.header("📊 Search Bolts in Database")
-    if df_bolt.empty:
-        st.warning("No bolt data available.")
+    if df.empty:
+        st.warning("No data available.")
     else:
         st.sidebar.header("Search Filters")
 
@@ -85,77 +85,100 @@ with tab1:
         spec_options = ["All", "Dimensional", "Mechanical", "Chemical"]
         specification = st.sidebar.selectbox("Select Specification", spec_options)
 
-        # Bolt Standards filter
+        # Standards filter depends on specification
         standards_options = ["All"]
-        if specification in ["All", "Dimensional"]:
-            standards_options += sorted(df_bolt['Standards'].dropna().unique())
+        if specification == "All":
+            standards_options += sorted(df['Standards'].dropna().unique())
         else:
-            if "Specification" in df_bolt.columns:
-                standards_options += sorted(df_bolt[df_bolt['Specification'] == specification]['Standards'].dropna().unique())
-        standard = st.sidebar.selectbox("Select Bolt Standard", standards_options)
+            if "Specification" in df.columns:
+                standards_options += sorted(
+                    df[df['Specification'] == specification]['Standards'].dropna().unique()
+                )
+            else:
+                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
+        standard = st.sidebar.selectbox("Select Standard", standards_options)
 
-        # Thread filter – only visible when Dimensional is selected
+        # Other filters
+        size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
+        size = st.sidebar.selectbox("Select Size", size_options)
+        product_options = ["All"] + sorted(df['Product'].dropna().unique())
+        product = st.sidebar.selectbox("Select Product", product_options)
+
+        # ======================================================
+        # 🔹 New Feature: Thread Filter (only for Dimensional)
+        # ======================================================
         thread_standard = "All"
+        thread_size = "All"
         if specification == "Dimensional":
             thread_standard = st.sidebar.selectbox(
                 "Select Thread Standard",
                 ["All"] + list(thread_files.keys())
             )
+            thread_size_input = st.sidebar.text_input(
+                "Enter Thread Size (e.g., 1/4-10)",
+                ""
+            )
+            if thread_size_input:
+                thread_size = thread_size_input.strip()
 
-        # Other filters
-        size_options = ["All"] + sorted(df_bolt['Size'].dropna().unique(), key=size_to_float)
-        size = st.sidebar.selectbox("Select Size", size_options)
-        product_options = ["All"] + sorted(df_bolt['Product'].dropna().unique())
-        product = st.sidebar.selectbox("Select Product", product_options)
-
-        # Filter bolt data
-        filtered_bolt = df_bolt.copy()
-        if specification != "All" and "Specification" in df_bolt.columns:
-            filtered_bolt = filtered_bolt[filtered_bolt['Specification'] == specification]
+        # ======================================================
+        # Filtering logic for Bolt Database
+        # ======================================================
+        filtered_df = df.copy()
+        if specification != "All" and "Specification" in df.columns:
+            filtered_df = filtered_df[filtered_df['Specification'] == specification]
         if standard != "All":
-            filtered_bolt = filtered_bolt[filtered_bolt['Standards'] == standard]
+            filtered_df = filtered_df[filtered_df['Standards'] == standard]
         if size != "All":
-            filtered_bolt = filtered_bolt[filtered_bolt['Size'] == size]
+            filtered_df = filtered_df[filtered_df['Size'] == size]
         if product != "All":
-            filtered_bolt = filtered_bolt[filtered_bolt['Product'] == product]
+            filtered_df = filtered_df[filtered_df['Product'] == product]
 
-        st.subheader(f"Found {len(filtered_bolt)} matching bolt items")
-        st.dataframe(filtered_bolt)
+        st.subheader(f"Found {len(filtered_df)} matching items")
+        st.dataframe(filtered_df)
 
-        # Filter and show thread data
-        filtered_thread_list = []
+        st.download_button(
+            "⬇️ Download Filtered Results as CSV",
+            filtered_df.to_csv(index=False),
+            file_name="filtered_bolts.csv",
+            mime="text/csv"
+        )
+
+        # ======================================================
+        # 🔹 Load and show thread data if Dimensional
+        # ======================================================
         if specification == "Dimensional":
+            filtered_thread_list = []
             for name, file in thread_files.items():
                 if thread_standard != "All" and thread_standard != name:
                     continue
                 if os.path.exists(file):
                     df_thread = pd.read_excel(file)
-                    # Extract base size from thread column (e.g., 1/4-10 -> 1/4)
-                    df_thread['Base_Size'] = df_thread.iloc[:,0].astype(str).str.split('-').str[0]
-                    df_thread_filtered = df_thread.copy()
-                    if size != "All":
-                        df_thread_filtered = df_thread[df_thread['Base_Size'] == size]
+                    if thread_size != "All":
+                        df_thread_filtered = df_thread[df_thread.iloc[:, 0].astype(str) == thread_size]
+                    else:
+                        df_thread_filtered = df_thread.copy()
                     if not df_thread_filtered.empty:
                         filtered_thread_list.append((name, df_thread_filtered))
 
-        for thread_name, df_thread_filtered in filtered_thread_list:
-            st.subheader(f"Thread Dimensions: {thread_name}")
-            st.dataframe(df_thread_filtered.drop(columns=['Base_Size']))
-            with open(thread_files[thread_name], "rb") as f:
-                st.download_button(
-                    f"⬇️ Download {thread_name} Thread Data",
-                    f,
-                    file_name=thread_files[thread_name],
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            for thread_name, df_thread_filtered in filtered_thread_list:
+                st.subheader(f"Thread Dimensions: {thread_name}")
+                st.dataframe(df_thread_filtered)
+                with open(thread_files[thread_name], "rb") as f:
+                    st.download_button(
+                        f"⬇️ Download {thread_name} Thread Data",
+                        f,
+                        file_name=thread_files[thread_name],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
-    product_type = st.selectbox("Select Product Type", sorted(df_bolt['Product'].dropna().unique()))
-    size_str = st.selectbox("Select Size", sorted(df_bolt['Size'].dropna().unique(), key=size_to_float))
+    product_type = st.selectbox("Select Product Type", sorted(df['Product'].dropna().unique()))
+    size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
     size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
@@ -180,6 +203,7 @@ with tab2:
 with tab3:
     st.header("Batch Weight Calculator")
     uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+
     if uploaded_file:
         user_df = pd.read_excel(uploaded_file)
         st.write("📄 Uploaded File Preview:")
