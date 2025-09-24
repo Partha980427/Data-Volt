@@ -4,8 +4,6 @@ import os
 from fractions import Fraction
 from openpyxl import load_workbook
 import tempfile
-import requests
-from io import BytesIO
 
 # ======================================================
 # 🔹 Page Setup
@@ -17,19 +15,19 @@ st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd |
 # ======================================================
 # 🔹 Load Database
 # ======================================================
-# Main Bolt Database
+# Main bolt database
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# Thread databases (latest ASME B1.1 New.xlsx)
+# Thread databases (new file names)
 thread_files = {
     "ASME B1.1": "ASME B1.1 New.xlsx",
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
 }
 
-@st.cache_data(ttl=3600)
-def load_main_data(url):
+@st.cache_data(show_spinner=False)
+def load_data(url):
     try:
         return pd.read_excel(url)
     except:
@@ -37,7 +35,7 @@ def load_main_data(url):
             return pd.read_excel(local_excel_path)
         return pd.DataFrame()
 
-df = load_main_data(url)
+df = load_data(url)
 
 # ======================================================
 # 🔹 Helper Functions
@@ -54,6 +52,7 @@ def size_to_float(size_str):
         return None
 
 def calculate_weight(product, size_in, length_in):
+    """Simplified cylinder formula (steel)"""
     size_mm = size_in * 25.4
     length_mm = length_in * 25.4
     density = 0.00785  # g/mm³
@@ -93,9 +92,7 @@ with tab1:
             standards_options += sorted(df['Standards'].dropna().unique())
         else:
             if "Specification" in df.columns:
-                standards_options += sorted(
-                    df[df['Specification'] == specification]['Standards'].dropna().unique()
-                )
+                standards_options += sorted(df[df['Specification'] == specification]['Standards'].dropna().unique())
             else:
                 st.sidebar.warning("⚠️ No 'Specification' column found in database.")
         standard = st.sidebar.selectbox("Select Standard", standards_options)
@@ -112,7 +109,7 @@ with tab1:
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic
+        # Filtering logic for bolt database
         filtered_df = df.copy()
         if specification != "All" and "Specification" in df.columns:
             filtered_df = filtered_df[filtered_df['Specification'] == specification]
@@ -134,11 +131,12 @@ with tab1:
         )
 
         # Load and show thread data if selected
-        df_thread = None
         if thread_standard != "All":
             thread_file = thread_files[thread_standard]
             if os.path.exists(thread_file):
-                df_thread = pd.read_excel(thread_file, header=0)  # ensure first row is header
+                df_thread = pd.read_excel(thread_file, header=0)
+                # Remove unnamed columns automatically
+                df_thread = df_thread.loc[:, ~df_thread.columns.str.contains('^Unnamed')]
                 st.subheader(f"Thread Dimensions for: {thread_standard}")
                 st.dataframe(df_thread)
                 with open(thread_file, "rb") as f:
@@ -158,13 +156,14 @@ with tab2:
     size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    # Unit selection
+    # Unit selection (unique keys)
     size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
     length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
 
     if st.button("Calculate Weight"):
         size_in = size_to_float(size_str)
         length_in = float(length_val)
+
         if size_unit_manual == "mm":
             size_in /= 25.4
         if length_unit_manual == "mm":
@@ -199,7 +198,7 @@ with tab3:
             min_value=1, value=len(user_df.columns)+1
         )
 
-        # Unit selection
+        # Unit selection (unique keys)
         size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
         length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
 
