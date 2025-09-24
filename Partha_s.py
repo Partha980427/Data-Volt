@@ -73,14 +73,34 @@ with tab1:
         st.warning("No data available.")
     else:
         st.sidebar.header("Search Filters")
-        standards_options = ["All"] + sorted(df['Standards'].dropna().unique())
+
+        # Specification filter
+        spec_options = ["All", "Dimensional", "Mechanical", "Chemical"]
+        specification = st.sidebar.selectbox("Select Specification", spec_options)
+
+        # Standards filter depends on specification
+        standards_options = ["All"]
+        if specification == "All":
+            standards_options += sorted(df['Standards'].dropna().unique())
+        else:
+            if "Specification" in df.columns:
+                standards_options += sorted(
+                    df[df['Specification'] == specification]['Standards'].dropna().unique()
+                )
+            else:
+                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
         standard = st.sidebar.selectbox("Select Standard", standards_options)
+
+        # Other filters
         size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
         size = st.sidebar.selectbox("Select Size", size_options)
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
+        # Filtering logic
         filtered_df = df.copy()
+        if specification != "All" and "Specification" in df.columns:
+            filtered_df = filtered_df[filtered_df['Specification'] == specification]
         if standard != "All":
             filtered_df = filtered_df[filtered_df['Standards'] == standard]
         if size != "All":
@@ -218,3 +238,4 @@ st.markdown("""
     © JSC Industries Pvt Ltd | Born to Perform
 </div>
 """, unsafe_allow_html=True)
+
