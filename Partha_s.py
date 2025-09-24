@@ -13,7 +13,7 @@ st.title("🔩 Bolt & Rod Search & Weight Calculator")
 st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd | Born to Perform</h4>", unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 Load Database
+# 🔹 Load Bolt Database
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
@@ -25,21 +25,16 @@ thread_files = {
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
 }
 
-# Mapping Dimensional specification to standards
-specification_mapping = {
-    "Dimensional": ["ASME B18.2.1"] + list(thread_files.keys())
-}
-
 @st.cache_data
-def load_data(url):
+def load_data(path_or_url):
     try:
-        return pd.read_excel(url)
+        return pd.read_excel(path_or_url)
     except:
-        if os.path.exists(local_excel_path):
-            return pd.read_excel(local_excel_path)
+        if os.path.exists(path_or_url):
+            return pd.read_excel(path_or_url)
         return pd.DataFrame()
 
-df = load_data(url)
+df_bolt = load_data(url)
 
 # ======================================================
 # 🔹 Helper Functions
@@ -81,8 +76,8 @@ tab1, tab2, tab3 = st.tabs(["📂 Database Search", "📝 Manual Weight Calculat
 # ======================================================
 with tab1:
     st.header("📊 Search Bolts in Database")
-    if df.empty:
-        st.warning("No data available.")
+    if df_bolt.empty:
+        st.warning("No bolt data available.")
     else:
         st.sidebar.header("Search Filters")
 
@@ -93,90 +88,79 @@ with tab1:
         # Standards filter depends on specification
         standards_options = ["All"]
         if specification == "All":
-            standards_options += sorted(df['Standards'].dropna().unique())
+            standards_options += sorted(df_bolt['Standards'].dropna().unique())
         else:
-            # Add Dimensional mapping standards
-            mapped_standards = specification_mapping.get(specification, [])
-            if "Specification" in df.columns:
+            if "Specification" in df_bolt.columns:
                 standards_options += sorted(
-                    list(df[df['Specification'] == specification]['Standards'].dropna().unique()) + mapped_standards
+                    df_bolt[df_bolt['Specification'] == specification]['Standards'].dropna().unique()
                 )
             else:
-                standards_options += mapped_standards
+                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
         standard = st.sidebar.selectbox("Select Standard", standards_options)
 
-        # Thread Standard filter
-        thread_standard = st.sidebar.selectbox(
-            "Select Thread Standard",
-            ["All"] + list(thread_files.keys())
-        )
-
         # Other filters
-        size_options = ["All"] + sorted(df['Size'].dropna().unique(), key=size_to_float)
+        size_options = ["All"] + sorted(df_bolt['Size'].dropna().unique(), key=size_to_float)
         size = st.sidebar.selectbox("Select Size", size_options)
-        product_options = ["All"] + sorted(df['Product'].dropna().unique())
+        product_options = ["All"] + sorted(df_bolt['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic
-        filtered_df = df.copy()
-        if specification != "All" and "Specification" in df.columns:
-            filtered_df = filtered_df[filtered_df['Specification'] == specification]
+        # Filtering bolt data
+        filtered_bolt = df_bolt.copy()
+        if specification != "All" and "Specification" in df_bolt.columns:
+            filtered_bolt = filtered_bolt[filtered_bolt['Specification'] == specification]
         if standard != "All":
-            filtered_df = filtered_df[filtered_df['Standards'] == standard]
+            filtered_bolt = filtered_bolt[filtered_bolt['Standards'] == standard]
         if size != "All":
-            filtered_df = filtered_df[filtered_df['Size'] == size]
+            filtered_bolt = filtered_bolt[filtered_bolt['Size'] == size]
         if product != "All":
-            filtered_df = filtered_df[filtered_df['Product'] == product]
+            filtered_bolt = filtered_bolt[filtered_bolt['Product'] == product]
 
-        st.subheader(f"Found {len(filtered_df)} matching items")
-        st.dataframe(filtered_df)
+        st.subheader(f"Found {len(filtered_bolt)} matching bolt items")
+        st.dataframe(filtered_bolt)
 
-        st.download_button(
-            "⬇️ Download Filtered Results as CSV",
-            filtered_df.to_csv(index=False),
-            file_name="filtered_bolts.csv",
-            mime="text/csv"
-        )
-
-        # Load and show thread data if selected
-        df_thread = None
-        if thread_standard != "All":
-            thread_file = thread_files[thread_standard]
-            if os.path.exists(thread_file):
-                df_thread = pd.read_excel(thread_file)
-                st.subheader(f"Thread Dimensions for: {thread_standard}")
-                st.dataframe(df_thread)
-                with open(thread_file, "rb") as f:
-                    st.download_button(
-                        f"⬇️ Download {thread_standard} Thread Data",
-                        f,
-                        file_name=thread_file,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+        # Filtering thread data by base size
+        filtered_thread_list = []
+        if size != "All":
+            for name, file in thread_files.items():
+                if os.path.exists(file):
+                    df_thread = pd.read_excel(file)
+                    # Extract base size (before dash)
+                    df_thread['Base_Size'] = df_thread.iloc[:,0].astype(str).str.split('-').str[0]
+                    df_thread_filtered = df_thread[df_thread['Base_Size'] == size]
+                    if not df_thread_filtered.empty:
+                        filtered_thread_list.append((name, df_thread_filtered))
+        
+        # Show thread results
+        for thread_name, df_thread_filtered in filtered_thread_list:
+            st.subheader(f"Thread Dimensions: {thread_name}")
+            st.dataframe(df_thread_filtered.drop(columns=['Base_Size']))
+            with open(thread_files[thread_name], "rb") as f:
+                st.download_button(
+                    f"⬇️ Download {thread_name} Thread Data",
+                    f,
+                    file_name=thread_files[thread_name],
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
-    product_type = st.selectbox("Select Product Type", sorted(df['Product'].dropna().unique()))
-    size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
+    product_type = st.selectbox("Select Product Type", sorted(df_bolt['Product'].dropna().unique()))
+    size_str = st.selectbox("Select Size", sorted(df_bolt['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    # Unit selection (unique keys)
     size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
     length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
 
     if st.button("Calculate Weight"):
         size_in = size_to_float(size_str)
         length_in = float(length_val)
-
-        # Convert to inches internally
         if size_unit_manual == "mm":
             size_in /= 25.4
         if length_unit_manual == "mm":
             length_in /= 25.4
-
         if size_in:
             weight = calculate_weight(product_type, size_in, length_in)
             st.success(f"Estimated Weight/pc: **{weight} Kg**")
@@ -189,13 +173,11 @@ with tab2:
 with tab3:
     st.header("Batch Weight Calculator")
     uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
-
     if uploaded_file:
         user_df = pd.read_excel(uploaded_file)
         st.write("📄 Uploaded File Preview:")
         st.dataframe(user_df.head())
 
-        # Detect columns automatically
         size_col = next((c for c in user_df.columns if "size" in c.lower()), None)
         length_col = next((c for c in user_df.columns if "length" in c.lower()), None)
         product_col = next((c for c in user_df.columns if "product" in c.lower()), None)
@@ -206,7 +188,6 @@ with tab3:
             min_value=1, value=len(user_df.columns)+1
         )
 
-        # Unit selection (unique keys)
         size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
         length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
 
@@ -222,7 +203,6 @@ with tab3:
                 )
 
             if st.button("Calculate Weights for All"):
-                # Use a temporary file to preserve uploaded Excel
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                 temp_file.write(uploaded_file.getbuffer())
                 temp_file.close()
@@ -230,7 +210,6 @@ with tab3:
                 wb = load_workbook(temp_file.name)
                 ws = wb.active
 
-                # Insert weight column if it doesn't exist at the desired index
                 if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
                     ws.insert_cols(weight_col_index)
                     ws.cell(row=1, column=weight_col_index, value=weight_col_name)
@@ -243,13 +222,10 @@ with tab3:
                     if size_val and length_val:
                         size_in = size_to_float(size_val)
                         length_in_float = float(length_val)
-
-                        # Convert units from mm to inch internally
                         if size_unit_batch == "mm":
                             size_in /= 25.4
                         if length_unit_batch == "mm":
                             length_in_float /= 25.4
-
                         ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in, length_in_float))
 
                 output_file = "updated_with_weights.xlsx"
@@ -262,8 +238,6 @@ with tab3:
                         file_name=output_file,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-        else:
-            st.error("❌ Could not detect Size or Length columns. Please check your file.")
 
 # ======================================================
 # 🔹 Footer
