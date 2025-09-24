@@ -15,18 +15,22 @@ st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd |
 # ======================================================
 # 🔹 Load Database
 # ======================================================
-# Main bolt database
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# Thread databases (new file names)
+# Thread databases
 thread_files = {
     "ASME B1.1": "ASME B1.1 New.xlsx",
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
 }
 
-@st.cache_data(show_spinner=False)
+# Mapping Dimensional specification to standards
+specification_mapping = {
+    "Dimensional": ["ASME B18.2.1"] + list(thread_files.keys())
+}
+
+@st.cache_data
 def load_data(url):
     try:
         return pd.read_excel(url)
@@ -91,10 +95,14 @@ with tab1:
         if specification == "All":
             standards_options += sorted(df['Standards'].dropna().unique())
         else:
+            # Add Dimensional mapping standards
+            mapped_standards = specification_mapping.get(specification, [])
             if "Specification" in df.columns:
-                standards_options += sorted(df[df['Specification'] == specification]['Standards'].dropna().unique())
+                standards_options += sorted(
+                    list(df[df['Specification'] == specification]['Standards'].dropna().unique()) + mapped_standards
+                )
             else:
-                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
+                standards_options += mapped_standards
         standard = st.sidebar.selectbox("Select Standard", standards_options)
 
         # Thread Standard filter
@@ -109,7 +117,7 @@ with tab1:
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic for bolt database
+        # Filtering logic
         filtered_df = df.copy()
         if specification != "All" and "Specification" in df.columns:
             filtered_df = filtered_df[filtered_df['Specification'] == specification]
@@ -131,12 +139,11 @@ with tab1:
         )
 
         # Load and show thread data if selected
+        df_thread = None
         if thread_standard != "All":
             thread_file = thread_files[thread_standard]
             if os.path.exists(thread_file):
-                df_thread = pd.read_excel(thread_file, header=0)
-                # Remove unnamed columns automatically
-                df_thread = df_thread.loc[:, ~df_thread.columns.str.contains('^Unnamed')]
+                df_thread = pd.read_excel(thread_file)
                 st.subheader(f"Thread Dimensions for: {thread_standard}")
                 st.dataframe(df_thread)
                 with open(thread_file, "rb") as f:
@@ -164,6 +171,7 @@ with tab2:
         size_in = size_to_float(size_str)
         length_in = float(length_val)
 
+        # Convert to inches internally
         if size_unit_manual == "mm":
             size_in /= 25.4
         if length_unit_manual == "mm":
@@ -214,6 +222,7 @@ with tab3:
                 )
 
             if st.button("Calculate Weights for All"):
+                # Use a temporary file to preserve uploaded Excel
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                 temp_file.write(uploaded_file.getbuffer())
                 temp_file.close()
@@ -221,6 +230,7 @@ with tab3:
                 wb = load_workbook(temp_file.name)
                 ws = wb.active
 
+                # Insert weight column if it doesn't exist at the desired index
                 if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
                     ws.insert_cols(weight_col_index)
                     ws.cell(row=1, column=weight_col_index, value=weight_col_name)
@@ -234,6 +244,7 @@ with tab3:
                         size_in = size_to_float(size_val)
                         length_in_float = float(length_val)
 
+                        # Convert units from mm to inch internally
                         if size_unit_batch == "mm":
                             size_in /= 25.4
                         if length_unit_batch == "mm":
