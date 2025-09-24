@@ -13,27 +13,28 @@ st.title("🔩 Bolt & Rod Search & Weight Calculator")
 st.markdown("<h4 style='text-align:center; color:gray;'>JSC Industries Pvt Ltd | Born to Perform</h4>", unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 Load Databases
+# 🔹 Load Database
 # ======================================================
-# Main bolt database (Google Sheets link)
-bolt_url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# Thread databases (GitHub raw links)
+# Thread databases
 thread_files = {
-    "ASME B1.1": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ASME%20B1.1.xlsx",
-    "ISO 965-2-98 Coarse": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ISO%20965-2-98%20Coarse.xlsx",
-    "ISO 965-2-98 Fine": "https://raw.githubusercontent.com/Partha980427/Data-Volt/main/ISO%20965-2-98%20Fine.xlsx"
+    "ASME B1.1": "ASME B1.1.xlsx",
+    "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
+    "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx"
 }
 
 @st.cache_data
 def load_data(url):
     try:
         return pd.read_excel(url)
-    except Exception as e:
-        st.error(f"Failed to load {url}: {e}")
+    except:
+        if os.path.exists(local_excel_path):
+            return pd.read_excel(local_excel_path)
         return pd.DataFrame()
 
-df = load_data(bolt_url)
+df = load_data(url)
 
 # ======================================================
 # 🔹 Helper Functions
@@ -65,6 +66,10 @@ def calculate_weight(product, size_in, length_in):
     weight_kg = vol * density / 1000
     return round(weight_kg, 3)
 
+def extract_nominal_size(size_str):
+    """Extracts the nominal size from thread size like '1/4-20' → '1/4'"""
+    return str(size_str).split('-')[0].strip()
+
 # ======================================================
 # 🔹 Tabs
 # ======================================================
@@ -76,7 +81,7 @@ tab1, tab2, tab3 = st.tabs(["📂 Database Search", "📝 Manual Weight Calculat
 with tab1:
     st.header("📊 Search Bolts in Database")
     if df.empty:
-        st.warning("No bolt data available.")
+        st.warning("No data available.")
     else:
         st.sidebar.header("Search Filters")
 
@@ -109,7 +114,7 @@ with tab1:
         product_options = ["All"] + sorted(df['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering logic for bolts
+        # Filtering logic for Bolt DB
         filtered_df = df.copy()
         if specification != "All" and "Specification" in df.columns:
             filtered_df = filtered_df[filtered_df['Specification'] == specification]
@@ -124,25 +129,39 @@ with tab1:
         st.dataframe(filtered_df)
 
         st.download_button(
-            "⬇️ Download Filtered Bolt Results as CSV",
+            "⬇️ Download Filtered Results as CSV",
             filtered_df.to_csv(index=False),
             file_name="filtered_bolts.csv",
             mime="text/csv"
         )
 
-        # Load and show thread data from GitHub
+        # ======================================================
+        # 🔹 Load and filter Thread DB
+        # ======================================================
+        df_thread = None
         if thread_standard != "All":
-            thread_url = thread_files[thread_standard]
-            df_thread = load_data(thread_url)
-            st.subheader(f"Thread Dimensions for: {thread_standard}")
-            st.dataframe(df_thread)
-            with st.spinner("Preparing download..."):
-                st.download_button(
-                    f"⬇️ Download {thread_standard} Thread Data",
-                    pd.ExcelWriter(thread_standard + ".xlsx"),
-                    file_name=f"{thread_standard}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            thread_file = thread_files[thread_standard]
+            if os.path.exists(thread_file):
+                df_thread = pd.read_excel(thread_file)
+                # Normalize Thread DB sizes
+                df_thread['NominalSize'] = df_thread['Size'].apply(extract_nominal_size)
+
+                # Filter threads based on selected bolt size
+                if size != "All":
+                    df_thread_filtered = df_thread[df_thread['NominalSize'] == size]
+                else:
+                    df_thread_filtered = df_thread
+
+                st.subheader(f"Thread Dimensions for: {thread_standard}")
+                st.dataframe(df_thread_filtered)
+
+                with open(thread_file, "rb") as f:
+                    st.download_button(
+                        f"⬇️ Download {thread_standard} Thread Data",
+                        f,
+                        file_name=thread_file,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
@@ -153,7 +172,7 @@ with tab2:
     size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    # Unit selection
+    # Unit selection (unique keys)
     size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
     length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
 
@@ -161,6 +180,7 @@ with tab2:
         size_in = size_to_float(size_str)
         length_in = float(length_val)
 
+        # Convert to inches internally
         if size_unit_manual == "mm":
             size_in /= 25.4
         if length_unit_manual == "mm":
@@ -195,7 +215,7 @@ with tab3:
             min_value=1, value=len(user_df.columns)+1
         )
 
-        # Unit selection
+        # Unit selection (unique keys)
         size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
         length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
 
@@ -211,6 +231,7 @@ with tab3:
                 )
 
             if st.button("Calculate Weights for All"):
+                # Use a temporary file to preserve uploaded Excel
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                 temp_file.write(uploaded_file.getbuffer())
                 temp_file.close()
@@ -218,6 +239,7 @@ with tab3:
                 wb = load_workbook(temp_file.name)
                 ws = wb.active
 
+                # Insert weight column if it doesn't exist at the desired index
                 if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
                     ws.insert_cols(weight_col_index)
                     ws.cell(row=1, column=weight_col_index, value=weight_col_name)
@@ -231,6 +253,7 @@ with tab3:
                         size_in = size_to_float(size_val)
                         length_in_float = float(length_val)
 
+                        # Convert units from mm to inch internally
                         if size_unit_batch == "mm":
                             size_in /= 25.4
                         if length_unit_batch == "mm":
@@ -248,6 +271,8 @@ with tab3:
                         file_name=output_file,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+        else:
+            st.error("❌ Could not detect Size or Length columns. Please check your file.")
 
 # ======================================================
 # 🔹 Footer
