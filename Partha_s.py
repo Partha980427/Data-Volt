@@ -94,8 +94,9 @@ with tab1:
                 standards_options += sorted(
                     df_bolt[df_bolt['Specification'] == specification]['Standards'].dropna().unique()
                 )
-            else:
-                st.sidebar.warning("⚠️ No 'Specification' column found in database.")
+            # Add thread standards under Dimensional automatically
+            if specification == "Dimensional":
+                standards_options += list(thread_files.keys())
         standard = st.sidebar.selectbox("Select Standard", standards_options)
 
         # Other filters
@@ -104,11 +105,11 @@ with tab1:
         product_options = ["All"] + sorted(df_bolt['Product'].dropna().unique())
         product = st.sidebar.selectbox("Select Product", product_options)
 
-        # Filtering bolt data
+        # Filter bolt data
         filtered_bolt = df_bolt.copy()
         if specification != "All" and "Specification" in df_bolt.columns:
             filtered_bolt = filtered_bolt[filtered_bolt['Specification'] == specification]
-        if standard != "All":
+        if standard != "All" and standard not in thread_files:
             filtered_bolt = filtered_bolt[filtered_bolt['Standards'] == standard]
         if size != "All":
             filtered_bolt = filtered_bolt[filtered_bolt['Size'] == size]
@@ -118,10 +119,12 @@ with tab1:
         st.subheader(f"Found {len(filtered_bolt)} matching bolt items")
         st.dataframe(filtered_bolt)
 
-        # Filtering thread data by base size
+        # Show thread data if standard matches or Dimensional selected
         filtered_thread_list = []
         if size != "All":
             for name, file in thread_files.items():
+                if standard != "All" and standard != name:
+                    continue
                 if os.path.exists(file):
                     df_thread = pd.read_excel(file)
                     # Extract base size (before dash)
@@ -130,7 +133,6 @@ with tab1:
                     if not df_thread_filtered.empty:
                         filtered_thread_list.append((name, df_thread_filtered))
         
-        # Show thread results
         for thread_name, df_thread_filtered in filtered_thread_list:
             st.subheader(f"Thread Dimensions: {thread_name}")
             st.dataframe(df_thread_filtered.drop(columns=['Base_Size']))
