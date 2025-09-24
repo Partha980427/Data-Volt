@@ -17,6 +17,7 @@ st.markdown("<h4 style='text-align:center; color:gray;'>Innovating Precision in 
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
+me_chem_path = r"Mechanical and Chemical.xlsx"  # ME&CERT file in same folder as .py
 
 # Thread databases
 thread_files = {
@@ -42,6 +43,14 @@ def load_thread_data(file):
         return pd.read_excel(file)
     except:
         return pd.DataFrame()
+
+@st.cache_data
+def load_mechem_data(file):
+    if os.path.exists(file):
+        return pd.read_excel(file)
+    return pd.DataFrame()
+
+df_mechem = load_mechem_data(me_chem_path)
 
 # ======================================================
 # 🔹 Helper Functions
@@ -84,7 +93,7 @@ tab1, tab2, tab3 = st.tabs(["📂 Database Search Panel", "📝 Manual Weight Ca
 with tab1:
     st.header("📊 Search Panel")
 
-    if df.empty:
+    if df.empty and df_mechem.empty:
         st.warning("No data available.")
     else:
         st.sidebar.header("🔍 Search Panel")
@@ -136,6 +145,23 @@ with tab1:
         thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
 
         # -----------------------------
+        # 4. ME&CERT Specification
+        # -----------------------------
+        st.sidebar.subheader("ME&CERT Specification")
+        mecert_standard_options = ["All"]
+        mecert_property_options = ["All"]
+
+        if not df_mechem.empty:
+            mecert_standard_options += sorted(df_mechem['Standards'].dropna().unique())
+        mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standard_options)
+
+        if mecert_standard != "All":
+            temp_df_me = df_mechem[df_mechem['Standards'] == mecert_standard]
+            if "Property Class" in temp_df_me.columns:
+                mecert_property_options += sorted(temp_df_me['Property Class'].dropna().unique())
+        mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
+
+        # -----------------------------
         # Filtering Main Database
         # -----------------------------
         filtered_df = df.copy()
@@ -157,6 +183,16 @@ with tab1:
                     df_thread = df_thread[df_thread["Thread"] == thread_size]
                 st.subheader(f"Thread Data: {thread_standard}")
                 st.dataframe(df_thread)
+
+        # Show ME&CERT data
+        filtered_mecert_df = df_mechem.copy()
+        if mecert_standard != "All":
+            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standards'] == mecert_standard]
+        if mecert_property != "All":
+            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property Class'] == mecert_property]
+
+        st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
+        st.dataframe(filtered_mecert_df)
 
 # ======================================================
 # 📝 Tab 2 – Manual Weight Calculator
