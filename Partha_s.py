@@ -25,6 +25,9 @@ thread_files = {
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
 }
 
+# ME&CERT combined database path
+mechchem_path = r"G:\My Drive\Streamlite\Mechanical and Chemical.xlsx"
+
 @st.cache_data
 def load_data(url):
     try:
@@ -35,6 +38,13 @@ def load_data(url):
         return pd.DataFrame()
 
 df = load_data(url)
+
+# Load ME&CERT combined database
+if os.path.exists(mechchem_path):
+    df_mechchem = pd.read_excel(mechchem_path)
+    if not df_mechchem.empty:
+        df_mechchem['Specification'] = 'ME&CERT'  # <-- Changed here
+        df = pd.concat([df, df_mechchem], ignore_index=True)
 
 @st.cache_data
 def load_thread_data(file):
@@ -94,7 +104,7 @@ with tab1:
         product_type = st.sidebar.selectbox("Select Product Type", product_types)
 
         # 2. Specification
-        spec_options = ["All", "Dimensional", "Mechanical", "Chemical"]
+        spec_options = ["All", "Dimensional", "ME&CERT"]
         specification = st.sidebar.selectbox("Select Specification", spec_options)
 
         # 3. Standards (linked with product type + specification)
