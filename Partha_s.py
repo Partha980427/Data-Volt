@@ -152,11 +152,11 @@ with tab1:
         mecert_property_options = ["All"]
 
         if not df_mechem.empty:
-            mecert_standard_options += sorted(df_mechem['Standards'].dropna().unique())
+            mecert_standard_options += sorted(df_mechem['Standard'].dropna().unique())
         mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standard_options)
 
         if mecert_standard != "All":
-            temp_df_me = df_mechem[df_mechem['Standards'] == mecert_standard]
+            temp_df_me = df_mechem[df_mechem['Standard'] == mecert_standard]
             if "Property Class" in temp_df_me.columns:
                 mecert_property_options += sorted(temp_df_me['Property Class'].dropna().unique())
         mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
@@ -187,7 +187,7 @@ with tab1:
         # Show ME&CERT data
         filtered_mecert_df = df_mechem.copy()
         if mecert_standard != "All":
-            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standards'] == mecert_standard]
+            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard'] == mecert_standard]
         if mecert_property != "All":
             filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property Class'] == mecert_property]
 
