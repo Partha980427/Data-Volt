@@ -137,12 +137,18 @@ with tab1:
             thread_standards = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
         thread_standard = st.sidebar.selectbox("Thread Standard", ["All"] + thread_standards)
 
+        # Thread Size Dropdown
         thread_size_options = ["All"]
+        thread_class_options = ["All"]
         if thread_standard != "All":
             df_thread = load_thread_data(thread_files[thread_standard])
-            if not df_thread.empty and "Thread" in df_thread.columns:
-                thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+            if not df_thread.empty:
+                if "Thread" in df_thread.columns:
+                    thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+                if "Class" in df_thread.columns:
+                    thread_class_options += sorted(df_thread['Class'].dropna().unique())
         thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
+        thread_class = st.sidebar.selectbox("Class", thread_class_options)
 
         # -----------------------------
         # 4. ME&CERT Specification
@@ -181,6 +187,8 @@ with tab1:
             if not df_thread.empty:
                 if thread_size != "All" and "Thread" in df_thread.columns:
                     df_thread = df_thread[df_thread["Thread"] == thread_size]
+                if thread_class != "All" and "Class" in df_thread.columns:
+                    df_thread = df_thread[df_thread["Class"] == thread_class]
                 st.subheader(f"Thread Data: {thread_standard}")
                 st.dataframe(df_thread)
 
