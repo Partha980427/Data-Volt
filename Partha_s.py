@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from fractions import Fraction
 from openpyxl import load_workbook, Workbook
-from openpyxl.styles import PatternFill
 from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
 
@@ -67,19 +66,22 @@ def size_to_float(size_str):
     except:
         return None
 
-def calculate_weight(product, size_in, length_in):
-    size_mm = size_in * 25.4
-    length_mm = length_in * 25.4
+def calculate_weight(product, diameter_mm, length_mm):
     density = 0.00785
-    multiplier = 1.0
-    if product == "Heavy Hex Bolt":
-        multiplier = 1.05
-    elif product == "Hex Cap Screw":
-        multiplier = 0.95
-    elif product == "Heavy Hex Screw":
-        multiplier = 1.1
-    vol = 3.1416 * (size_mm/2)**2 * length_mm * multiplier
-    weight_kg = vol * density / 1000
+    weight_kg = 0
+    if product in ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]:
+        multiplier = 1.0
+        if product == "Heavy Hex Bolt":
+            multiplier = 1.05
+        elif product == "Hex Cap Screw":
+            multiplier = 0.95
+        elif product == "Heavy Hex Screw":
+            multiplier = 1.1
+        vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm * multiplier
+        weight_kg = vol * density / 1000
+    elif product in ["Threaded Rod", "Stud"]:
+        vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
+        weight_kg = vol * density / 1000
     return round(weight_kg, 3)
 
 # ======================================================
@@ -207,13 +209,13 @@ with tab1:
                 st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 📝 Tab 2 – Manual Weight Calculator (Final with Class)
+# 📝 Tab 2 – Manual Weight Calculator
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
 
     # 1. Product
-    product_options = sorted(df['Product'].dropna().unique())
+    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
     selected_product = st.selectbox("Select Product", product_options)
 
     # 2. Series
@@ -236,7 +238,6 @@ with tab2:
         df_thread_temp = load_thread_data(thread_files["ASME B1.1"])
         size_options = sorted(df_thread_temp["Thread"].dropna().unique())
     else:
-        # Metric ISO threads
         metric_files = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
         df_metric = pd.concat([load_thread_data(thread_files[f]) for f in metric_files if f in thread_files], ignore_index=True)
         size_options = sorted(df_metric["Thread"].dropna().unique())
@@ -259,12 +260,9 @@ with tab2:
         diameter_mm = diameter_input * 25.4 if length_unit == "inch" else diameter_input
     elif dia_type == "Pitch Diameter":
         if selected_series == "Inch":
-            thread_standard = "ASME B1.1"
-            df_thread = load_thread_data(thread_files[thread_standard])
-            # Class dropdown for Inch
+            df_thread = load_thread_data(thread_files["ASME B1.1"])
             classes = sorted(df_thread["Class"].dropna().unique()) if "Class" in df_thread.columns else []
             pitch_class = st.selectbox("Select Class", classes)
-            # Filter Pitch Diameter (Min) based on Thread and Class
             pitch_row = df_thread[(df_thread["Thread"] == selected_size) & (df_thread["Class"] == pitch_class)]
             if not pitch_row.empty:
                 pitch_val = pitch_row["Pitch Diameter (Min)"].values[0]
@@ -272,7 +270,6 @@ with tab2:
             else:
                 st.warning("⚠️ Pitch Diameter not found for selected Thread/Class.")
         else:
-            # Metric series: choose coarse/fine standard
             metric_thread_standards = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
             thread_standard = st.selectbox("Select Thread Standard for Pitch Dia", metric_thread_standards)
             if thread_standard in thread_files:
@@ -292,22 +289,8 @@ with tab2:
         if diameter_mm is None or length_mm <= 0:
             st.error("❌ Please provide valid diameter and length.")
         else:
-            density = 0.00785
-            weight_kg = 0
-            if selected_product in ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]:
-                multiplier = 1.0
-                if selected_product == "Heavy Hex Bolt":
-                    multiplier = 1.05
-                elif selected_product == "Hex Cap Screw":
-                    multiplier = 0.95
-                elif selected_product == "Heavy Hex Screw":
-                    multiplier = 1.1
-                vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm * multiplier
-                weight_kg = vol * density / 1000
-            elif selected_product in ["Threaded Rod", "Stud"]:
-                vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
-                weight_kg = vol * density / 1000
-            st.success(f"✅ Estimated Weight/pc: **{round(weight_kg, 3)} Kg**")
+            weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
+            st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
 
 # ======================================================
 # 📤 Tab 3 – Batch Excel Uploader
@@ -336,7 +319,7 @@ with tab3:
 
             selected_product_type = None
             if not product_col:
-                selected_product_type = st.selectbox("Select Product Type (for all rows)", ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"], key="product_batch")
+                selected_product_type = st.selectbox("Select Product Type (for all rows)", ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw", "Threaded Rod", "Stud"], key="product_batch")
 
             if st.button("Calculate Weights for All"):
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
@@ -362,7 +345,7 @@ with tab3:
                             size_in /= 25.4
                         if length_unit_batch == "mm":
                             length_in_float /= 25.4
-                        ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in, length_in_float))
+                        ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in*25.4, length_in_float*25.4))
 
                 output_file = "updated_with_weights.xlsx"
                 wb.save(output_file)
