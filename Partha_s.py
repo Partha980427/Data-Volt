@@ -75,6 +75,8 @@ def calculate_weight(product, diameter_mm, length_mm):
         multiplier = 0.95
     elif product == "Heavy Hex Screw":
         multiplier = 1.1
+    elif product == "Threaded Rod":
+        multiplier = 1.0  # plain cylinder
     vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm * multiplier
     weight_kg = vol * density / 1000
     return round(weight_kg, 3)
@@ -206,13 +208,13 @@ with tab1:
                 st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 📝 Tab 2 – Manual Weight Calculator (Refactored)
+# 📝 Tab 2 – Manual Weight Calculator
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
 
     # 1️⃣ Select Product
-    product_options = sorted(df['Product'].dropna().unique())
+    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
     selected_product = st.selectbox("1️⃣ Select Product", product_options)
 
     # 2️⃣ Select Series
