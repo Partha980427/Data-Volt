@@ -231,29 +231,90 @@ with tab1:
                 st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 📝 Tab 2 – Manual Weight Calculator
+# 📝 Tab 2 – Manual Weight Calculator (Modified)
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
-    product_type = st.selectbox("Select Product Type", sorted(df['Product'].dropna().unique()))
-    size_str = st.selectbox("Select Size", sorted(df['Size'].dropna().unique(), key=size_to_float))
+
+    # 1. Select Product
+    product_options = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw", "Threaded Rod", "Stud"]
+    selected_product = st.selectbox("Select Product", product_options)
+
+    # 2. Select Series
+    series_options = ["Inch", "Metric"]
+    selected_series = st.selectbox("Select Series", series_options, key="manual_series")
+
+    # 3. Select Size
+    size_options = []
+    if selected_series == "Inch":
+        temp_df = df[df["Standards"] == "ASME B18.2.1"]
+    elif selected_series == "Metric":
+        temp_df = df[df["Standards"].str.contains("ISO", na=False)]
+    else:
+        temp_df = df.copy()
+
+    if not temp_df.empty and "Size" in temp_df.columns:
+        size_options = sorted(temp_df["Size"].dropna().unique(), key=size_to_float)
+
+    selected_size = st.selectbox("Select Size", size_options)
+
+    # 4. Select Length Unit
+    length_unit = st.selectbox("Select Length Unit", ["inch", "mm"], key="manual_length_unit")
+
+    # 5. Enter Length
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
 
-    size_unit_manual = st.selectbox("Select Size Unit (Manual)", ["inch", "mm"], key="size_manual")
-    length_unit_manual = st.selectbox("Select Length Unit (Manual)", ["inch", "mm"], key="length_manual")
+    # 6. Select Diameter Type
+    dia_type = st.selectbox("Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
 
+    # 7. Handle Diameter
+    diameter_mm = None
+    if dia_type == "Body Diameter":
+        diameter_input = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1)
+        diameter_mm = diameter_input * 25.4 if length_unit == "inch" else diameter_input
+    elif dia_type == "Pitch Diameter":
+        thread_standard = None
+        if selected_series == "Inch":
+            thread_standard = "ASME B1.1"
+        elif selected_series == "Metric":
+            # Let user choose Coarse or Fine
+            thread_standard = st.selectbox("Select Thread Standard for Pitch Dia", ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"])
+
+        if thread_standard and thread_standard in thread_files:
+            df_thread = load_thread_data(thread_files[thread_standard])
+            if not df_thread.empty and "Thread" in df_thread.columns:
+                pitch_row = df_thread[df_thread["Thread"] == selected_size]
+                if not pitch_row.empty:
+                    pitch_val = pitch_row["Pitch Diameter"].values[0]
+                    diameter_mm = pitch_val * 25.4 if selected_series == "Inch" else pitch_val
+
+    # Length conversion
+    length_mm = length_val * 25.4 if length_unit == "inch" else length_val
+
+    # 8. Weight Calculation
     if st.button("Calculate Weight"):
-        size_in = size_to_float(size_str)
-        length_in = float(length_val)
-        if size_unit_manual == "mm":
-            size_in /= 25.4
-        if length_unit_manual == "mm":
-            length_in /= 25.4
-        if size_in:
-            weight = calculate_weight(product_type, size_in, length_in)
-            st.success(f"Estimated Weight/pc: **{weight} Kg**")
+        if diameter_mm is None or length_mm <= 0:
+            st.error("❌ Please provide valid diameter and length.")
         else:
-            st.error("Invalid size format")
+            density = 0.00785  # g/mm³
+            weight_kg = 0
+
+            if selected_product in ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"]:
+                multiplier = 1.0
+                if selected_product == "Heavy Hex Bolt":
+                    multiplier = 1.05
+                elif selected_product == "Hex Cap Screw":
+                    multiplier = 0.95
+                elif selected_product == "Heavy Hex Screw":
+                    multiplier = 1.1
+                vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm * multiplier
+                weight_kg = vol * density / 1000
+
+            elif selected_product in ["Threaded Rod", "Stud"]:
+                vol = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
+                weight_kg = vol * density / 1000
+
+            st.success(f"✅ Estimated Weight/pc: **{round(weight_kg, 3)} Kg**")
 
 # ======================================================
 # 📤 Tab 3 – Batch Excel Uploader
