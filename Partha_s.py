@@ -99,7 +99,7 @@ with tab1:
         st.sidebar.header("🔍 Search Panel")
 
         # Product & Series
-        product_types = ["All"] + sorted(df['Product'].dropna().unique())
+        product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
         product_type = st.sidebar.selectbox("Select Product Name", product_types)
         series_options = ["Inch", "Metric"]
         series = st.sidebar.selectbox("Select Series", series_options)
@@ -109,6 +109,8 @@ with tab1:
         dimensional_standards = []
         if series == "Inch":
             dimensional_standards = ["ASME B18.2.1"]
+        elif series == "Metric":
+            dimensional_standards = ["ISO"]
         dimensional_standard = st.sidebar.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
 
         dimensional_size_options = ["All"]
@@ -207,25 +209,28 @@ with tab1:
                 st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 📝 Tab 2 – Manual Weight Calculator (Final with Class)
+# 📝 Tab 2 – Manual Weight Calculator
 # ======================================================
 with tab2:
     st.header("Manual Weight Calculator")
 
     # 1. Product
-    product_options = sorted(df['Product'].dropna().unique())
+    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
     selected_product = st.selectbox("Select Product", product_options)
 
     # 2. Series
     series_options = ["Inch", "Metric"]
     selected_series = st.selectbox("Select Series", series_options, key="manual_series")
 
-    # 3. Standard (Dimensional)
-    if selected_series == "Inch":
-        selected_standard = "ASME B1.1"
-    elif selected_series == "Metric":
-        metric_standards = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-        selected_standard = st.selectbox("Select Standard", metric_standards)
+    # 3. Standard
+    standard_options = []
+    temp_df = df[df["Product"] == selected_product]
+    if "Standards" in temp_df.columns:
+        standard_options = sorted(temp_df["Standards"].dropna().unique())
+    if selected_series == "Metric":
+        selected_standard = "ISO"
+    else:
+        selected_standard = "ASME B18.2.1"
 
     # 4. Size (from thread specification)
     size_options = []
@@ -233,7 +238,6 @@ with tab2:
         df_thread_temp = load_thread_data(thread_files["ASME B1.1"])
         size_options = sorted(df_thread_temp["Thread"].dropna().unique())
     else:
-        # Metric ISO threads
         metric_files = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
         df_metric = pd.concat([load_thread_data(thread_files[f]) for f in metric_files if f in thread_files], ignore_index=True)
         size_options = sorted(df_metric["Thread"].dropna().unique())
@@ -258,10 +262,8 @@ with tab2:
         if selected_series == "Inch":
             thread_standard = "ASME B1.1"
             df_thread = load_thread_data(thread_files[thread_standard])
-            # Class dropdown for Inch
             classes = sorted(df_thread["Class"].dropna().unique()) if "Class" in df_thread.columns else []
             pitch_class = st.selectbox("Select Class", classes)
-            # Filter Pitch Diameter (Min) based on Thread and Class
             pitch_row = df_thread[(df_thread["Thread"] == selected_size) & (df_thread["Class"] == pitch_class)]
             if not pitch_row.empty:
                 pitch_val = pitch_row["Pitch Diameter (Min)"].values[0]
@@ -269,7 +271,6 @@ with tab2:
             else:
                 st.warning("⚠️ Pitch Diameter not found for selected Thread/Class.")
         else:
-            # Metric series: choose coarse/fine standard
             metric_thread_standards = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
             thread_standard = st.selectbox("Select Thread Standard for Pitch Dia", metric_thread_standards)
             if thread_standard in thread_files:
@@ -281,10 +282,8 @@ with tab2:
                 else:
                     st.warning("⚠️ Pitch Diameter not found for selected Metric Thread.")
 
-    # Convert length to mm
     length_mm = length_val * 25.4 if length_unit == "inch" else length_val
 
-    # Weight Calculation
     if st.button("Calculate Weight"):
         if diameter_mm is None or length_mm <= 0:
             st.error("❌ Please provide valid diameter and length.")
@@ -333,7 +332,7 @@ with tab3:
 
             selected_product_type = None
             if not product_col:
-                selected_product_type = st.selectbox("Select Product Type (for all rows)", ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw"], key="product_batch")
+                selected_product_type = st.selectbox("Select Product Type (for all rows)", ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw", "Threaded Rod", "Stud"], key="product_batch")
 
             if st.button("Calculate Weights for All"):
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
