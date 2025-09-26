@@ -276,67 +276,105 @@ with tab2:
             st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
 
 # ======================================================
-# 📤 Tab 3 – Batch Excel Uploader
+# 📤 Tab 3 – Batch Excel Uploader (Modified)
 # ======================================================
 with tab3:
     st.header("Batch Weight Calculator")
-    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
-    if uploaded_file:
-        user_df = pd.read_excel(uploaded_file)
+    # 1️⃣ Select Product
+    batch_product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
+    batch_selected_product = st.selectbox("1️⃣ Select Product", batch_product_options, key="batch_product")
+
+    # 2️⃣ Select Series
+    batch_series = st.selectbox("2️⃣ Select Series", ["Inch", "Metric"], key="batch_series")
+
+    # 3️⃣ Standard (auto based on series and product)
+    if batch_series == "Inch":
+        batch_standard = "ASME B1.1"
+    else:
+        metric_type_batch = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"], key="batch_metric_type")
+        batch_standard = "ISO 965-2-98 Coarse" if metric_type_batch == "Coarse" else "ISO 965-2-98 Fine"
+    st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
+
+    # 4️⃣ Length Unit
+    batch_length_unit = st.selectbox("4️⃣ Select Length Unit", ["inch", "mm", "meter"], key="batch_length_unit")
+
+    # 5️⃣ Column Name for Weight
+    batch_weight_col_name = st.text_input("5️⃣ Enter column name for Weight/pc (Kg)", "Weight/pc (Kg)", key="batch_weight_col_name")
+
+    # 6️⃣ Column Index No
+    batch_weight_col_index = st.number_input("6️⃣ Enter column index to write Weight/pc (numeric, e.g., 3 = C column)", min_value=1, value=10, key="batch_weight_col_index")
+
+    # 7️⃣ Upload Section
+    uploaded_file_batch = st.file_uploader("7️⃣ Upload Excel file", type=["xlsx"], key="batch_file")
+
+    if uploaded_file_batch:
+        user_df_batch = pd.read_excel(uploaded_file_batch)
         st.write("📄 Uploaded File Preview:")
-        st.dataframe(user_df.head())
+        st.dataframe(user_df_batch.head())
 
-        size_col = next((c for c in user_df.columns if "size" in c.lower()), None)
-        length_col = next((c for c in user_df.columns if "length" in c.lower()), None)
-        product_col = next((c for c in user_df.columns if "product" in c.lower()), None)
+        size_col_batch = next((c for c in user_df_batch.columns if "size" in c.lower()), None)
+        length_col_batch = next((c for c in user_df_batch.columns if "length" in c.lower()), None)
 
-        weight_col_name = st.text_input("Enter column name for Weight/pc (Kg)", "Weight/pc (Kg)")
-        weight_col_index = st.number_input("Enter column index to write Weight/pc (numeric, e.g., 3 = C column)", min_value=1, value=len(user_df.columns)+1)
+        if size_col_batch and length_col_batch:
+            st.info(f"Detected columns → Size: {size_col_batch}, Length: {length_col_batch}")
 
-        size_unit_batch = st.selectbox("Select Size Unit (Batch)", ["inch", "mm"], key="size_batch")
-        length_unit_batch = st.selectbox("Select Length Unit (Batch)", ["inch", "mm"], key="length_batch")
+            if st.button("8️⃣ Calculate Weights for All Rows"):
+                temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                temp_file_batch.write(uploaded_file_batch.getbuffer())
+                temp_file_batch.close()
 
-        if size_col and length_col:
-            st.info(f"Detected columns → Size: {size_col}, Length: {length_col}")
-
-            selected_product_type = None
-            if not product_col:
-                selected_product_type = st.selectbox("Select Product Type (for all rows)", ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screw", "Heavy Hex Screw", "Threaded Rod", "Stud"], key="product_batch")
-
-            if st.button("Calculate Weights for All"):
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                temp_file.write(uploaded_file.getbuffer())
-                temp_file.close()
-
-                wb = load_workbook(temp_file.name)
+                wb = load_workbook(temp_file_batch.name)
                 ws = wb.active
 
-                if ws.cell(row=1, column=weight_col_index).value != weight_col_name:
-                    ws.insert_cols(weight_col_index)
-                    ws.cell(row=1, column=weight_col_index, value=weight_col_name)
+                if ws.cell(row=1, column=batch_weight_col_index).value != batch_weight_col_name:
+                    ws.insert_cols(batch_weight_col_index)
+                    ws.cell(row=1, column=batch_weight_col_index, value=batch_weight_col_name)
+
+                dim_df = df[df['Product'] == batch_selected_product] if not df.empty else pd.DataFrame()
+                thread_df = load_thread_data(thread_files[batch_standard])
 
                 for row_idx in range(2, ws.max_row + 1):
-                    size_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(size_col)+1).value
-                    length_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(length_col)+1).value
-                    prod_val = ws.cell(row=row_idx, column=user_df.columns.get_loc(product_col)+1).value if product_col else selected_product_type
+                    size_val = ws.cell(row=row_idx, column=user_df_batch.columns.get_loc(size_col_batch)+1).value
+                    length_val = ws.cell(row=row_idx, column=user_df_batch.columns.get_loc(length_col_batch)+1).value
 
                     if size_val and length_val:
-                        size_in = size_to_float(size_val)
-                        length_in_float = float(length_val)
-                        if size_unit_batch == "mm":
-                            size_in /= 25.4
-                        if length_unit_batch == "mm":
-                            length_in_float /= 25.4
-                        ws.cell(row=row_idx, column=weight_col_index, value=calculate_weight(prod_val, size_in*25.4, length_in_float*25.4))
+                        size_mm = size_to_float(size_val)
+                        length_mm = float(length_val)
 
-                output_file = "updated_with_weights.xlsx"
-                wb.save(output_file)
+                        if batch_length_unit == "inch":
+                            length_mm *= 25.4
+                        elif batch_length_unit == "meter":
+                            length_mm *= 1000
+
+                        diameter_mm = None
+                        if not dim_df.empty and "Size" in dim_df.columns and "Body Diameter" in dim_df.columns:
+                            row_dim = dim_df[dim_df["Size"] == size_val]
+                            if not row_dim.empty:
+                                diameter_mm = row_dim["Body Diameter"].values[0]
+
+                        if not thread_df.empty and "Thread" in thread_df.columns and "Pitch Diameter (Min)" in thread_df.columns:
+                            row_thread = thread_df[thread_df["Thread"] == size_val]
+                            if not row_thread.empty:
+                                pitch_val = row_thread["Pitch Diameter (Min)"].values[0]
+                                diameter_mm = pitch_val
+
+                        if diameter_mm is None:
+                            diameter_mm = size_mm
+
+                        weight = calculate_weight(batch_selected_product, diameter_mm, length_mm)
+                        ws.cell(row=row_idx, column=batch_weight_col_index, value=weight)
+
+                output_file_batch = "updated_with_weights.xlsx"
+                wb.save(output_file_batch)
                 st.success("✅ Weights calculated successfully!")
-                with open(output_file, "rb") as f:
-                    st.download_button("⬇️ Download Updated Excel", f, file_name=output_file, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+                # 8️⃣ Download Section
+                with open(output_file_batch, "rb") as f:
+                    st.download_button("⬇️ Download Updated Excel", f, file_name=output_file_batch, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
         else:
-            st.error("❌ Could not detect Size or Length columns. Please check your file.")
+            st.error("❌ Could not detect Size or Length columns in the uploaded file. Please check your file.")
 
 # ======================================================
 # 🔹 Footer
