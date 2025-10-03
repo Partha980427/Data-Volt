@@ -79,7 +79,7 @@ def calculate_weight(product, diameter_mm, length_mm):
         factor = 1.0
     volume = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
     weight_kg = volume * density * factor / 1000
-    return round(weight_kg, 4)  # Changed to 4 decimal places
+    return round(weight_kg, 4)  # 4 decimal places
 
 # ======================================================
 # 🔹 Initialize Session State
@@ -289,7 +289,35 @@ def show_section(title):
             else:
                 weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
                 st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
+        
+        # ======================================================
+        # 🔹 Batch Weight Calculator
+        # ======================================================
+        st.subheader("📊 Batch Weight Calculator")
+        batch_file = st.file_uploader("Upload Batch Excel/CSV (Columns: Product, Diameter_mm, Length_mm, Series)", type=["xlsx","csv"], key="batch")
+        if batch_file:
+            if batch_file.name.endswith(".csv"):
+                batch_df = pd.read_csv(batch_file)
+            else:
+                batch_df = pd.read_excel(batch_file)
 
+            required_cols = ["Product","Diameter_mm","Length_mm","Series"]
+            if all(col in batch_df.columns for col in required_cols):
+                if st.button("⚖️ Calculate Batch Weights", key="batch_calc"):
+                    batch_df["Weight_Kg"] = batch_df.apply(
+                        lambda row: calculate_weight(row["Product"], row["Diameter_mm"], row["Length_mm"]), axis=1
+                    )
+                    st.dataframe(batch_df)
+
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                    batch_df.to_excel(temp_file.name, index=False)
+                    with open(temp_file.name,"rb") as f:
+                        st.download_button("⬇️ Download Batch Weight Excel", f, 
+                                           file_name="Batch_Weight.xlsx",
+                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                st.error(f"❌ Uploaded file must contain columns: {', '.join(required_cols)}")
+        
     elif title == "🕵️ Inspection":
         st.header("🕵️ Inspection")
         st.subheader("Supplier Inspection")
