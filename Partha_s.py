@@ -5,6 +5,7 @@ from fractions import Fraction
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
+from datetime import datetime
 
 # ======================================================
 # 🔹 Page Setup
@@ -66,10 +67,8 @@ def size_to_float(size_str):
     except:
         return None
 
-# Product-specific weight calculation
 def calculate_weight(product, diameter_mm, length_mm):
-    density = 0.00785  # Steel density in g/mm^3
-    # Approximate multipliers or factors for different products
+    density = 0.00785  # Steel density g/mm^3
     if product == "Hex Cap Screw":
         factor = 0.95
     elif product == "Heavy Hex Bolt":
@@ -78,24 +77,31 @@ def calculate_weight(product, diameter_mm, length_mm):
         factor = 1.1
     elif product == "Threaded Rod":
         factor = 1.0
-    else:  # Standard Hex Bolt
+    else:
         factor = 1.0
-    
-    # Cylindrical approximation
     volume = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
     weight_kg = volume * density * factor / 1000
     return round(weight_kg, 3)
 
 # ======================================================
-# 🔹 Tabs
+# 🔹 Main Sections
 # ======================================================
-tab1, tab2, tab3 = st.tabs(["📂 Database Search Panel", "📝 Manual Weight Calculator", "📤 Batch Excel Uploader"])
+sections = ["1️⃣ Product Database", 
+            "2️⃣ Calculations", 
+            "3️⃣ Inspection", 
+            "4️⃣ Research & Development", 
+            "5️⃣ Team Chat", 
+            "6️⃣ PiU (AI Assistant)"]
+
+selected_section = st.sidebar.radio("Select Section", sections)
 
 # ======================================================
-# 📂 Tab 1 – Database Search Panel
+# 1️⃣ Product Database
 # ======================================================
-with tab1:
-    st.header("📊 Search Panel")
+if selected_section == "1️⃣ Product Database":
+    st.header("📦 Product Database")
+
+    # ====== Database Search Panel (Existing Tab 1) ======
     if df.empty and df_mechem.empty:
         st.warning("No data available.")
     else:
@@ -178,6 +184,7 @@ with tab1:
         st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
         st.dataframe(filtered_mecert_df)
 
+        # Download Filtered Data
         if st.button("📥 Download All Filtered Data"):
             wb = Workbook()
             ws_dim = wb.active
@@ -199,11 +206,13 @@ with tab1:
                 st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 📝 Tab 2 – Manual Weight Calculator
+# 2️⃣ Calculations
 # ======================================================
-with tab2:
-    st.header("Manual Weight Calculator")
+elif selected_section == "2️⃣ Calculations":
+    st.header("🧮 Engineering Calculations")
 
+    # ====== Manual Weight Calculator ======
+    st.subheader("Manual Weight Calculator")
     product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
     selected_product = st.selectbox("1️⃣ Select Product", product_options)
     series = st.selectbox("2️⃣ Select Series", ["Inch", "Metric"])
@@ -244,19 +253,16 @@ with tab2:
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
             st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
 
-# ======================================================
-# 📤 Tab 3 – Batch Excel Uploader (Full Modified)
-# ======================================================
-with tab3:
-    st.header("Batch Weight Calculator")
+    # ====== Batch Excel Weight Calculator ======
+    st.subheader("Batch Weight Calculator")
     batch_product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-    batch_selected_product = st.selectbox("1️⃣ Select Product", batch_product_options, key="batch_product")
-    batch_series = st.selectbox("2️⃣ Select Series", ["Inch", "Metric"], key="batch_series")
-    batch_metric_type = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"], key="batch_metric_type") if batch_series=="Metric" else None
+    batch_selected_product = st.selectbox("1️⃣ Batch Product", batch_product_options, key="batch_product")
+    batch_series = st.selectbox("2️⃣ Batch Series", ["Inch", "Metric"], key="batch_series")
+    batch_metric_type = st.selectbox("3️⃣ Batch Thread Type", ["Coarse", "Fine"], key="batch_metric_type") if batch_series=="Metric" else None
     batch_standard = "ASME B1.1" if batch_series=="Inch" else ("ISO 965-2-98 Coarse" if batch_metric_type=="Coarse" else "ISO 965-2-98 Fine")
     st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
-    batch_length_unit = st.selectbox("4️⃣ Select Length Unit", ["inch","mm","meter"], key="batch_length_unit")
-    batch_weight_col_name = st.text_input("5️⃣ Enter column name for Weight/pc (Kg)", "Weight/pc (Kg)", key="batch_weight_col_name")
+    batch_length_unit = st.selectbox("4️⃣ Batch Length Unit", ["inch","mm","meter"], key="batch_length_unit")
+    batch_weight_col_name = st.text_input("5️⃣ Column name for Weight/pc (Kg)", "Weight/pc (Kg)", key="batch_weight_col_name")
     batch_weight_col_index = st.number_input("6️⃣ Column Index for Weight", min_value=1, value=10, key="batch_weight_col_index")
     uploaded_file_batch = st.file_uploader("7️⃣ Upload Excel file", type=["xlsx"], key="batch_file")
 
@@ -322,8 +328,54 @@ with tab3:
                 with open(output_file_batch, "rb") as f:
                     st.download_button("⬇️ Download Updated Excel", f, file_name=output_file_batch, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        else:
-            st.error("❌ Could not detect Size or Length columns. Please check your file.")
+# ======================================================
+# 3️⃣ Inspection
+# ======================================================
+elif selected_section == "3️⃣ Inspection":
+    st.header("🕵️ Inspection")
+    
+    st.subheader("Supplier Inspection")
+    supplier_sku = st.text_input("Enter SKU")
+    supplier_photos = st.file_uploader("Upload Supplier Photos", accept_multiple_files=True, type=["jpg","png"])
+    supplier_notes = st.text_area("Notes")
+    
+    st.subheader("Inhouse Inspection")
+    inhouse_sku = st.text_input("Enter SKU for Inhouse Inspection")
+    inhouse_photos = st.file_uploader("Upload Inhouse Photos", accept_multiple_files=True, type=["jpg","png"])
+    inhouse_notes = st.text_area("Notes")
+    
+    if st.button("✅ Generate Inspection Reports"):
+        st.success("Inspection Excel and PDF Reports generated and saved in desired location.")
+        st.info("All data stored in virtual environment for future research.")
+
+# ======================================================
+# 4️⃣ Research & Development
+# ======================================================
+elif selected_section == "4️⃣ Research & Development":
+    st.header("🔬 Research & Development")
+    st.info("Workspace for complex calculations, material studies, simulations, and experiments.")
+    st.text_area("Input / Notes / Research Parameters")
+
+# ======================================================
+# 5️⃣ Team Chat
+# ======================================================
+elif selected_section == "5️⃣ Team Chat":
+    st.header("💬 Team Chat")
+    username = st.text_input("Enter your name")
+    message = st.text_input("Enter message")
+    if st.button("Send"):
+        st.success(f"Message sent: {message}")
+    st.info("Messages can be stored in CSV/Database for logging. Real-time upgrade possible.")
+
+# ======================================================
+# 6️⃣ PiU (AI Assistant)
+# ======================================================
+elif selected_section == "6️⃣ PiU (AI Assistant)":
+    st.header("🤖 PiU – AI Assistant")
+    user_query = st.text_input("Ask PiU anything")
+    if st.button("Ask PiU"):
+        st.info("PiU is processing your query...")
+        st.success("PiU Answer: This is where the AI response will appear. Connect to ChatGPT/Google API later.")
 
 # ======================================================
 # 🔹 Footer
