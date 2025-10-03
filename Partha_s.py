@@ -332,7 +332,8 @@ def show_section(title):
                         prod = row["Product"]
                         size_val = row["Size"]
                         length_val = float(row["Length"])
-                        unit = row.get("Unit","mm").lower()  
+                        # 🔹 Use Streamlit length unit if Excel has no Unit column
+                        unit = str(row.get("Unit", batch_length_unit)).lower()  
 
                         length_mm = length_val
                         if unit=="inch":
