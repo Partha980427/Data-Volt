@@ -332,16 +332,16 @@ def show_section(title):
                         prod = row["Product"]
                         size_val = row["Size"]
                         length_val = float(row["Length"])
-                        # 🔹 Use Streamlit length unit if Excel has no Unit column
-                        unit = str(row.get("Unit", batch_length_unit)).lower()  
-
+                        # -------- FIXED UNIT CONVERSION --------
+                        unit = str(row.get("Unit","mm")).strip().lower()  
                         length_mm = length_val
                         if unit=="inch":
                             length_mm *= 25.4
                         elif unit=="meter":
                             length_mm *= 1000
-                        elif unit=="ft":
+                        elif unit in ["ft","feet"]:
                             length_mm *= 304.8
+                        # --------------------------------------
 
                         diameter_mm = None
                         dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
