@@ -150,18 +150,14 @@ def show_section(title):
         if df.empty and df_mechem.empty:
             st.warning("No data available.")
         else:
-            # ---------- Sidebar Filters ----------
+            # Sidebar filters (unchanged)
             st.sidebar.header("🔍 Filter Options")
-
             product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
             product_type = st.sidebar.selectbox("Select Product", product_types)
-
             series_options = ["Inch","Metric"]
             series = st.sidebar.selectbox("Select Series", series_options)
-
             dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
             dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
-
             size_options = ["All"]
             temp_df = df.copy()
             if product_type != "All":
@@ -170,14 +166,12 @@ def show_section(title):
                 temp_df = temp_df[temp_df['Standards']==dimensional_standard]
             size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
             dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
-
             thread_standards = ["All"]
             if series=="Inch":
                 thread_standards += ["ASME B1.1"]
             else:
                 thread_standards += ["ISO 965-2-98 Coarse","ISO 965-2-98 Fine"]
             thread_standard = st.sidebar.selectbox("Thread Standard", thread_standards)
-
             thread_size_options = ["All"]
             thread_class_options = ["All"]
             if thread_standard != "All":
@@ -195,7 +189,6 @@ def show_section(title):
             if not df_mechem.empty:
                 mecert_standards += sorted(df_mechem['Standard'].dropna().unique())
             mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standards)
-
             mecert_property_options = ["All"]
             if mecert_standard != "All" and not df_mechem.empty:
                 temp_me = df_mechem[df_mechem['Standard']==mecert_standard]
@@ -203,7 +196,7 @@ def show_section(title):
                     mecert_property_options += sorted(temp_me['Property class'].dropna().unique())
             mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
 
-            # ---------- Apply Filters ----------
+            # Apply Filters
             filtered_df = df.copy()
             if product_type != "All":
                 filtered_df = filtered_df[filtered_df['Product']==product_type]
@@ -256,9 +249,7 @@ def show_section(title):
     elif title == "🧮 Calculations":
         st.header("🧮 Engineering Calculations")
 
-        # ------------------------
-        # Manual Weight Calculator
-        # ------------------------
+        # Manual Calculator (unchanged)
         st.subheader("Manual Weight Calculator")
         product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
         selected_product = st.selectbox("Select Product", product_options)
@@ -266,14 +257,12 @@ def show_section(title):
         metric_type = st.selectbox("Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
         selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
         st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
-
         df_thread = load_thread_data(thread_files[selected_standard])
         size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
         selected_size = st.selectbox("Select Size", size_options)
         length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
         length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
         dia_type = st.selectbox("Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
-
         diameter_mm = None
         if dia_type == "Body Diameter":
             body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1)
@@ -286,7 +275,6 @@ def show_section(title):
                     diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
                 else:
                     st.warning("⚠️ Pitch Diameter not found.")
-
         if st.button("Calculate Weight"):
             length_mm = length_val
             if length_unit=="inch":
@@ -301,9 +289,7 @@ def show_section(title):
                 weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
                 st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
 
-        # ------------------------
-        # Batch Weight Calculator (FIXED)
-        # ------------------------
+        # Batch Calculator (FIXED)
         st.subheader("Batch Weight Calculator")
         batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
         batch_series = st.selectbox("Select Series", ["Inch", "Metric"], key="batch_series")
@@ -312,29 +298,23 @@ def show_section(title):
         st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
         batch_length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","FT"], key="batch_length_unit")
         uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
-
         if uploaded_file_batch:
             batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
             st.write("Uploaded File Preview:")
             st.dataframe(batch_df.head())
-
             required_cols = ["Product","Size","Length"]
             if all(col in batch_df.columns for col in required_cols):
                 if st.button("Calculate Batch Weights", key="calc_batch_weights"):
                     df_thread_batch = load_thread_data(thread_files[batch_standard])
                     df_dim_batch = df[df['Product']==batch_selected_product]
-
                     weight_col_name = "Weight/pc (Kg)"
                     if weight_col_name not in batch_df.columns:
                         batch_df[weight_col_name] = 0
-
-                    # ---------- Process Each Row ----------
                     for idx, row in batch_df.iterrows():
                         prod = row["Product"]
                         size_val = row["Size"]
                         length_val = float(row["Length"])
-
-                        # Convert length according to selected batch unit
+                        # Convert length
                         length_mm = length_val
                         if batch_length_unit=="inch":
                             length_mm *= 25.4
@@ -342,30 +322,26 @@ def show_section(title):
                             length_mm *= 1000
                         elif batch_length_unit=="FT":
                             length_mm *= 304.8
-
                         # Determine diameter
                         diameter_mm = None
                         dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
                         if not dim_row.empty and "Body Diameter" in dim_row.columns:
                             diameter_mm = dim_row["Body Diameter"].values[0]
-
                         thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val] if not df_thread_batch.empty else pd.DataFrame()
                         if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
                             diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
-
+                            if batch_series == "Inch":   # Convert Pitch Diameter inch → mm
+                                diameter_mm *= 25.4
                         if diameter_mm is None:
                             try:
                                 diameter_mm = float(size_val)
                             except:
                                 diameter_mm = 0
-
                         # Calculate weight
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
-
                     st.dataframe(batch_df)
-
-                    # Save Excel safely without distortion
+                    # Save Excel safely
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     batch_df.to_excel(temp_file.name, index=False)
                     temp_file.close()
