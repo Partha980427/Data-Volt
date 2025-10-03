@@ -259,6 +259,7 @@ def show_section(title):
         # ------------------------
         # Manual Weight Calculator
         # ------------------------
+        st.subheader("Manual Weight Calculator")
         product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
         selected_product = st.selectbox("Select Product", product_options)
         series = st.selectbox("Select Series", ["Inch", "Metric"])
@@ -269,7 +270,7 @@ def show_section(title):
         df_thread = load_thread_data(thread_files[selected_standard])
         size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
         selected_size = st.selectbox("Select Size", size_options)
-        length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","FT"])
+        length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
         length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
         dia_type = st.selectbox("Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
 
@@ -292,7 +293,7 @@ def show_section(title):
                 length_mm *= 25.4
             elif length_unit=="meter":
                 length_mm *= 1000
-            elif length_unit=="FT":
+            elif length_unit=="ft":
                 length_mm *= 304.8
             if diameter_mm is None:
                 st.error("❌ Provide diameter.")
@@ -333,7 +334,7 @@ def show_section(title):
                         size_val = row["Size"]
                         length_val = float(row["Length"])
 
-                        # Convert based on dropdown (FT handled)
+                        # Use dropdown selected unit for all rows
                         length_mm = length_val
                         if batch_length_unit=="inch":
                             length_mm *= 25.4
