@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from fractions import Fraction
 from openpyxl import load_workbook, Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
 from datetime import datetime
 
@@ -145,41 +146,111 @@ def generate_tds(template_file, supplier, product_name, length_val, size_val, ma
 # ======================================================
 def show_section(title):
     if title == "📦 Product Database":
-        st.header("📦 Product Database")
-        if df.empty:
-            st.warning("No product database available.")
+        st.header("📦 Product Database Search Panel")
+        if df.empty and df_mechem.empty:
+            st.warning("No data available.")
         else:
+            # ---------- Sidebar Filters ----------
+            st.sidebar.header("🔍 Filter Options")
+
             product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-            product_type = st.selectbox("Select Product", product_types)
-            series_options = ["Inch", "Metric"]
-            series = st.selectbox("Select Series", series_options)
-            dimensional_standard_options = ["All"] + sorted(df['Standards'].dropna().unique())
-            dimensional_standard = st.selectbox("Dimensional Standard", dimensional_standard_options)
+            product_type = st.sidebar.selectbox("Select Product", product_types)
+
+            series_options = ["Inch","Metric"]
+            series = st.sidebar.selectbox("Select Series", series_options)
+
+            dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
+            dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
+
             size_options = ["All"]
+            temp_df = df.copy()
+            if product_type != "All":
+                temp_df = temp_df[temp_df['Product']==product_type]
             if dimensional_standard != "All":
-                temp_df = df.copy()
-                if product_type != "All":
-                    temp_df = temp_df[temp_df['Product']==product_type]
                 temp_df = temp_df[temp_df['Standards']==dimensional_standard]
-                size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
-            size_selected = st.selectbox("Select Size", size_options)
-            
+            size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
+            dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
+
+            thread_standards = ["All"]
+            if series=="Inch":
+                thread_standards += ["ASME B1.1"]
+            else:
+                thread_standards += ["ISO 965-2-98 Coarse","ISO 965-2-98 Fine"]
+            thread_standard = st.sidebar.selectbox("Thread Standard", thread_standards)
+
+            thread_size_options = ["All"]
+            thread_class_options = ["All"]
+            if thread_standard != "All":
+                df_thread = load_thread_data(thread_files[thread_standard])
+                if not df_thread.empty:
+                    if "Thread" in df_thread.columns:
+                        thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+                    if "Class" in df_thread.columns:
+                        thread_class_options += sorted(df_thread['Class'].dropna().unique())
+            thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
+            thread_class = st.sidebar.selectbox("Class", thread_class_options)
+
+            # ME&CERT filters
+            mecert_standards = ["All"]
+            if not df_mechem.empty:
+                mecert_standards += sorted(df_mechem['Standard'].dropna().unique())
+            mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standards)
+
+            mecert_property_options = ["All"]
+            if mecert_standard != "All" and not df_mechem.empty:
+                temp_me = df_mechem[df_mechem['Standard']==mecert_standard]
+                if "Property class" in temp_me.columns:
+                    mecert_property_options += sorted(temp_me['Property class'].dropna().unique())
+            mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
+
+            # ---------- Apply Filters ----------
             filtered_df = df.copy()
             if product_type != "All":
                 filtered_df = filtered_df[filtered_df['Product']==product_type]
             if dimensional_standard != "All":
                 filtered_df = filtered_df[filtered_df['Standards']==dimensional_standard]
-            if size_selected != "All":
-                filtered_df = filtered_df[filtered_df['Size']==size_selected]
-            
+            if dimensional_size != "All":
+                filtered_df = filtered_df[filtered_df['Size']==dimensional_size]
+
             st.subheader(f"Found {len(filtered_df)} records")
             st.dataframe(filtered_df)
 
-            if st.button("📥 Download Filtered Data"):
+            if thread_standard != "All" and not df_thread.empty:
+                df_thread_filtered = df_thread.copy()
+                if thread_size != "All":
+                    df_thread_filtered = df_thread_filtered[df_thread_filtered['Thread']==thread_size]
+                if thread_class != "All":
+                    df_thread_filtered = df_thread_filtered[df_thread_filtered['Class']==thread_class]
+                st.subheader(f"Thread Data: {thread_standard}")
+                st.dataframe(df_thread_filtered)
+
+            filtered_mecert_df = df_mechem.copy()
+            if mecert_standard != "All":
+                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard']==mecert_standard]
+            if mecert_property != "All":
+                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class']==mecert_property]
+            st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
+            st.dataframe(filtered_mecert_df)
+
+            if st.button("📥 Download All Filtered Data"):
+                wb = Workbook()
+                ws_dim = wb.active
+                ws_dim.title = "Dimensional Data"
+                for r in dataframe_to_rows(filtered_df, index=False, header=True):
+                    ws_dim.append(r)
+                if thread_standard != "All" and not df_thread.empty:
+                    ws_thread = wb.create_sheet("Thread Data")
+                    for r in dataframe_to_rows(df_thread_filtered, index=False, header=True):
+                        ws_thread.append(r)
+                if not filtered_mecert_df.empty:
+                    ws_me = wb.create_sheet("ME&CERT Data")
+                    for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
+                        ws_me.append(r)
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                filtered_df.to_excel(temp_file.name, index=False)
+                wb.save(temp_file.name)
+                temp_file.close()
                 with open(temp_file.name, "rb") as f:
-                    st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx",
+                    st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", 
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     elif title == "🧮 Calculations":
