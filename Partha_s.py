@@ -11,8 +11,6 @@ from datetime import datetime
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#2C3E50;'>JSC Industries – Advanced Fastener Intelligence</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align:center; color:gray;'>Innovating Precision in Every Fastener</h4>", unsafe_allow_html=True)
 
 # ======================================================
 # 🔹 Load Databases
@@ -84,298 +82,239 @@ def calculate_weight(product, diameter_mm, length_mm):
     return round(weight_kg, 3)
 
 # ======================================================
-# 🔹 Main Sections
+# 🔹 Initialize Session State
 # ======================================================
-sections = ["1️⃣ Product Database", 
-            "2️⃣ Calculations", 
-            "3️⃣ Inspection", 
-            "4️⃣ Research & Development", 
-            "5️⃣ Team Chat", 
-            "6️⃣ PiU (AI Assistant)"]
-
-selected_section = st.sidebar.radio("Select Section", sections)
+if "selected_section" not in st.session_state:
+    st.session_state.selected_section = None
 
 # ======================================================
-# 1️⃣ Product Database
+# 🔹 Home Dashboard
 # ======================================================
-if selected_section == "1️⃣ Product Database":
-    st.header("📦 Product Database")
-
-    # ====== Database Search Panel (Existing Tab 1) ======
-    if df.empty and df_mechem.empty:
-        st.warning("No data available.")
-    else:
-        st.sidebar.header("🔍 Search Panel")
-        product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-        product_type = st.sidebar.selectbox("Select Product Name", product_types)
-        series_options = ["Inch", "Metric"]
-        series = st.sidebar.selectbox("Select Series", series_options)
-
-        # Dimensional Specification
-        st.sidebar.subheader("Dimensional Specification")
-        dimensional_standards = ["ASME B18.2.1"] if series == "Inch" else ["ISO"]
-        dimensional_standard = st.sidebar.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
-
-        dimensional_size_options = ["All"]
-        if dimensional_standard != "All" and "Size" in df.columns:
-            temp_df = df.copy()
-            if product_type != "All":
-                temp_df = temp_df[temp_df['Product'] == product_type]
-            if dimensional_standard != "All":
-                temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
-            dimensional_size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
-        dimensional_size = st.sidebar.selectbox("Dimensional Size", dimensional_size_options)
-
-        # Thread Specification
-        st.sidebar.subheader("Thread Specification")
-        thread_standards = ["ASME B1.1"] if series == "Inch" else ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-        thread_standard = st.sidebar.selectbox("Thread Standard", ["All"] + thread_standards)
-
-        thread_size_options = ["All"]
-        thread_class_options = ["All"]
-        if thread_standard != "All":
-            df_thread = load_thread_data(thread_files[thread_standard])
-            if not df_thread.empty:
-                if "Thread" in df_thread.columns:
-                    thread_size_options += sorted(df_thread['Thread'].dropna().unique())
-                if "Class" in df_thread.columns:
-                    thread_class_options += sorted(df_thread['Class'].dropna().unique())
-        thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
-        thread_class = st.sidebar.selectbox("Class", thread_class_options)
-
-        # ME&CERT Specification
-        st.sidebar.subheader("ME&CERT Specification")
-        mecert_standard_options = ["All"] + (sorted(df_mechem['Standard'].dropna().unique()) if not df_mechem.empty else [])
-        mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standard_options)
-        mecert_property_options = ["All"]
-        if mecert_standard != "All":
-            temp_df_me = df_mechem[df_mechem['Standard'] == mecert_standard]
-            if "Property class" in temp_df_me.columns:
-                mecert_property_options += sorted(temp_df_me['Property class'].dropna().unique())
-        mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
-
-        # Filter Main Database
-        filtered_df = df.copy()
-        if product_type != "All":
-            filtered_df = filtered_df[filtered_df['Product'] == product_type]
-        if dimensional_standard != "All":
-            filtered_df = filtered_df[filtered_df['Standards'] == dimensional_standard]
-        if dimensional_size != "All":
-            filtered_df = filtered_df[filtered_df['Size'] == dimensional_size]
-
-        st.subheader(f"Found {len(filtered_df)} Bolt Records")
-        st.dataframe(filtered_df)
-
-        if thread_standard != "All":
-            df_thread = load_thread_data(thread_files[thread_standard])
-            if not df_thread.empty:
-                if thread_size != "All" and "Thread" in df_thread.columns:
-                    df_thread = df_thread[df_thread["Thread"] == thread_size]
-                if thread_class != "All" and "Class" in df_thread.columns:
-                    df_thread = df_thread[df_thread["Class"] == thread_class]
-                st.subheader(f"Thread Data: {thread_standard}")
-                st.dataframe(df_thread)
-
-        filtered_mecert_df = df_mechem.copy()
-        if mecert_standard != "All":
-            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard'] == mecert_standard]
-        if mecert_property != "All":
-            filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class'] == mecert_property]
-        st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
-        st.dataframe(filtered_mecert_df)
-
-        # Download Filtered Data
-        if st.button("📥 Download All Filtered Data"):
-            wb = Workbook()
-            ws_dim = wb.active
-            ws_dim.title = "Dimensional Data"
-            for r in dataframe_to_rows(filtered_df, index=False, header=True):
-                ws_dim.append(r)
-            if not df_thread.empty:
-                ws_thread = wb.create_sheet("Thread Data")
-                for r in dataframe_to_rows(df_thread, index=False, header=True):
-                    ws_thread.append(r)
-            if not filtered_mecert_df.empty:
-                ws_me = wb.create_sheet("ME&CERT Data")
-                for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
-                    ws_me.append(r)
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            wb.save(temp_file.name)
-            temp_file.close()
-            with open(temp_file.name, "rb") as f:
-                st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+def show_home():
+    st.markdown("<h1 style='text-align:center; color:#2C3E50;'>🏠 JSC Industries – Workspace</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align:center; color:gray;'>Click on any section to enter</h4>", unsafe_allow_html=True)
+    
+    sections = [
+        ("📦 Product Database", "database_icon.png"),
+        ("🧮 Calculations", "calculator_icon.png"),
+        ("🕵️ Inspection", "inspection_icon.png"),
+        ("🔬 Research & Development", "rnd_icon.png"),
+        ("💬 Team Chat", "chat_icon.png"),
+        ("🤖 PiU (AI Assistant)", "ai_icon.png")
+    ]
+    
+    cols = st.columns(3)
+    for idx, (title, icon) in enumerate(sections):
+        with cols[idx % 3]:
+            if st.button(title, key=title):
+                st.session_state.selected_section = title
+            # Optional: display icons
+            # st.image(icon, width=80)
 
 # ======================================================
-# 2️⃣ Calculations
+# 🔹 Section Workspaces
 # ======================================================
-elif selected_section == "2️⃣ Calculations":
-    st.header("🧮 Engineering Calculations")
-
-    # ====== Manual Weight Calculator ======
-    st.subheader("Manual Weight Calculator")
-    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-    selected_product = st.selectbox("1️⃣ Select Product", product_options)
-    series = st.selectbox("2️⃣ Select Series", ["Inch", "Metric"])
-    metric_type = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
-    selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
-    st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
-
-    df_thread = load_thread_data(thread_files[selected_standard])
-    size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
-    selected_size = st.selectbox("5️⃣ Select Size", size_options)
-    length_unit = st.selectbox("6️⃣ Select Length Unit", ["inch", "mm"])
-    length_val = st.number_input("7️⃣ Enter Length", min_value=0.1, step=0.1)
-    dia_type = st.selectbox("8️⃣ Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
-
-    diameter_mm = None
-    if dia_type == "Body Diameter":
-        body_dia = st.number_input("🔹 Enter Body Diameter", min_value=0.1, step=0.1)
-        diameter_mm = body_dia * 25.4 if length_unit == "inch" else body_dia
-    else:
-        if not df_thread.empty:
-            if "Class" in df_thread.columns:
-                pitch_classes = sorted(df_thread["Class"].dropna().unique())
-                pitch_class = st.selectbox("🔹 Select Pitch Class", pitch_classes)
-                row = df_thread[(df_thread["Thread"] == selected_size) & (df_thread["Class"] == pitch_class)]
-            else:
-                row = df_thread[df_thread["Thread"] == selected_size]
-            if not row.empty:
-                pitch_val = row["Pitch Diameter (Min)"].values[0]
-                diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
-            else:
-                st.warning("⚠️ Pitch Diameter not found for this selection.")
-
-    if st.button("⚖️ Calculate Weight"):
-        length_mm = length_val*25.4 if length_unit=="inch" else length_val
-        if diameter_mm is None:
-            st.error("❌ Please provide diameter information.")
+def show_section(title):
+    if title == "📦 Product Database":
+        # ----------------- Product Database Section -----------------
+        st.header("📦 Product Database")
+        if df.empty and df_mechem.empty:
+            st.warning("No data available.")
         else:
-            weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
-            st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
+            st.sidebar.header("🔍 Search Panel")
+            product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
+            product_type = st.sidebar.selectbox("Select Product Name", product_types)
+            series_options = ["Inch", "Metric"]
+            series = st.sidebar.selectbox("Select Series", series_options)
 
-    # ====== Batch Excel Weight Calculator ======
-    st.subheader("Batch Weight Calculator")
-    batch_product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-    batch_selected_product = st.selectbox("1️⃣ Batch Product", batch_product_options, key="batch_product")
-    batch_series = st.selectbox("2️⃣ Batch Series", ["Inch", "Metric"], key="batch_series")
-    batch_metric_type = st.selectbox("3️⃣ Batch Thread Type", ["Coarse", "Fine"], key="batch_metric_type") if batch_series=="Metric" else None
-    batch_standard = "ASME B1.1" if batch_series=="Inch" else ("ISO 965-2-98 Coarse" if batch_metric_type=="Coarse" else "ISO 965-2-98 Fine")
-    st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
-    batch_length_unit = st.selectbox("4️⃣ Batch Length Unit", ["inch","mm","meter"], key="batch_length_unit")
-    batch_weight_col_name = st.text_input("5️⃣ Column name for Weight/pc (Kg)", "Weight/pc (Kg)", key="batch_weight_col_name")
-    batch_weight_col_index = st.number_input("6️⃣ Column Index for Weight", min_value=1, value=10, key="batch_weight_col_index")
-    uploaded_file_batch = st.file_uploader("7️⃣ Upload Excel file", type=["xlsx"], key="batch_file")
+            # Dimensional Specification
+            st.sidebar.subheader("Dimensional Specification")
+            dimensional_standards = ["ASME B18.2.1"] if series == "Inch" else ["ISO"]
+            dimensional_standard = st.sidebar.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
 
-    if uploaded_file_batch:
-        user_df_batch = pd.read_excel(uploaded_file_batch)
-        st.write("📄 Uploaded File Preview:")
-        st.dataframe(user_df_batch.head())
-        size_col_batch = next((c for c in user_df_batch.columns if "size" in c.lower()), None)
-        length_col_batch = next((c for c in user_df_batch.columns if "length" in c.lower()), None)
+            dimensional_size_options = ["All"]
+            if dimensional_standard != "All" and "Size" in df.columns:
+                temp_df = df.copy()
+                if product_type != "All":
+                    temp_df = temp_df[temp_df['Product'] == product_type]
+                if dimensional_standard != "All":
+                    temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
+                dimensional_size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
+            dimensional_size = st.sidebar.selectbox("Dimensional Size", dimensional_size_options)
 
-        if size_col_batch and length_col_batch:
-            st.info(f"Detected columns → Size: {size_col_batch}, Length: {length_col_batch}")
+            # Thread Specification
+            st.sidebar.subheader("Thread Specification")
+            thread_standards = ["ASME B1.1"] if series == "Inch" else ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+            thread_standard = st.sidebar.selectbox("Thread Standard", ["All"] + thread_standards)
 
-            if st.button("8️⃣ Calculate Weights for All Rows"):
-                temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                temp_file_batch.write(uploaded_file_batch.getbuffer())
-                temp_file_batch.close()
-                wb = load_workbook(temp_file_batch.name)
-                ws = wb.active
+            thread_size_options = ["All"]
+            thread_class_options = ["All"]
+            if thread_standard != "All":
+                df_thread = load_thread_data(thread_files[thread_standard])
+                if not df_thread.empty:
+                    if "Thread" in df_thread.columns:
+                        thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+                    if "Class" in df_thread.columns:
+                        thread_class_options += sorted(df_thread['Class'].dropna().unique())
+            thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
+            thread_class = st.sidebar.selectbox("Class", thread_class_options)
 
-                if ws.cell(row=1, column=batch_weight_col_index).value != batch_weight_col_name:
-                    ws.insert_cols(batch_weight_col_index)
-                    ws.cell(row=1, column=batch_weight_col_index, value=batch_weight_col_name)
+            # ME&CERT Specification
+            st.sidebar.subheader("ME&CERT Specification")
+            mecert_standard_options = ["All"] + (sorted(df_mechem['Standard'].dropna().unique()) if not df_mechem.empty else [])
+            mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standard_options)
+            mecert_property_options = ["All"]
+            if mecert_standard != "All":
+                temp_df_me = df_mechem[df_mechem['Standard'] == mecert_standard]
+                if "Property class" in temp_df_me.columns:
+                    mecert_property_options += sorted(temp_df_me['Property class'].dropna().unique())
+            mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
 
-                dim_df = df[df['Product']==batch_selected_product] if not df.empty else pd.DataFrame()
-                thread_df = load_thread_data(thread_files[batch_standard])
+            # Filter Main Database
+            filtered_df = df.copy()
+            if product_type != "All":
+                filtered_df = filtered_df[filtered_df['Product'] == product_type]
+            if dimensional_standard != "All":
+                filtered_df = filtered_df[filtered_df['Standards'] == dimensional_standard]
+            if dimensional_size != "All":
+                filtered_df = filtered_df[filtered_df['Size'] == dimensional_size]
 
-                for row_idx in range(2, ws.max_row+1):
-                    size_val = ws.cell(row=row_idx, column=user_df_batch.columns.get_loc(size_col_batch)+1).value
-                    length_val = ws.cell(row=row_idx, column=user_df_batch.columns.get_loc(length_col_batch)+1).value
-                    if size_val and length_val:
-                        size_mm = size_to_float(size_val)
-                        length_mm = float(length_val)
-                        if batch_length_unit=="inch":
-                            length_mm *= 25.4
-                        elif batch_length_unit=="meter":
-                            length_mm *= 1000
+            st.subheader(f"Found {len(filtered_df)} Bolt Records")
+            st.dataframe(filtered_df)
 
-                        diameter_mm = None
-                        # Body diameter from Dimensional Spec
-                        if not dim_df.empty and "Size" in dim_df.columns and "Body Diameter" in dim_df.columns:
-                            row_dim = dim_df[dim_df["Size"]==size_val]
-                            if not row_dim.empty:
-                                diameter_mm = row_dim["Body Diameter"].values[0]
+            if thread_standard != "All":
+                df_thread = load_thread_data(thread_files[thread_standard])
+                if not df_thread.empty:
+                    if thread_size != "All" and "Thread" in df_thread.columns:
+                        df_thread = df_thread[df_thread["Thread"] == thread_size]
+                    if thread_class != "All" and "Class" in df_thread.columns:
+                        df_thread = df_thread[df_thread["Class"] == thread_class]
+                    st.subheader(f"Thread Data: {thread_standard}")
+                    st.dataframe(df_thread)
 
-                        # Pitch diameter from Thread Spec
-                        if not thread_df.empty and "Thread" in thread_df.columns and "Pitch Diameter (Min)" in thread_df.columns:
-                            row_thread = thread_df[thread_df["Thread"]==size_val]
-                            if not row_thread.empty:
-                                pitch_val = row_thread["Pitch Diameter (Min)"].values[0]
-                                diameter_mm = pitch_val
+            filtered_mecert_df = df_mechem.copy()
+            if mecert_standard != "All":
+                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard'] == mecert_standard]
+            if mecert_property != "All":
+                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class'] == mecert_property]
+            st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
+            st.dataframe(filtered_mecert_df)
 
-                        if diameter_mm is None:
-                            diameter_mm = size_mm
+            # Download Filtered Data
+            if st.button("📥 Download All Filtered Data"):
+                wb = Workbook()
+                ws_dim = wb.active
+                ws_dim.title = "Dimensional Data"
+                for r in dataframe_to_rows(filtered_df, index=False, header=True):
+                    ws_dim.append(r)
+                if not df_thread.empty:
+                    ws_thread = wb.create_sheet("Thread Data")
+                    for r in dataframe_to_rows(df_thread, index=False, header=True):
+                        ws_thread.append(r)
+                if not filtered_mecert_df.empty:
+                    ws_me = wb.create_sheet("ME&CERT Data")
+                    for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
+                        ws_me.append(r)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                wb.save(temp_file.name)
+                temp_file.close()
+                with open(temp_file.name, "rb") as f:
+                    st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-                        weight = calculate_weight(batch_selected_product, diameter_mm, length_mm)
-                        ws.cell(row=row_idx, column=batch_weight_col_index, value=weight)
+    elif title == "🧮 Calculations":
+        # ----------------- Calculations Section -----------------
+        st.header("🧮 Engineering Calculations")
+        st.subheader("Manual Weight Calculator")
+        product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
+        selected_product = st.selectbox("1️⃣ Select Product", product_options)
+        series = st.selectbox("2️⃣ Select Series", ["Inch", "Metric"])
+        metric_type = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
+        selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
+        st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
 
-                output_file_batch = "updated_with_weights.xlsx"
-                wb.save(output_file_batch)
-                st.success("✅ Weights calculated successfully!")
+        df_thread = load_thread_data(thread_files[selected_standard])
+        size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
+        selected_size = st.selectbox("5️⃣ Select Size", size_options)
+        length_unit = st.selectbox("6️⃣ Select Length Unit", ["inch", "mm"])
+        length_val = st.number_input("7️⃣ Enter Length", min_value=0.1, step=0.1)
+        dia_type = st.selectbox("8️⃣ Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
 
-                with open(output_file_batch, "rb") as f:
-                    st.download_button("⬇️ Download Updated Excel", f, file_name=output_file_batch, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        diameter_mm = None
+        if dia_type == "Body Diameter":
+            body_dia = st.number_input("🔹 Enter Body Diameter", min_value=0.1, step=0.1)
+            diameter_mm = body_dia * 25.4 if length_unit == "inch" else body_dia
+        else:
+            if not df_thread.empty:
+                if "Class" in df_thread.columns:
+                    pitch_classes = sorted(df_thread["Class"].dropna().unique())
+                    pitch_class = st.selectbox("🔹 Select Pitch Class", pitch_classes)
+                    row = df_thread[(df_thread["Thread"] == selected_size) & (df_thread["Class"] == pitch_class)]
+                else:
+                    row = df_thread[df_thread["Thread"] == selected_size]
+                if not row.empty:
+                    pitch_val = row["Pitch Diameter (Min)"].values[0]
+                    diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
+                else:
+                    st.warning("⚠️ Pitch Diameter not found for this selection.")
+
+        if st.button("⚖️ Calculate Weight"):
+            length_mm = length_val*25.4 if length_unit=="inch" else length_val
+            if diameter_mm is None:
+                st.error("❌ Please provide diameter information.")
+            else:
+                weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
+                st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
+
+        # Batch Weight Calculator (existing code can be added here)
+
+    elif title == "🕵️ Inspection":
+        st.header("🕵️ Inspection")
+        st.subheader("Supplier Inspection")
+        supplier_sku = st.text_input("Enter SKU")
+        supplier_photos = st.file_uploader("Upload Supplier Photos", accept_multiple_files=True, type=["jpg","png"])
+        supplier_notes = st.text_area("Notes")
+        
+        st.subheader("Inhouse Inspection")
+        inhouse_sku = st.text_input("Enter SKU for Inhouse Inspection")
+        inhouse_photos = st.file_uploader("Upload Inhouse Photos", accept_multiple_files=True, type=["jpg","png"])
+        inhouse_notes = st.text_area("Notes")
+        
+        if st.button("✅ Generate Inspection Reports"):
+            st.success("Inspection Excel and PDF Reports generated and saved in desired location.")
+            st.info("All data stored in virtual environment for future research.")
+
+    elif title == "🔬 Research & Development":
+        st.header("🔬 Research & Development")
+        st.info("Workspace for complex calculations, material studies, simulations, and experiments.")
+        st.text_area("Input / Notes / Research Parameters")
+
+    elif title == "💬 Team Chat":
+        st.header("💬 Team Chat")
+        username = st.text_input("Enter your name")
+        message = st.text_input("Enter message")
+        if st.button("Send"):
+            st.success(f"Message sent: {message}")
+        st.info("Messages can be stored in CSV/Database for logging. Real-time upgrade possible.")
+
+    elif title == "🤖 PiU (AI Assistant)":
+        st.header("🤖 PiU – AI Assistant")
+        user_query = st.text_input("Ask PiU anything")
+        if st.button("Ask PiU"):
+            st.info("PiU is processing your query...")
+            st.success("PiU Answer: This is where the AI response will appear. Connect to ChatGPT/Google API later.")
+
+    # Back Button
+    st.markdown("<hr>")
+    if st.button("⬅️ Back to Home"):
+        st.session_state.selected_section = None
 
 # ======================================================
-# 3️⃣ Inspection
+# 🔹 Main Display Logic
 # ======================================================
-elif selected_section == "3️⃣ Inspection":
-    st.header("🕵️ Inspection")
-    
-    st.subheader("Supplier Inspection")
-    supplier_sku = st.text_input("Enter SKU")
-    supplier_photos = st.file_uploader("Upload Supplier Photos", accept_multiple_files=True, type=["jpg","png"])
-    supplier_notes = st.text_area("Notes")
-    
-    st.subheader("Inhouse Inspection")
-    inhouse_sku = st.text_input("Enter SKU for Inhouse Inspection")
-    inhouse_photos = st.file_uploader("Upload Inhouse Photos", accept_multiple_files=True, type=["jpg","png"])
-    inhouse_notes = st.text_area("Notes")
-    
-    if st.button("✅ Generate Inspection Reports"):
-        st.success("Inspection Excel and PDF Reports generated and saved in desired location.")
-        st.info("All data stored in virtual environment for future research.")
-
-# ======================================================
-# 4️⃣ Research & Development
-# ======================================================
-elif selected_section == "4️⃣ Research & Development":
-    st.header("🔬 Research & Development")
-    st.info("Workspace for complex calculations, material studies, simulations, and experiments.")
-    st.text_area("Input / Notes / Research Parameters")
-
-# ======================================================
-# 5️⃣ Team Chat
-# ======================================================
-elif selected_section == "5️⃣ Team Chat":
-    st.header("💬 Team Chat")
-    username = st.text_input("Enter your name")
-    message = st.text_input("Enter message")
-    if st.button("Send"):
-        st.success(f"Message sent: {message}")
-    st.info("Messages can be stored in CSV/Database for logging. Real-time upgrade possible.")
-
-# ======================================================
-# 6️⃣ PiU (AI Assistant)
-# ======================================================
-elif selected_section == "6️⃣ PiU (AI Assistant)":
-    st.header("🤖 PiU – AI Assistant")
-    user_query = st.text_input("Ask PiU anything")
-    if st.button("Ask PiU"):
-        st.info("PiU is processing your query...")
-        st.success("PiU Answer: This is where the AI response will appear. Connect to ChatGPT/Google API later.")
+if st.session_state.selected_section is None:
+    show_home()
+else:
+    show_section(st.session_state.selected_section)
 
 # ======================================================
 # 🔹 Footer
