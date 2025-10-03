@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from fractions import Fraction
 from openpyxl import load_workbook, Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
 from datetime import datetime
 
@@ -79,7 +78,7 @@ def calculate_weight(product, diameter_mm, length_mm):
         factor = 1.0
     volume = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
     weight_kg = volume * density * factor / 1000
-    return round(weight_kg, 4)  # 4 decimal places
+    return round(weight_kg, 4)
 
 # ======================================================
 # 🔹 Initialize Session State
@@ -110,46 +109,12 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 TDS Generation Helper
-# ======================================================
-def generate_tds(template_file, supplier, product_name, length_val, size_val, marking, grade, filtered_df, filtered_mecert_df):
-    wb = load_workbook(template_file)
-    ws = wb.active
-    
-    ws["B2"] = supplier
-    ws["B3"] = product_name
-    ws["B4"] = f"Size: {size_val}, Length: {length_val}"
-    ws["B5"] = marking
-    ws["B6"] = grade
-    
-    row_start = 10
-    for idx, row in filtered_df.iterrows():
-        col = 1
-        for val in row:
-            ws.cell(row=row_start, column=col, value=val)
-            col += 1
-        row_start += 1
-    
-    row_start += 2
-    for idx, row in filtered_mecert_df.iterrows():
-        col = 1
-        for val in row:
-            ws.cell(row=row_start, column=col, value=val)
-            col += 1
-        row_start += 1
-    
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    wb.save(temp_file.name)
-    return temp_file.name
-
-# ======================================================
 # 🔹 Section Workspaces
 # ======================================================
 def show_section(title):
     if title == "📦 Product Database":
         st.header("📦 Product Database")
-        # …[Existing Product DB & TDS code]…
-        pass
+        pass  # Keep existing code
 
     elif title == "🧮 Calculations":
         st.header("🧮 Engineering Calculations")
@@ -174,17 +139,12 @@ def show_section(title):
             diameter_mm = body_dia * 25.4 if length_unit=="inch" else body_dia
         else:
             if not df_thread.empty:
-                if "Class" in df_thread.columns:
-                    pitch_classes = sorted(df_thread["Class"].dropna().unique())
-                    pitch_class = st.selectbox("🔹 Select Pitch Class", pitch_classes)
-                    row = df_thread[(df_thread["Thread"]==selected_size) & (df_thread["Class"]==pitch_class)]
-                else:
-                    row = df_thread[df_thread["Thread"]==selected_size]
+                row = df_thread[df_thread["Thread"]==selected_size]
                 if not row.empty:
                     pitch_val = row["Pitch Diameter (Min)"].values[0]
                     diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
                 else:
-                    st.warning("⚠️ Pitch Diameter not found for this selection.")
+                    st.warning("⚠️ Pitch Diameter not found.")
 
         if st.button("⚖️ Calculate Weight"):
             length_mm = length_val*25.4 if length_unit=="inch" else length_val
@@ -195,7 +155,7 @@ def show_section(title):
                 st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
 
         # ======================================================
-        # 🔹 Batch Weight Calculator (Correct Version)
+        # 🔹 Batch Weight Calculator (Universal)
         # ======================================================
         st.subheader("📊 Batch Weight Calculator")
         batch_selected_product = st.selectbox("1️⃣ Select Product for Batch", product_options, key="batch_product")
@@ -211,39 +171,44 @@ def show_section(title):
             st.write("📄 Uploaded File Preview:")
             st.dataframe(batch_df.head())
 
-            required_cols = ["Product","Size","Length","Unit"]
+            # Auto-detect required columns
+            required_cols = ["Product","Size","Length"]
             if all(col in batch_df.columns for col in required_cols):
                 if st.button("⚖️ Calculate Batch Weights", key="calc_batch_weights"):
-                    weights = []
                     df_thread_batch = load_thread_data(thread_files[batch_standard])
                     df_dim_batch = df[df['Product']==batch_selected_product]
+
+                    # Ensure weight column exists or create
+                    weight_col_name = "Weight/pc (Kg)"
+                    if weight_col_name not in batch_df.columns:
+                        batch_df[weight_col_name] = 0
 
                     for idx, row in batch_df.iterrows():
                         prod = row["Product"]
                         size_val = row["Size"]
                         length_val = float(row["Length"])
-                        unit = row["Unit"].lower()
+                        unit = row.get("Unit","mm").lower()  # Default mm
 
                         # Convert length to mm
                         length_mm = length_val
                         if unit=="inch":
-                            length_mm = length_val*25.4
+                            length_mm *= 25.4
                         elif unit=="meter":
-                            length_mm = length_val*1000
+                            length_mm *= 1000
 
-                        # Determine diameter
+                        # Determine diameter from database
                         diameter_mm = None
                         # Check Dimensional DB first
-                        if not df_dim_batch.empty and "Size" in df_dim_batch.columns and "Body Diameter" in df_dim_batch.columns:
-                            dim_row = df_dim_batch[df_dim_batch["Size"]==size_val]
-                            if not dim_row.empty:
-                                diameter_mm = dim_row["Body Diameter"].values[0]
-                        # Check Thread DB
-                        if not df_thread_batch.empty and "Thread" in df_thread_batch.columns and "Pitch Diameter (Min)" in df_thread_batch.columns:
-                            thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
-                            if not thread_row.empty:
-                                diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
-                        # Fallback
+                        dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
+                        if not dim_row.empty and "Body Diameter" in dim_row.columns:
+                            diameter_mm = dim_row["Body Diameter"].values[0]
+
+                        # Check Thread DB for Pitch Diameter
+                        thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val] if not df_thread_batch.empty else pd.DataFrame()
+                        if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                            diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
+
+                        # Fallback if no DB info
                         if diameter_mm is None:
                             try:
                                 diameter_mm = float(size_val)
@@ -251,8 +216,8 @@ def show_section(title):
                                 diameter_mm = 0
 
                         weight = calculate_weight(prod, diameter_mm, length_mm)
-                        weights.append(weight)
-                    batch_df["Weight_Kg"] = weights
+                        batch_df.at[idx, weight_col_name] = weight
+
                     st.dataframe(batch_df)
 
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
@@ -263,8 +228,6 @@ def show_section(title):
                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             else:
                 st.error(f"❌ Uploaded file must contain columns: {', '.join(required_cols)}")
-
-    # …[Other sections like Inspection, R&D, Team Chat, PiU]…
 
     # Back Button
     st.markdown("<hr>")
@@ -288,4 +251,3 @@ st.markdown("""
     © JSC Industries Pvt Ltd | Born to Perform
 </div>
 """, unsafe_allow_html=True)
-
