@@ -302,7 +302,7 @@ def show_section(title):
                 st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
 
         # ------------------------
-        # Batch Weight Calculator
+        # Batch Weight Calculator (FIXED)
         # ------------------------
         st.subheader("Batch Weight Calculator")
         batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
@@ -334,7 +334,7 @@ def show_section(title):
                         size_val = row["Size"]
                         length_val = float(row["Length"])
 
-                        # Use dropdown selected unit for all rows
+                        # Convert length according to selected batch unit
                         length_mm = length_val
                         if batch_length_unit=="inch":
                             length_mm *= 25.4
@@ -359,12 +359,13 @@ def show_section(title):
                             except:
                                 diameter_mm = 0
 
+                        # Calculate weight
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
 
                     st.dataframe(batch_df)
 
-                    # Save Excel safely
+                    # Save Excel safely without distortion
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     batch_df.to_excel(temp_file.name, index=False)
                     temp_file.close()
