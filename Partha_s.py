@@ -108,8 +108,6 @@ def show_home():
         with cols[idx % 3]:
             if st.button(title, key=title):
                 st.session_state.selected_section = title
-            # Optional: display icons
-            # st.image(icon, width=80)
 
 # ======================================================
 # 🔹 TDS Generation Helper
@@ -118,14 +116,12 @@ def generate_tds(template_file, supplier, product_name, length_val, size_val, ma
     wb = load_workbook(template_file)
     ws = wb.active
     
-    # Example: update cells (modify according to your template)
     ws["B2"] = supplier
     ws["B3"] = product_name
     ws["B4"] = f"Size: {size_val}, Length: {length_val}"
     ws["B5"] = marking
     ws["B6"] = grade
     
-    # Dimensional Data (assuming starts at row 10)
     row_start = 10
     for idx, row in filtered_df.iterrows():
         col = 1
@@ -134,7 +130,6 @@ def generate_tds(template_file, supplier, product_name, length_val, size_val, ma
             col += 1
         row_start += 1
     
-    # ME&CERT Data (assuming starts at row after dimensional)
     row_start += 2
     for idx, row in filtered_mecert_df.iterrows():
         col = 1
@@ -165,7 +160,6 @@ def show_section(title):
                 series_options = ["Inch", "Metric"]
                 series = st.selectbox("Select Series", series_options)
                 
-                # Dimensional Filter
                 dimensional_standards = ["ASME B18.2.1"] if series=="Inch" else ["ISO"]
                 dimensional_standard = st.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
                 
@@ -179,7 +173,6 @@ def show_section(title):
                     dimensional_size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
                 dimensional_size = st.selectbox("Dimensional Size", dimensional_size_options)
                 
-                # ME&CERT Filter
                 mecert_standard_options = ["All"] + (sorted(df_mechem['Standard'].dropna().unique()) if not df_mechem.empty else [])
                 mecert_standard = st.selectbox("ME&CERT Standard", mecert_standard_options)
                 mecert_property_options = ["All"]
@@ -189,7 +182,6 @@ def show_section(title):
                         mecert_property_options += sorted(temp_df_me['Property class'].dropna().unique())
                 mecert_property = st.selectbox("Property Class", mecert_property_options)
                 
-                # Filter Data
                 filtered_df = df.copy()
                 if product_type!="All":
                     filtered_df = filtered_df[filtered_df['Product']==product_type]
@@ -291,22 +283,44 @@ def show_section(title):
                 st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
         
         # ======================================================
-        # 🔹 Batch Weight Calculator
+        # 🔹 Batch Weight Calculator (Full Integrated)
         # ======================================================
         st.subheader("📊 Batch Weight Calculator")
-        batch_file = st.file_uploader("Upload Batch Excel/CSV (Columns: Product, Diameter_mm, Length_mm, Series)", type=["xlsx","csv"], key="batch")
+        batch_file = st.file_uploader("Upload Batch Excel/CSV (Columns: Product, Size, Length, Unit)", type=["xlsx","csv"], key="batch")
         if batch_file:
             if batch_file.name.endswith(".csv"):
                 batch_df = pd.read_csv(batch_file)
             else:
                 batch_df = pd.read_excel(batch_file)
 
-            required_cols = ["Product","Diameter_mm","Length_mm","Series"]
+            required_cols = ["Product","Size","Length","Unit"]
             if all(col in batch_df.columns for col in required_cols):
                 if st.button("⚖️ Calculate Batch Weights", key="batch_calc"):
-                    batch_df["Weight_Kg"] = batch_df.apply(
-                        lambda row: calculate_weight(row["Product"], row["Diameter_mm"], row["Length_mm"]), axis=1
-                    )
+                    weights = []
+                    for idx, row in batch_df.iterrows():
+                        prod = row["Product"]
+                        size_val = row["Size"]
+                        length_val = float(row["Length"])
+                        unit = row["Unit"].lower()
+                        length_mm = length_val * 25.4 if unit=="inch" else (length_val*1000 if unit=="meter" else length_val)
+
+                        # Get diameter from Dimensional DB or Thread DB
+                        diameter_mm = None
+                        dim_row = df[(df['Product']==prod) & (df['Size']==size_val)]
+                        if not dim_row.empty and "Body Diameter" in dim_row.columns:
+                            diameter_mm = dim_row["Body Diameter"].values[0]
+                        thread_row = df_thread[df_thread['Thread']==size_val] if not df_thread.empty else pd.DataFrame()
+                        if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                            diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
+
+                        if diameter_mm is None:
+                            try:
+                                diameter_mm = float(size_val)
+                            except:
+                                diameter_mm = 0
+                        weight = calculate_weight(prod, diameter_mm, length_mm)
+                        weights.append(weight)
+                    batch_df["Weight_Kg"] = weights
                     st.dataframe(batch_df)
 
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
