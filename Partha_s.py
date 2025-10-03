@@ -79,7 +79,7 @@ def calculate_weight(product, diameter_mm, length_mm):
         factor = 1.0
     volume = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
     weight_kg = volume * density * factor / 1000
-    return round(weight_kg, 3)
+    return round(weight_kg, 4)  # Changed to 4 decimal places
 
 # ======================================================
 # 🔹 Initialize Session State
@@ -112,117 +112,142 @@ def show_home():
             # st.image(icon, width=80)
 
 # ======================================================
+# 🔹 TDS Generation Helper
+# ======================================================
+def generate_tds(template_file, supplier, product_name, length_val, size_val, marking, grade, filtered_df, filtered_mecert_df):
+    wb = load_workbook(template_file)
+    ws = wb.active
+    
+    # Example: update cells (modify according to your template)
+    ws["B2"] = supplier
+    ws["B3"] = product_name
+    ws["B4"] = f"Size: {size_val}, Length: {length_val}"
+    ws["B5"] = marking
+    ws["B6"] = grade
+    
+    # Dimensional Data (assuming starts at row 10)
+    row_start = 10
+    for idx, row in filtered_df.iterrows():
+        col = 1
+        for val in row:
+            ws.cell(row=row_start, column=col, value=val)
+            col += 1
+        row_start += 1
+    
+    # ME&CERT Data (assuming starts at row after dimensional)
+    row_start += 2
+    for idx, row in filtered_mecert_df.iterrows():
+        col = 1
+        for val in row:
+            ws.cell(row=row_start, column=col, value=val)
+            col += 1
+        row_start += 1
+    
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    wb.save(temp_file.name)
+    return temp_file.name
+
+# ======================================================
 # 🔹 Section Workspaces
 # ======================================================
 def show_section(title):
     if title == "📦 Product Database":
-        # ----------------- Product Database Section -----------------
         st.header("📦 Product Database")
         if df.empty and df_mechem.empty:
             st.warning("No data available.")
         else:
-            st.sidebar.header("🔍 Search Panel")
-            product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
-            product_type = st.sidebar.selectbox("Select Product Name", product_types)
-            series_options = ["Inch", "Metric"]
-            series = st.sidebar.selectbox("Select Series", series_options)
-
-            # Dimensional Specification
-            st.sidebar.subheader("Dimensional Specification")
-            dimensional_standards = ["ASME B18.2.1"] if series == "Inch" else ["ISO"]
-            dimensional_standard = st.sidebar.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
-
-            dimensional_size_options = ["All"]
-            if dimensional_standard != "All" and "Size" in df.columns:
-                temp_df = df.copy()
-                if product_type != "All":
-                    temp_df = temp_df[temp_df['Product'] == product_type]
-                if dimensional_standard != "All":
-                    temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
-                dimensional_size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
-            dimensional_size = st.sidebar.selectbox("Dimensional Size", dimensional_size_options)
-
-            # Thread Specification
-            st.sidebar.subheader("Thread Specification")
-            thread_standards = ["ASME B1.1"] if series == "Inch" else ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-            thread_standard = st.sidebar.selectbox("Thread Standard", ["All"] + thread_standards)
-
-            thread_size_options = ["All"]
-            thread_class_options = ["All"]
-            if thread_standard != "All":
-                df_thread = load_thread_data(thread_files[thread_standard])
-                if not df_thread.empty:
-                    if "Thread" in df_thread.columns:
-                        thread_size_options += sorted(df_thread['Thread'].dropna().unique())
-                    if "Class" in df_thread.columns:
-                        thread_class_options += sorted(df_thread['Class'].dropna().unique())
-            thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
-            thread_class = st.sidebar.selectbox("Class", thread_class_options)
-
-            # ME&CERT Specification
-            st.sidebar.subheader("ME&CERT Specification")
-            mecert_standard_options = ["All"] + (sorted(df_mechem['Standard'].dropna().unique()) if not df_mechem.empty else [])
-            mecert_standard = st.sidebar.selectbox("ME&CERT Standard", mecert_standard_options)
-            mecert_property_options = ["All"]
-            if mecert_standard != "All":
-                temp_df_me = df_mechem[df_mechem['Standard'] == mecert_standard]
-                if "Property class" in temp_df_me.columns:
-                    mecert_property_options += sorted(temp_df_me['Property class'].dropna().unique())
-            mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
-
-            # Filter Main Database
-            filtered_df = df.copy()
-            if product_type != "All":
-                filtered_df = filtered_df[filtered_df['Product'] == product_type]
-            if dimensional_standard != "All":
-                filtered_df = filtered_df[filtered_df['Standards'] == dimensional_standard]
-            if dimensional_size != "All":
-                filtered_df = filtered_df[filtered_df['Size'] == dimensional_size]
-
-            st.subheader(f"Found {len(filtered_df)} Bolt Records")
-            st.dataframe(filtered_df)
-
-            if thread_standard != "All":
-                df_thread = load_thread_data(thread_files[thread_standard])
-                if not df_thread.empty:
-                    if thread_size != "All" and "Thread" in df_thread.columns:
-                        df_thread = df_thread[df_thread["Thread"] == thread_size]
-                    if thread_class != "All" and "Class" in df_thread.columns:
-                        df_thread = df_thread[df_thread["Class"] == thread_class]
-                    st.subheader(f"Thread Data: {thread_standard}")
-                    st.dataframe(df_thread)
-
-            filtered_mecert_df = df_mechem.copy()
-            if mecert_standard != "All":
-                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard'] == mecert_standard]
-            if mecert_property != "All":
-                filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class'] == mecert_property]
-            st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
-            st.dataframe(filtered_mecert_df)
-
-            # Download Filtered Data
-            if st.button("📥 Download All Filtered Data"):
-                wb = Workbook()
-                ws_dim = wb.active
-                ws_dim.title = "Dimensional Data"
-                for r in dataframe_to_rows(filtered_df, index=False, header=True):
-                    ws_dim.append(r)
-                if not df_thread.empty:
-                    ws_thread = wb.create_sheet("Thread Data")
-                    for r in dataframe_to_rows(df_thread, index=False, header=True):
-                        ws_thread.append(r)
-                if not filtered_mecert_df.empty:
+            tab1, tab2 = st.tabs(["🔍 Search Database", "📝 Create Technical Data Sheet"])
+            
+            with tab1:
+                st.subheader("Database Search")
+                product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
+                product_type = st.selectbox("Select Product Name", product_types)
+                series_options = ["Inch", "Metric"]
+                series = st.selectbox("Select Series", series_options)
+                
+                # Dimensional Filter
+                dimensional_standards = ["ASME B18.2.1"] if series=="Inch" else ["ISO"]
+                dimensional_standard = st.selectbox("Dimensional Standard", ["All"] + dimensional_standards)
+                
+                dimensional_size_options = ["All"]
+                if dimensional_standard != "All" and "Size" in df.columns:
+                    temp_df = df.copy()
+                    if product_type != "All":
+                        temp_df = temp_df[temp_df['Product']==product_type]
+                    if dimensional_standard != "All":
+                        temp_df = temp_df[temp_df['Standards']==dimensional_standard]
+                    dimensional_size_options += sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
+                dimensional_size = st.selectbox("Dimensional Size", dimensional_size_options)
+                
+                # ME&CERT Filter
+                mecert_standard_options = ["All"] + (sorted(df_mechem['Standard'].dropna().unique()) if not df_mechem.empty else [])
+                mecert_standard = st.selectbox("ME&CERT Standard", mecert_standard_options)
+                mecert_property_options = ["All"]
+                if mecert_standard != "All":
+                    temp_df_me = df_mechem[df_mechem['Standard']==mecert_standard]
+                    if "Property class" in temp_df_me.columns:
+                        mecert_property_options += sorted(temp_df_me['Property class'].dropna().unique())
+                mecert_property = st.selectbox("Property Class", mecert_property_options)
+                
+                # Filter Data
+                filtered_df = df.copy()
+                if product_type!="All":
+                    filtered_df = filtered_df[filtered_df['Product']==product_type]
+                if dimensional_standard!="All":
+                    filtered_df = filtered_df[filtered_df['Standards']==dimensional_standard]
+                if dimensional_size!="All":
+                    filtered_df = filtered_df[filtered_df['Size']==dimensional_size]
+                
+                st.subheader(f"Found {len(filtered_df)} Bolt Records")
+                st.dataframe(filtered_df)
+                
+                filtered_mecert_df = df_mechem.copy()
+                if mecert_standard!="All":
+                    filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard']==mecert_standard]
+                if mecert_property!="All":
+                    filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class']==mecert_property]
+                st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
+                st.dataframe(filtered_mecert_df)
+                
+                if st.button("📥 Download All Filtered Data"):
+                    wb = Workbook()
+                    ws_dim = wb.active
+                    ws_dim.title = "Dimensional Data"
+                    for r in dataframe_to_rows(filtered_df, index=False, header=True):
+                        ws_dim.append(r)
                     ws_me = wb.create_sheet("ME&CERT Data")
                     for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
                         ws_me.append(r)
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                wb.save(temp_file.name)
-                temp_file.close()
-                with open(temp_file.name, "rb") as f:
-                    st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+                    wb.save(temp_file.name)
+                    with open(temp_file.name,"rb") as f:
+                        st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx",
+                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            with tab2:
+                st.subheader("Create Technical Data Sheet")
+                tds_template = st.file_uploader("Upload TDS Excel Template (from GitHub)", type=["xlsx"])
+                supplier_name = st.text_input("Supplier Name")
+                product_name = st.selectbox("Product Name", df['Product'].dropna().unique())
+                size_val = st.text_input("Size (from DB)")
+                length_val = st.number_input("Length", min_value=1.0, step=0.1)
+                marking = st.selectbox("Marking", ["Yes", "No"])
+                if marking=="No":
+                    marking_value = "NA"
+                else:
+                    marking_value = st.text_input("Enter Marking Value")
+                grade_standard = st.selectbox("Grade Standard", df_mechem['Standard'].dropna().unique())
+                grade_property = st.selectbox("Grade Property", df_mechem['Property class'].dropna().unique())
+                grade_value = f"{grade_standard}-{grade_property}"
+                
+                if st.button("✅ Generate TDS") and tds_template is not None:
+                    tds_file = generate_tds(tds_template.name, supplier_name, product_name, length_val, size_val,
+                                            marking_value, grade_value, filtered_df, filtered_mecert_df)
+                    with open(tds_file,"rb") as f:
+                        st.download_button("⬇️ Download Generated TDS", f, file_name="Technical_Data_Sheet.xlsx",
+                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    
     elif title == "🧮 Calculations":
-        # ----------------- Calculations Section -----------------
         st.header("🧮 Engineering Calculations")
         st.subheader("Manual Weight Calculator")
         product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
@@ -231,32 +256,32 @@ def show_section(title):
         metric_type = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
         selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
         st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
-
+        
         df_thread = load_thread_data(thread_files[selected_standard])
         size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
         selected_size = st.selectbox("5️⃣ Select Size", size_options)
         length_unit = st.selectbox("6️⃣ Select Length Unit", ["inch", "mm"])
         length_val = st.number_input("7️⃣ Enter Length", min_value=0.1, step=0.1)
         dia_type = st.selectbox("8️⃣ Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
-
+        
         diameter_mm = None
         if dia_type == "Body Diameter":
             body_dia = st.number_input("🔹 Enter Body Diameter", min_value=0.1, step=0.1)
-            diameter_mm = body_dia * 25.4 if length_unit == "inch" else body_dia
+            diameter_mm = body_dia * 25.4 if length_unit=="inch" else body_dia
         else:
             if not df_thread.empty:
                 if "Class" in df_thread.columns:
                     pitch_classes = sorted(df_thread["Class"].dropna().unique())
                     pitch_class = st.selectbox("🔹 Select Pitch Class", pitch_classes)
-                    row = df_thread[(df_thread["Thread"] == selected_size) & (df_thread["Class"] == pitch_class)]
+                    row = df_thread[(df_thread["Thread"]==selected_size) & (df_thread["Class"]==pitch_class)]
                 else:
-                    row = df_thread[df_thread["Thread"] == selected_size]
+                    row = df_thread[df_thread["Thread"]==selected_size]
                 if not row.empty:
                     pitch_val = row["Pitch Diameter (Min)"].values[0]
                     diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
                 else:
                     st.warning("⚠️ Pitch Diameter not found for this selection.")
-
+        
         if st.button("⚖️ Calculate Weight"):
             length_mm = length_val*25.4 if length_unit=="inch" else length_val
             if diameter_mm is None:
@@ -264,8 +289,6 @@ def show_section(title):
             else:
                 weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
                 st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
-
-        # Batch Weight Calculator (existing code can be added here)
 
     elif title == "🕵️ Inspection":
         st.header("🕵️ Inspection")
