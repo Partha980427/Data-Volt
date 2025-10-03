@@ -80,6 +80,20 @@ def calculate_weight(product, diameter_mm, length_mm):
     weight_kg = volume * density * factor / 1000
     return round(weight_kg, 4)
 
+def convert_to_mm(length_val, unit):
+    """Convert any supported unit to mm"""
+    unit = unit.lower()
+    if unit == "mm":
+        return length_val
+    elif unit == "inch":
+        return length_val * 25.4
+    elif unit == "meter":
+        return length_val * 1000
+    elif unit == "ft":
+        return length_val * 304.8
+    else:
+        return length_val
+
 # ======================================================
 # 🔹 Initialize Session State
 # ======================================================
@@ -129,14 +143,14 @@ def show_section(title):
         df_thread = load_thread_data(thread_files[selected_standard])
         size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
         selected_size = st.selectbox("5️⃣ Select Size", size_options)
-        length_unit = st.selectbox("6️⃣ Select Length Unit", ["inch", "mm"])
+        length_unit = st.selectbox("6️⃣ Select Length Unit", ["mm","inch","meter","ft"])  # Added ft
         length_val = st.number_input("7️⃣ Enter Length", min_value=0.1, step=0.1)
         dia_type = st.selectbox("8️⃣ Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
 
         diameter_mm = None
         if dia_type == "Body Diameter":
             body_dia = st.number_input("🔹 Enter Body Diameter", min_value=0.1, step=0.1)
-            diameter_mm = body_dia * 25.4 if length_unit=="inch" else body_dia
+            diameter_mm = convert_to_mm(body_dia, length_unit)
         else:
             if not df_thread.empty:
                 row = df_thread[df_thread["Thread"]==selected_size]
@@ -147,7 +161,7 @@ def show_section(title):
                     st.warning("⚠️ Pitch Diameter not found.")
 
         if st.button("⚖️ Calculate Weight"):
-            length_mm = length_val*25.4 if length_unit=="inch" else length_val
+            length_mm = convert_to_mm(length_val, length_unit)  # Always convert to mm internally
             if diameter_mm is None:
                 st.error("❌ Please provide diameter information.")
             else:
@@ -155,7 +169,7 @@ def show_section(title):
                 st.success(f"✅ Estimated Weight/pc: **{weight_kg} Kg**")
 
         # ======================================================
-        # 🔹 Batch Weight Calculator (Universal)
+        # 🔹 Batch Weight Calculator
         # ======================================================
         st.subheader("📊 Batch Weight Calculator")
         batch_selected_product = st.selectbox("1️⃣ Select Product for Batch", product_options, key="batch_product")
@@ -163,7 +177,7 @@ def show_section(title):
         batch_metric_type = st.selectbox("3️⃣ Select Thread Type", ["Coarse", "Fine"], key="batch_metric_type") if batch_series=="Metric" else None
         batch_standard = "ASME B1.1" if batch_series=="Inch" else ("ISO 965-2-98 Coarse" if batch_metric_type=="Coarse" else "ISO 965-2-98 Fine")
         st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
-        batch_length_unit = st.selectbox("4️⃣ Select Length Unit", ["inch","mm","meter"], key="batch_length_unit")
+        batch_length_unit = st.selectbox("4️⃣ Select Length Unit", ["mm","inch","meter","ft"], key="batch_length_unit")  # Added ft
         uploaded_file_batch = st.file_uploader("5️⃣ Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
 
         if uploaded_file_batch:
@@ -171,14 +185,12 @@ def show_section(title):
             st.write("📄 Uploaded File Preview:")
             st.dataframe(batch_df.head())
 
-            # Auto-detect required columns
             required_cols = ["Product","Size","Length"]
             if all(col in batch_df.columns for col in required_cols):
                 if st.button("⚖️ Calculate Batch Weights", key="calc_batch_weights"):
                     df_thread_batch = load_thread_data(thread_files[batch_standard])
                     df_dim_batch = df[df['Product']==batch_selected_product]
 
-                    # Ensure weight column exists or create
                     weight_col_name = "Weight/pc (Kg)"
                     if weight_col_name not in batch_df.columns:
                         batch_df[weight_col_name] = 0
@@ -187,28 +199,18 @@ def show_section(title):
                         prod = row["Product"]
                         size_val = row["Size"]
                         length_val = float(row["Length"])
-                        unit = row.get("Unit","mm").lower()  # Default mm
+                        unit = row.get("Unit", batch_length_unit).lower()  # Default to selected unit
+                        length_mm = convert_to_mm(length_val, unit)  # Always convert to mm
 
-                        # Convert length to mm
-                        length_mm = length_val
-                        if unit=="inch":
-                            length_mm *= 25.4
-                        elif unit=="meter":
-                            length_mm *= 1000
-
-                        # Determine diameter from database
                         diameter_mm = None
-                        # Check Dimensional DB first
                         dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
                         if not dim_row.empty and "Body Diameter" in dim_row.columns:
                             diameter_mm = dim_row["Body Diameter"].values[0]
 
-                        # Check Thread DB for Pitch Diameter
                         thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val] if not df_thread_batch.empty else pd.DataFrame()
                         if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
                             diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
 
-                        # Fallback if no DB info
                         if diameter_mm is None:
                             try:
                                 diameter_mm = float(size_val)
@@ -219,7 +221,6 @@ def show_section(title):
                         batch_df.at[idx, weight_col_name] = weight
 
                     st.dataframe(batch_df)
-
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     batch_df.to_excel(temp_file.name, index=False)
                     with open(temp_file.name,"rb") as f:
@@ -229,7 +230,6 @@ def show_section(title):
             else:
                 st.error(f"❌ Uploaded file must contain columns: {', '.join(required_cols)}")
 
-    # Back Button
     st.markdown("<hr>")
     if st.button("⬅️ Back to Home"):
         st.session_state.selected_section = None
