@@ -249,14 +249,16 @@ def show_section(title):
     elif title == "🧮 Calculations":
         st.header("🧮 Engineering Calculations")
 
-        # Manual Calculator (unchanged)
-        st.subheader("Manual Weight Calculator")
+        # ------------------------
+        # Manual Weight Calculator
+        # ------------------------
         product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
         selected_product = st.selectbox("Select Product", product_options)
         series = st.selectbox("Select Series", ["Inch", "Metric"])
         metric_type = st.selectbox("Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
         selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
         st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
+
         df_thread = load_thread_data(thread_files[selected_standard])
         size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
         selected_size = st.selectbox("Select Size", size_options)
@@ -275,6 +277,7 @@ def show_section(title):
                     diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
                 else:
                     st.warning("⚠️ Pitch Diameter not found.")
+
         if st.button("Calculate Weight"):
             length_mm = length_val
             if length_unit=="inch":
@@ -289,7 +292,9 @@ def show_section(title):
                 weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
                 st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
 
-        # Batch Calculator (FIXED)
+        # ------------------------
+        # Batch Weight Calculator with Class Dropdown for Inch
+        # ------------------------
         st.subheader("Batch Weight Calculator")
         batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
         batch_series = st.selectbox("Select Series", ["Inch", "Metric"], key="batch_series")
@@ -298,6 +303,15 @@ def show_section(title):
         st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
         batch_length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","FT"], key="batch_length_unit")
         uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
+
+        batch_class = None
+        if batch_series=="Inch" and not df_thread.empty:
+            df_thread_batch = load_thread_data(thread_files[batch_standard])
+            class_options = ["All"]
+            if "Class" in df_thread_batch.columns:
+                class_options += sorted(df_thread_batch["Class"].dropna().unique())
+            batch_class = st.selectbox("Select Class", class_options, key="batch_class")
+
         if uploaded_file_batch:
             batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
             st.write("Uploaded File Preview:")
@@ -310,6 +324,7 @@ def show_section(title):
                     weight_col_name = "Weight/pc (Kg)"
                     if weight_col_name not in batch_df.columns:
                         batch_df[weight_col_name] = 0
+
                     for idx, row in batch_df.iterrows():
                         prod = row["Product"]
                         size_val = row["Size"]
@@ -322,24 +337,37 @@ def show_section(title):
                             length_mm *= 1000
                         elif batch_length_unit=="FT":
                             length_mm *= 304.8
-                        # Determine diameter
+
+                        # Determine diameter using Size + Class for Inch
                         diameter_mm = None
                         dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
                         if not dim_row.empty and "Body Diameter" in dim_row.columns:
                             diameter_mm = dim_row["Body Diameter"].values[0]
-                        thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val] if not df_thread_batch.empty else pd.DataFrame()
+
+                        thread_row = pd.DataFrame()
+                        if batch_series=="Inch":
+                            if batch_class != "All" and df_thread_batch is not None:
+                                thread_row = df_thread_batch[(df_thread_batch["Thread"]==size_val) & (df_thread_batch["Class"]==batch_class)]
+                            else:
+                                thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
+                        else:
+                            thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
+
                         if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
                             diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
-                            if batch_series == "Inch":   # Convert Pitch Diameter inch → mm
+                            if batch_series=="Inch":
                                 diameter_mm *= 25.4
+
                         if diameter_mm is None:
                             try:
                                 diameter_mm = float(size_val)
                             except:
                                 diameter_mm = 0
+
                         # Calculate weight
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
+
                     st.dataframe(batch_df)
                     # Save Excel safely
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
