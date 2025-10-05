@@ -377,7 +377,7 @@ def show_section(title):
                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # ======================================================
-    # 🔹 PiU AI Assistant Section
+    # 🔹 PiU AI Assistant Section (UPGRADED)
     # ======================================================
     elif title == "🤖 PiU (AI Assistant)":
         st.header("🤖 PiU – AI Assistant (Optional)")
@@ -389,28 +389,37 @@ def show_section(title):
             if ai_query.strip() == "":
                 st.warning("Please type a question.")
             else:
-                # AI processing (search your data)
-                response = "Sorry, no matching data found."
+                response_parts = []
 
-                # Search in product database
+                # Search in Product Database
                 if df is not None and not df.empty:
-                    df_lower = df.applymap(lambda x: str(x).lower())
-                    mask = df_lower.apply(lambda row: row.astype(str).str.contains(ai_query.lower()).any(), axis=1)
-                    filtered = df[mask]
-                    if not filtered.empty:
-                        response = f"Found {len(filtered)} matching product records:\n"
-                        response += filtered.to_string(index=False)
+                    mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_prod = df[mask_prod]
+                    if not filtered_prod.empty:
+                        response_parts.append(f"✅ Found {len(filtered_prod)} matching Product records:\n{filtered_prod.to_string(index=False)}")
+
+                # Search in Thread Data
+                for file in thread_files.values():
+                    df_thread_temp = load_thread_data(file)
+                    if not df_thread_temp.empty:
+                        mask_thread = df_thread_temp.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                        filtered_thread = df_thread_temp[mask_thread]
+                        if not filtered_thread.empty:
+                            response_parts.append(f"🔧 Found {len(filtered_thread)} matching Thread records in {file}:\n{filtered_thread.to_string(index=False)}")
 
                 # Search in ME&CERT
-                if (df_mechem is not None and not df_mechem.empty) and response == "Sorry, no matching data found.":
-                    df_me_lower = df_mechem.applymap(lambda x: str(x).lower())
-                    mask_me = df_me_lower.apply(lambda row: row.astype(str).str.contains(ai_query.lower()).any(), axis=1)
+                if df_mechem is not None and not df_mechem.empty:
+                    mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
                     filtered_me = df_mechem[mask_me]
                     if not filtered_me.empty:
-                        response = f"Found {len(filtered_me)} ME&CERT records:\n"
-                        response += filtered_me.to_string(index=False)
+                        response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
 
-                st.text_area("AI Response:", value=response, height=300)
+                if response_parts:
+                    response = "\n\n".join(response_parts)
+                else:
+                    response = "❌ Sorry, no matching data found."
+
+                st.text_area("AI Response:", value=response, height=400)
 
     st.markdown("<hr>")
     if st.button("Back to Home"):
