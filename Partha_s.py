@@ -150,7 +150,7 @@ def show_section(title):
         if df.empty and df_mechem.empty:
             st.warning("No data available.")
         else:
-            # Sidebar filters (unchanged)
+            # Sidebar filters
             st.sidebar.header("🔍 Filter Options")
             product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
             product_type = st.sidebar.selectbox("Select Product", product_types)
@@ -248,7 +248,6 @@ def show_section(title):
 
     elif title == "🧮 Calculations":
         st.header("🧮 Engineering Calculations")
-
         # ------------------------
         # Manual Weight Calculator
         # ------------------------
@@ -293,7 +292,7 @@ def show_section(title):
                 st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
 
         # ------------------------
-        # Batch Weight Calculator with Class Dropdown for Inch
+        # Batch Weight Calculator
         # ------------------------
         st.subheader("Batch Weight Calculator")
         batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
@@ -376,6 +375,42 @@ def show_section(title):
                     with open(temp_file.name,"rb") as f:
                         st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    # ======================================================
+    # 🔹 PiU AI Assistant Section
+    # ======================================================
+    elif title == "🤖 PiU (AI Assistant)":
+        st.header("🤖 PiU – AI Assistant (Optional)")
+        st.info("You can ask questions about your products, threads, or ME&CERT data.")
+
+        ai_query = st.text_area("Enter your question for the AI:")
+
+        if st.button("Ask AI"):
+            if ai_query.strip() == "":
+                st.warning("Please type a question.")
+            else:
+                # AI processing (search your data)
+                response = "Sorry, no matching data found."
+
+                # Search in product database
+                if df is not None and not df.empty:
+                    df_lower = df.applymap(lambda x: str(x).lower())
+                    mask = df_lower.apply(lambda row: row.astype(str).str.contains(ai_query.lower()).any(), axis=1)
+                    filtered = df[mask]
+                    if not filtered.empty:
+                        response = f"Found {len(filtered)} matching product records:\n"
+                        response += filtered.to_string(index=False)
+
+                # Search in ME&CERT
+                if (df_mechem is not None and not df_mechem.empty) and response == "Sorry, no matching data found.":
+                    df_me_lower = df_mechem.applymap(lambda x: str(x).lower())
+                    mask_me = df_me_lower.apply(lambda row: row.astype(str).str.contains(ai_query.lower()).any(), axis=1)
+                    filtered_me = df_mechem[mask_me]
+                    if not filtered_me.empty:
+                        response = f"Found {len(filtered_me)} ME&CERT records:\n"
+                        response += filtered_me.to_string(index=False)
+
+                st.text_area("AI Response:", value=response, height=300)
 
     st.markdown("<hr>")
     if st.button("Back to Home"):
