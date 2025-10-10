@@ -156,8 +156,21 @@ def show_section(title):
             product_type = st.sidebar.selectbox("Select Product", product_types)
             series_options = ["Inch","Metric"]
             series = st.sidebar.selectbox("Select Series", series_options)
+            
+            # =======================
+            # 🔹 Auto Select Standard Feature
+            # =======================
+            if product_type=="Hex Bolt":
+                if series=="Inch":
+                    dimensional_standard_default = "ASME B18.2.1"
+                else:
+                    dimensional_standard_default = "ISO 4014 / ISO 4017"
+            else:
+                dimensional_standard_default = "All"
+            
             dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
-            dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
+            dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards, index=dimensional_standards.index(dimensional_standard_default) if dimensional_standard_default in dimensional_standards else 0)
+            
             size_options = ["All"]
             temp_df = df.copy()
             if product_type != "All":
