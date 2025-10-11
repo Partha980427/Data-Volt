@@ -367,14 +367,22 @@ def show_section(title):
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
 
+                    st.subheader("✅ Calculated Batch Weights")
                     st.dataframe(batch_df)
-                    # Save Excel safely
+
+                    # -----------------------------
+                    # Download button for batch weights
+                    # -----------------------------
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
                     batch_df.to_excel(temp_file.name, index=False)
                     temp_file.close()
-                    with open(temp_file.name,"rb") as f:
-                        st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
-                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    with open(temp_file.name, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Download Calculated Batch Weights",
+                            data=f,
+                            file_name="Batch_Weights_Calculated.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
 
     # ======================================================
     # 🔹 PiU AI Assistant Section (UPGRADED)
