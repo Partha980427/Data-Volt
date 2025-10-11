@@ -10,8 +10,8 @@ from datetime import datetime
 # ======================================================
 # 🔹 Clear Streamlit Caches (for development)
 # ======================================================
-st.cache_data.clear()
-st.cache_resource.clear()
+# st.cache_data.clear()  # Uncomment only for development
+# st.cache_resource.clear()  # Uncomment only for development
 
 # ======================================================
 # 🔹 Page Setup
@@ -92,6 +92,10 @@ def calculate_weight(product, diameter_mm, length_mm):
 # ======================================================
 if "selected_section" not in st.session_state:
     st.session_state.selected_section = None
+
+# Initialize batch result dataframe in session_state
+if "batch_result_df" not in st.session_state:
+    st.session_state.batch_result_df = None
 
 # ======================================================
 # 🔹 Home Dashboard
@@ -318,7 +322,6 @@ def show_section(title):
                 class_options += sorted(df_thread_batch["Class"].dropna().unique())
             batch_class = st.selectbox("Select Class", class_options, key="batch_class")
 
-        batch_result_df = None
         if uploaded_file_batch:
             batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
             st.write("Uploaded File Preview:")
@@ -375,13 +378,14 @@ def show_section(title):
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
 
-                    batch_result_df = batch_df
-                    st.dataframe(batch_result_df)
+                    # Store in session_state for download
+                    st.session_state.batch_result_df = batch_df
+                    st.dataframe(batch_df)
 
         # 🔹 Batch Download Button
-        if batch_result_df is not None:
+        if st.session_state.batch_result_df is not None:
             temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            batch_result_df.to_excel(temp_file_batch.name, index=False)
+            st.session_state.batch_result_df.to_excel(temp_file_batch.name, index=False)
             temp_file_batch.close()
             with open(temp_file_batch.name,"rb") as f:
                 st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
