@@ -8,9 +8,16 @@ import tempfile
 from datetime import datetime
 
 # ======================================================
+# 🔹 Clear Streamlit Caches (for development)
+# ======================================================
+st.cache_data.clear()
+st.cache_resource.clear()
+
+# ======================================================
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
+st.markdown("**App Version: 2.0 – Batch Download Added ✅**")
 
 # ======================================================
 # 🔹 Load Databases
@@ -311,6 +318,7 @@ def show_section(title):
                 class_options += sorted(df_thread_batch["Class"].dropna().unique())
             batch_class = st.selectbox("Select Class", class_options, key="batch_class")
 
+        batch_result_df = None
         if uploaded_file_batch:
             batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
             st.write("Uploaded File Preview:")
@@ -367,46 +375,34 @@ def show_section(title):
                         weight = calculate_weight(prod, diameter_mm, length_mm)
                         batch_df.at[idx, weight_col_name] = weight
 
-                    st.subheader("✅ Calculated Batch Weights")
-                    st.dataframe(batch_df)
+                    batch_result_df = batch_df
+                    st.dataframe(batch_result_df)
 
-                    # -----------------------------
-                    # Download button for batch weights
-                    # -----------------------------
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    batch_df.to_excel(temp_file.name, index=False)
-                    temp_file.close()
-                    with open(temp_file.name, "rb") as f:
-                        st.download_button(
-                            label="⬇️ Download Calculated Batch Weights",
-                            data=f,
-                            file_name="Batch_Weights_Calculated.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
+        # 🔹 Batch Download Button
+        if batch_result_df is not None:
+            temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+            batch_result_df.to_excel(temp_file_batch.name, index=False)
+            temp_file_batch.close()
+            with open(temp_file_batch.name,"rb") as f:
+                st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # ======================================================
-    # 🔹 PiU AI Assistant Section (UPGRADED)
-    # ======================================================
     elif title == "🤖 PiU (AI Assistant)":
         st.header("🤖 PiU – AI Assistant (Optional)")
         st.info("You can ask questions about your products, threads, or ME&CERT data.")
-
         ai_query = st.text_area("Enter your question for the AI:")
-
         if st.button("Ask AI"):
             if ai_query.strip() == "":
                 st.warning("Please type a question.")
             else:
                 response_parts = []
-
-                # Search in Product Database
+                # Search Product Database
                 if df is not None and not df.empty:
                     mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
                     filtered_prod = df[mask_prod]
                     if not filtered_prod.empty:
                         response_parts.append(f"✅ Found {len(filtered_prod)} matching Product records:\n{filtered_prod.to_string(index=False)}")
-
-                # Search in Thread Data
+                # Search Thread Data
                 for file in thread_files.values():
                     df_thread_temp = load_thread_data(file)
                     if not df_thread_temp.empty:
@@ -414,19 +410,13 @@ def show_section(title):
                         filtered_thread = df_thread_temp[mask_thread]
                         if not filtered_thread.empty:
                             response_parts.append(f"🔧 Found {len(filtered_thread)} matching Thread records in {file}:\n{filtered_thread.to_string(index=False)}")
-
-                # Search in ME&CERT
+                # Search ME&CERT
                 if df_mechem is not None and not df_mechem.empty:
                     mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
                     filtered_me = df_mechem[mask_me]
                     if not filtered_me.empty:
                         response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
-
-                if response_parts:
-                    response = "\n\n".join(response_parts)
-                else:
-                    response = "❌ Sorry, no matching data found."
-
+                response = "\n\n".join(response_parts) if response_parts else "❌ Sorry, no matching data found."
                 st.text_area("AI Response:", value=response, height=400)
 
     st.markdown("<hr>")
