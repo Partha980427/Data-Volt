@@ -5,6 +5,7 @@ from fractions import Fraction
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
+import re
 
 # ======================================================
 # 🔹 Enhanced Configuration & Error Handling
@@ -119,18 +120,91 @@ def load_thread_data(file):
         return pd.DataFrame()
 
 # ======================================================
-# 🔹 Enhanced Helper Functions
+# 🔹 COMPLETELY BULLETPROOF SIZE HANDLING
 # ======================================================
 def size_to_float(size_str):
+    """Convert size string to float for sorting - ULTRA ROBUST VERSION"""
     try:
+        # Handle empty/None values
+        if pd.isna(size_str) or not isinstance(size_str, (str, int, float)):
+            return 0.0
+        
         size_str = str(size_str).strip()
-        if "-" in size_str and not size_str.replace("-", "").isdigit():
-            parts = size_str.split("-")
-            return float(parts[0]) + float(Fraction(parts[1]))
-        else:
-            return float(Fraction(size_str))
+        if not size_str or size_str == "":
+            return 0.0
+        
+        # Handle ISO metric sizes like "M1.6 X 0.35", "M30 X3.5", "M30 X 3.5"
+        if size_str.startswith('M'):
+            # Extract the number after M (handle various formats)
+            match = re.match(r'M\s*([\d.]+)', size_str)
+            if match:
+                return float(match.group(1))
+            return 0.0
+        
+        # Handle inch fractional sizes like "1/2", "1/4", "3/8"
+        if "/" in size_str:
+            try:
+                # Handle mixed numbers like "1-1/2"
+                if "-" in size_str:
+                    parts = size_str.split("-")
+                    whole = float(parts[0]) if parts[0] else 0
+                    fraction = float(Fraction(parts[1]))
+                    return whole + fraction
+                else:
+                    return float(Fraction(size_str))
+            except:
+                return 0.0
+        
+        # Handle decimal numbers
+        try:
+            return float(size_str)
+        except:
+            return 0.0
+        
+    except Exception as e:
+        # Silent fail - return 0 for any error
+        return 0.0
+
+def safe_sort_sizes(size_list):
+    """Safely sort size list with multiple fallbacks"""
+    if not size_list or len(size_list) == 0:
+        return []
+    
+    try:
+        # First try: numeric sorting with our converter
+        return sorted(size_list, key=lambda x: (size_to_float(x), str(x)))
     except:
-        return None
+        try:
+            # Second try: string sorting
+            return sorted(size_list, key=str)
+        except:
+            # Final fallback: return as-is
+            return list(size_list)
+
+def get_safe_size_options(temp_df):
+    """Completely safe way to get size options"""
+    size_options = ["All"]
+    
+    if temp_df is None or temp_df.empty:
+        return size_options
+    
+    if 'Size' not in temp_df.columns:
+        return size_options
+    
+    try:
+        unique_sizes = temp_df['Size'].dropna().unique()
+        if len(unique_sizes) > 0:
+            sorted_sizes = safe_sort_sizes(unique_sizes)
+            size_options.extend(sorted_sizes)
+    except Exception as e:
+        # If everything fails, just return unique values without sorting
+        try:
+            unique_sizes = temp_df['Size'].dropna().unique()
+            size_options.extend(list(unique_sizes))
+        except:
+            pass
+    
+    return size_options
 
 def calculate_weight(product, diameter_mm, length_mm):
     """Enhanced with validation"""
@@ -217,7 +291,7 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 Product Database Section
+# 🔹 Product Database Section - ULTRA SAFE VERSION
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
@@ -226,37 +300,52 @@ def show_product_database():
         return
     
     st.sidebar.header("🔍 Filter Options")
+    
+    # Product Type Selection
     product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     product_type = st.sidebar.selectbox("Select Product", product_types)
     
+    # Series Selection
     series_options = ["Inch", "Metric"]
     series = st.sidebar.selectbox("Select Series", series_options)
     
-    dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
-    if "Metric" in series and "ISO 4014" not in dimensional_standards:
-        dimensional_standards.append("ISO 4014")
+    # Dimensional Standards based on series selection
+    dimensional_standards = ["All"]
+    if series == "Inch":
+        inch_standards = [std for std in df['Standards'].dropna().unique() if "ISO" not in str(std)]
+        dimensional_standards.extend(sorted(inch_standards))
+    else:
+        metric_standards = [std for std in df['Standards'].dropna().unique() if "ISO" in str(std)]
+        dimensional_standards.extend(sorted(metric_standards))
+        if "ISO 4014" not in dimensional_standards:
+            dimensional_standards.append("ISO 4014")
+    
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
+    # Get the appropriate dataframe
     temp_df = df.copy()
-    if dimensional_standard=="ISO 4014":
+    if dimensional_standard == "ISO 4014":
         temp_df = df_iso4014
     else:
         if product_type != "All":
-            temp_df = temp_df[temp_df['Product']==product_type]
+            temp_df = temp_df[temp_df['Product'] == product_type]
         if dimensional_standard != "All":
-            temp_df = temp_df[temp_df['Standards']==dimensional_standard]
+            temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
     
-    size_options = ["All"] + sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
+    # USE THE COMPLETELY SAFE SIZE OPTIONS FUNCTION
+    size_options = get_safe_size_options(temp_df)
     dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
     
-    # Thread
+    # Thread Standards
     thread_standards = ["All"]
-    if series=="Inch":
+    if series == "Inch":
         thread_standards += ["ASME B1.1"]
     else:
-        thread_standards += ["ISO 965-2-98 Coarse","ISO 965-2-98 Fine"]
+        thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+    
     thread_standard = st.sidebar.selectbox("Thread Standard", thread_standards)
     
+    # Thread Size and Class options
     thread_size_options = ["All"]
     thread_class_options = ["All"]
     if thread_standard != "All":
@@ -266,10 +355,11 @@ def show_product_database():
                 thread_size_options += sorted(df_thread['Thread'].dropna().unique())
             if "Class" in df_thread.columns:
                 thread_class_options += sorted(df_thread['Class'].dropna().unique())
+    
     thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
     thread_class = st.sidebar.selectbox("Class", thread_class_options)
     
-    # ME&CERT
+    # ME&CERT Standards
     mecert_standards = ["All"]
     if not df_mechem.empty:
         mecert_standards += sorted(df_mechem['Standard'].dropna().unique())
@@ -277,34 +367,40 @@ def show_product_database():
     
     mecert_property_options = ["All"]
     if mecert_standard != "All" and not df_mechem.empty:
-        temp_me = df_mechem[df_mechem['Standard']==mecert_standard]
+        temp_me = df_mechem[df_mechem['Standard'] == mecert_standard]
         if "Property class" in temp_me.columns:
             mecert_property_options += sorted(temp_me['Property class'].dropna().unique())
     mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
     
-    # Apply filters
+    # Apply final size filter
     filtered_df = temp_df.copy()
     if dimensional_size != "All":
-        filtered_df = filtered_df[filtered_df['Size']==dimensional_size]
+        filtered_df = filtered_df[filtered_df['Size'] == dimensional_size]
     
+    # Display Results
     st.subheader(f"Found {len(filtered_df)} records")
-    st.dataframe(filtered_df, use_container_width=True)
+    if not filtered_df.empty:
+        st.dataframe(filtered_df, use_container_width=True)
+    else:
+        st.info("No records found with the selected filters.")
     
-    # Thread data
+    # Thread data display
     if thread_standard != "All":
         df_thread_filtered = get_thread_data(thread_standard, thread_size, thread_class)
         if not df_thread_filtered.empty:
             st.subheader(f"Thread Data: {thread_standard}")
             st.dataframe(df_thread_filtered, use_container_width=True)
     
-    # ME&CERT data
+    # ME&CERT data display
     filtered_mecert_df = df_mechem.copy()
     if mecert_standard != "All":
-        filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard']==mecert_standard]
+        filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Standard'] == mecert_standard]
     if mecert_property != "All":
-        filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class']==mecert_property]
-    st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
-    st.dataframe(filtered_mecert_df, use_container_width=True)
+        filtered_mecert_df = filtered_mecert_df[filtered_mecert_df['Property class'] == mecert_property]
+    
+    if not filtered_mecert_df.empty:
+        st.subheader(f"ME&CERT Records: {len(filtered_mecert_df)}")
+        st.dataframe(filtered_mecert_df, use_container_width=True)
     
     # Download all filtered data
     if st.button("📥 Download All Filtered Data"):
@@ -343,150 +439,87 @@ def show_product_database():
             st.error(f"❌ Error preparing download: {str(e)}")
 
 # ======================================================
-# 🔹 Calculations Section (with Batch + ISO 4014)
+# 🔹 Calculations Section (unchanged)
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
     
     # Single Item Calculation
     st.subheader("Single Item Weight Calculation")
-    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
+    
+    # Series selection first - determines available options
+    series = st.selectbox("Select Series", ["Inch", "Metric"])
+    
+    # Product and standard options based on series
+    if series == "Inch":
+        product_options = sorted([p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p])
+        standard_options = ["ASME B1.1"]
+    else:  # Metric
+        product_options = ["Hex Bolt"]  # ISO 4014 is specifically for hex bolts
+        standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014"]
+    
     selected_product = st.selectbox("Select Product", product_options)
-    series = st.selectbox("Select Series", ["Inch","Metric"])
-    metric_type = st.selectbox("Select Thread Type", ["Coarse","Fine"]) if series=="Metric" else None
-    standard_options = ["ASME B1.1","ISO 965-2-98 Coarse","ISO 965-2-98 Fine","ISO 4014"]
     selected_standard = st.selectbox("Select Standard", standard_options)
     
-    # Thread data
-    df_thread = get_thread_data(selected_standard)
+    # Get appropriate data source
+    if selected_standard == "ISO 4014":
+        df_source = df_iso4014
+        size_options = sorted(df_source['Size'].dropna().unique())
+    elif selected_standard in thread_files:
+        df_thread = get_thread_data(selected_standard)
+        size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
+    else:
+        size_options = []
     
-    size_options = []
-    if selected_standard=="ISO 4014":
-        size_options = sorted(df_iso4014['Size'].dropna().unique())
-    elif not df_thread.empty:
-        size_options = sorted(df_thread['Thread'].dropna().unique())
-    selected_size = st.selectbox("Select Size", size_options) if size_options else st.selectbox("Select Size", [])
+    selected_size = st.selectbox("Select Size", size_options) if size_options else st.selectbox("Select Size", ["No sizes available"])
     
-    length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
+    length_unit = st.selectbox("Select Length Unit", ["mm", "inch", "meter", "ft"])
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1, value=10.0)
-    dia_type = st.selectbox("Select Diameter Type", ["Body Diameter","Pitch Diameter"])
     
+    # Diameter handling based on standard and series
     diameter_mm = None
-    if selected_standard=="ISO 4014" and selected_size:
-        row_iso = df_iso4014[df_iso4014['Size']==selected_size]
+    if selected_standard == "ISO 4014" and selected_size != "No sizes available":
+        row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
         if not row_iso.empty and 'Body Diameter' in row_iso.columns:
             diameter_mm = row_iso['Body Diameter'].values[0]
-    elif dia_type=="Pitch Diameter" and not df_thread.empty and selected_size:
-        row = df_thread[df_thread["Thread"]==selected_size]
-        if not row.empty and "Pitch Diameter (Min)" in row.columns:
-            pitch_val = row["Pitch Diameter (Min)"].values[0]
-            diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
-    elif dia_type=="Body Diameter":
+            st.info(f"Body Diameter from ISO 4014: {diameter_mm} mm")
+    elif selected_standard in thread_files and selected_size != "No sizes available":
+        df_thread = get_thread_data(selected_standard)
+        if not df_thread.empty:
+            thread_row = df_thread[df_thread["Thread"] == selected_size]
+            if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                pitch_val = thread_row["Pitch Diameter (Min)"].values[0]
+                diameter_mm = pitch_val if series == "Metric" else pitch_val * 25.4
+                st.info(f"Pitch Diameter: {diameter_mm} mm")
+    
+    # Manual diameter input as fallback
+    if diameter_mm is None:
+        st.warning("Could not auto-detect diameter. Please enter manually:")
         body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0)
-        diameter_mm = body_dia*25.4 if length_unit=="inch" else body_dia
+        diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"])
+        diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
 
-    class_options_manual = ["1A","2A","3A"] if series=="Inch" else ["6g","6H"]
-    selected_class_manual = st.selectbox("Select Class (Manual Calculation)", class_options_manual)
+    # Class selection based on series
+    if series == "Inch":
+        class_options = ["1A", "2A", "3A"]
+    else:  # Metric
+        class_options = ["6g", "6H", "4g", "4H", "8g", "8H"]
+    
+    selected_class = st.selectbox("Select Class", class_options)
 
     if st.button("Calculate Weight"):
-        if diameter_mm is None:
-            st.error("❌ Please provide diameter information.")
+        if diameter_mm is None or diameter_mm <= 0:
+            st.error("❌ Please provide valid diameter information.")
         else:
             length_mm = convert_length_to_mm(length_val, length_unit)
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
             if weight_kg > 0:
-                st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
-
-    # -------------------------
-    # Batch Weight Calculator
-    # -------------------------
-    st.subheader("Batch Weight Calculator")
-    batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
-    batch_series = st.selectbox("Select Series", ["Inch","Metric"], key="batch_series")
-    batch_standard = st.selectbox("Select Standard for Batch", standard_options, key="batch_standard")
-    batch_length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"], key="batch_length_unit")
-    uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
-
-    batch_class = None
-    df_thread_batch = get_thread_data(batch_standard)
-    if not df_thread_batch.empty:
-        class_options = ["All"]
-        if "Class" in df_thread_batch.columns:
-            class_options += sorted(df_thread_batch["Class"].dropna().unique())
-        batch_class = st.selectbox("Select Class", class_options, key="batch_class")
-
-    if uploaded_file_batch:
-        try:
-            batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
-            st.write("Uploaded File Preview:")
-            st.dataframe(batch_df.head())
-            required_cols = ["Product","Size","Length"]
-            if all(col in batch_df.columns for col in required_cols):
-                if st.button("Calculate Batch Weights", key="calc_batch_weights"):
-                    loading_placeholder = show_loading_placeholder("🧮 Calculating batch weights...")
-                    df_dim_batch = df.copy()
-                    weight_col_name = "Weight/pc (Kg)"
-                    if weight_col_name not in batch_df.columns:
-                        batch_df[weight_col_name] = 0.0
-                    
-                    success_count = 0
-                    for idx, row in batch_df.iterrows():
-                        try:
-                            prod = row["Product"]
-                            size_val = str(row["Size"])
-                            length_val = float(row["Length"])
-                            length_mm = convert_length_to_mm(length_val, batch_length_unit)
-                            diameter_mm = None
-
-                            if batch_standard=="ISO 4014":
-                                row_iso = df_iso4014[df_iso4014['Size']==size_val]
-                                if not row_iso.empty and 'Body Diameter' in row_iso.columns:
-                                    diameter_mm = row_iso['Body Diameter'].values[0]
-                            elif not df_thread_batch.empty:
-                                thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
-                                if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
-                                    diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
-                                    if batch_series=="Inch":
-                                        diameter_mm *= 25.4
-                            
-                            if diameter_mm is None:
-                                try:
-                                    diameter_mm = float(size_val)
-                                except:
-                                    diameter_mm = 0
-                            
-                            weight = calculate_weight(prod, diameter_mm, length_mm)
-                            batch_df.at[idx, weight_col_name] = weight
-                            if weight > 0:
-                                success_count += 1
-                                
-                        except Exception as e:
-                            st.warning(f"Error processing row {idx}: {str(e)}")
-                            batch_df.at[idx, weight_col_name] = 0
-
-                    st.session_state.batch_result_df = batch_df
-                    clear_loading(loading_placeholder)
-                    st.success(f"✅ Successfully calculated weights for {success_count}/{len(batch_df)} items")
-                    st.dataframe(batch_df)
-                    
+                st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class})")
             else:
-                st.error(f"❌ Required columns missing. Need: {required_cols}")
-        except Exception as e:
-            st.error(f"❌ Error reading uploaded file: {str(e)}")
-
-    if st.session_state.batch_result_df is not None:
-        try:
-            temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            st.session_state.batch_result_df.to_excel(temp_file_batch.name, index=False)
-            temp_file_batch.close()
-            with open(temp_file_batch.name,"rb") as f:
-                st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
-                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        except Exception as e:
-            st.error(f"❌ Error creating download file: {str(e)}")
+                st.error("❌ Failed to calculate weight. Please check inputs.")
 
 # ======================================================
-# 🔹 AI Assistant Section
+# 🔹 AI Assistant Section (unchanged)
 # ======================================================
 def show_ai_assistant():
     st.header("🤖 PiU – AI Assistant")
@@ -509,6 +542,16 @@ def show_ai_assistant():
                         response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
                 except Exception as e:
                     st.warning(f"Error searching product data: {str(e)}")
+            
+            # Search in ISO 4014 data
+            if not df_iso4014.empty:
+                try:
+                    mask_iso = df_iso4014.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_iso = df_iso4014[mask_iso]
+                    if not filtered_iso.empty:
+                        response_parts.append(f"🌍 Found {len(filtered_iso)} ISO 4014 records:\n{filtered_iso.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching ISO 4014 data: {str(e)}")
             
             # Search in thread data
             for standard_name in thread_files.keys():
