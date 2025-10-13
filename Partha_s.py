@@ -102,12 +102,17 @@ if df_iso4014.empty:
     st.info("🔄 Online ISO 4014 file not accessible, trying local version...")
     df_iso4014 = safe_load_excel_file(iso4014_local_path)  # Fallback to local file
 
+# FIXED: Use correct column name "Product Grade" instead of "Grade"
 if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
     df_iso4014['Standards'] = "ISO-4014-2011"
-    if 'Grade' not in df_iso4014.columns:
-        df_iso4014['Grade'] = "A"
+    # Remove the old 'Grade' column if it exists and use 'Product Grade'
+    if 'Grade' in df_iso4014.columns and 'Product Grade' in df_iso4014.columns:
+        df_iso4014 = df_iso4014.drop('Grade', axis=1)
     st.success(f"✅ ISO 4014 data loaded successfully with {len(df_iso4014)} records")
+    
+    # Debug: Show column names
+    st.sidebar.info(f"ISO 4014 Columns: {list(df_iso4014.columns)}")
 else:
     st.warning("⚠️ Could not load ISO 4014 data from any source")
 
@@ -291,7 +296,7 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 Product Database Section - WITH WORKING GRADE FILTER
+# 🔹 Product Database Section - FIXED GRADE COLUMN
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
@@ -332,12 +337,12 @@ def show_product_database():
         if dimensional_standard != "All":
             temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
     
-    # PRODUCT GRADE FILTER - FIXED VERSION
+    # PRODUCT GRADE FILTER - FIXED: Use "Product Grade" column for ISO 4014
     product_grade_options = ["All"]
     if dimensional_standard == "ISO 4014":
-        # For ISO 4014, use the 'Grade' column from the filtered temp_df
-        if not temp_df.empty and 'Grade' in temp_df.columns:
-            grades = temp_df['Grade'].dropna().unique()
+        # FIXED: Use 'Product Grade' column instead of 'Grade'
+        if not temp_df.empty and 'Product Grade' in temp_df.columns:
+            grades = temp_df['Product Grade'].dropna().unique()
             if len(grades) > 0:
                 product_grade_options.extend(sorted(grades))
     else:
@@ -392,10 +397,10 @@ def show_product_database():
     # APPLY ALL FILTERS TO FINAL DATAFRAME
     filtered_df = temp_df.copy()
     
-    # Apply grade filter
+    # Apply grade filter - FIXED: Use "Product Grade" for ISO 4014
     if selected_grade != "All":
-        if dimensional_standard == "ISO 4014" and 'Grade' in filtered_df.columns:
-            filtered_df = filtered_df[filtered_df['Grade'] == selected_grade]
+        if dimensional_standard == "ISO 4014" and 'Product Grade' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Product Grade'] == selected_grade]
         elif 'Product Grade' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Product Grade'] == selected_grade]
     
