@@ -291,7 +291,7 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 Product Database Section - ULTRA SAFE VERSION
+# 🔹 Product Database Section - WITH PRODUCT GRADE DROPDOWN
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
@@ -322,15 +322,36 @@ def show_product_database():
     
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
+    # PRODUCT GRADE FILTER - ADDED FOR ISO 4014
+    product_grade_options = ["All"]
+    if dimensional_standard == "ISO 4014":
+        # For ISO 4014, use the 'Grade' column
+        if not df_iso4014.empty and 'Grade' in df_iso4014.columns:
+            product_grade_options.extend(sorted(df_iso4014['Grade'].dropna().unique()))
+    else:
+        # For other standards, use 'Product Grade' column if it exists
+        if dimensional_standard != "All":
+            temp_grade_df = df[df['Standards'] == dimensional_standard]
+            if 'Product Grade' in temp_grade_df.columns:
+                product_grade_options.extend(sorted(temp_grade_df['Product Grade'].dropna().unique()))
+    
+    selected_grade = st.sidebar.selectbox("Product Grade", product_grade_options)
+    
     # Get the appropriate dataframe
     temp_df = df.copy()
     if dimensional_standard == "ISO 4014":
         temp_df = df_iso4014
+        # Apply grade filter for ISO 4014
+        if selected_grade != "All":
+            temp_df = temp_df[temp_df['Grade'] == selected_grade]
     else:
         if product_type != "All":
             temp_df = temp_df[temp_df['Product'] == product_type]
         if dimensional_standard != "All":
             temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
+        # Apply grade filter for other standards
+        if selected_grade != "All" and 'Product Grade' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product Grade'] == selected_grade]
     
     # USE THE COMPLETELY SAFE SIZE OPTIONS FUNCTION
     size_options = get_safe_size_options(temp_df)
@@ -439,7 +460,7 @@ def show_product_database():
             st.error(f"❌ Error preparing download: {str(e)}")
 
 # ======================================================
-# 🔹 Calculations Section (unchanged)
+# 🔹 Calculations Section
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
@@ -519,7 +540,7 @@ def show_calculations():
                 st.error("❌ Failed to calculate weight. Please check inputs.")
 
 # ======================================================
-# 🔹 AI Assistant Section (unchanged)
+# 🔹 AI Assistant Section
 # ======================================================
 def show_ai_assistant():
     st.header("🤖 PiU – AI Assistant")
