@@ -426,38 +426,89 @@ def get_safe_size_options(temp_df):
     
     return size_options
 
-def calculate_weight(product, diameter_mm, length_mm):
-    """Enhanced with validation"""
+# ======================================================
+# 🔹 ENHANCED WEIGHT CALCULATION WITH ALL PRODUCT TYPES
+# ======================================================
+def calculate_weight_enhanced(product, diameter_mm, length_mm, diameter_type="body"):
+    """Enhanced weight calculation for all product types with diameter type support"""
     if diameter_mm <= 0 or length_mm <= 0:
         st.error("❌ Diameter and length must be positive values")
         return 0
     
     try:
-        density = 0.00785  # g/mm^3
+        density = 0.00785  # g/mm^3 for steel
+        
+        # Calculate shank volume (common for all products)
         V_shank = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
+        
+        # Calculate head/nut volume based on product type
         head_volume = 0
         product_lower = product.lower()
-        if "hex cap" in product_lower:
-            a = 1.5 * diameter_mm
-            h = 0.8 * diameter_mm
+        
+        if "hex cap" in product_lower or "hex bolt" in product_lower:
+            # Hex head bolt
+            a = 1.5 * diameter_mm  # across flats
+            h = 0.8 * diameter_mm  # head height
             head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+            
         elif "heavy hex" in product_lower:
-            a = 2 * diameter_mm
-            h = 1.2 * diameter_mm
+            # Heavy hex bolt
+            a = 2 * diameter_mm  # across flats
+            h = 1.2 * diameter_mm  # head height
             head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+            
         elif "socket head" in product_lower or "low head cap" in product_lower:
+            # Socket head cap screw
             h = 0.6 * diameter_mm
             r = 0.8 * diameter_mm / 2
             head_volume = 3.1416 * r ** 2 * h
+            
         elif "button head" in product_lower:
+            # Button head screw
             h = 0.4 * diameter_mm
             r = 0.9 * diameter_mm / 2
             head_volume = 3.1416 * r ** 2 * h
+            
+        elif "threaded rod" in product_lower or "stud" in product_lower:
+            # Threaded rod or stud - no head, just threaded portion
+            # For threaded rods, we calculate based on nominal diameter
+            # Threaded rods typically have reduced cross-sectional area due to threads
+            if diameter_type == "pitch":
+                # Use pitch diameter for more accurate calculation
+                head_volume = 0
+            else:
+                # Use nominal diameter
+                head_volume = 0
+                
+        elif "nut" in product_lower:
+            # Hex nut - calculate nut volume
+            a = 1.5 * diameter_mm  # across flats
+            h = 0.8 * diameter_mm  # nut height
+            head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+            
+        elif "washer" in product_lower:
+            # Washer - annular volume
+            outer_dia = 2 * diameter_mm
+            inner_dia = diameter_mm
+            thickness = 0.1 * diameter_mm
+            head_volume = 3.1416 * ((outer_dia/2)**2 - (inner_dia/2)**2) * thickness
+            
         else:
-            head_volume = 0.5 * 3.1416 * (diameter_mm / 2) ** 2 * (0.5 * diameter_mm)
+            # Default for unknown products - assume standard hex head
+            a = 1.5 * diameter_mm
+            h = 0.8 * diameter_mm
+            head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+        
+        # For threaded rods and studs, apply thread reduction factor
+        if "threaded rod" in product_lower or "stud" in product_lower:
+            # Thread reduction factor (approximate)
+            thread_reduction = 0.85  # 15% reduction due to threads
+            V_shank = V_shank * thread_reduction
+        
         total_volume = V_shank + head_volume
         weight_kg = total_volume * density / 1000
         return round(weight_kg, 4)
+        
     except Exception as e:
         st.error(f"Calculation error: {str(e)}")
         return 0
@@ -989,7 +1040,7 @@ def show_enhanced_product_database():
                 st.dataframe(filtered_mecert_df, use_container_width=True)
 
 # ======================================================
-# 🔹 Enhanced Calculations Section - FIXED WEIGHT CALCULATION
+# 🔹 ENHANCED CALCULATIONS SECTION WITH ALL PRODUCT TYPES
 # ======================================================
 def show_enhanced_calculations():
     st.markdown("""
@@ -1012,28 +1063,32 @@ def show_enhanced_calculations():
         with col1:
             series = st.selectbox("Measurement System", ["Inch", "Metric"], key="calc_series")
             
+            # Enhanced product options including threaded rod and stud
             if series == "Inch":
-                product_options_from_df = [p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p] if not df.empty else []
+                product_options_from_df = [p for p in df['Product'].dropna().unique() if any(x in p.lower() for x in ['hex', 'bolt', 'screw', 'nut'])] if not df.empty else []
                 unique_products = list(set(product_options_from_df))
-                product_options = sorted(unique_products)
+                product_options = sorted(unique_products) + ["Threaded Rod", "Stud", "Washer"]
                 standard_options = ["ASME B1.1"]
             else:
-                product_options = ["Hex Bolt"]
+                product_options = ["Hex Bolt", "Threaded Rod", "Stud", "Nut", "Washer"]
                 standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014"]
             
             selected_product = st.selectbox("Product Type", product_options)
             selected_standard = st.selectbox("Applicable Standard", standard_options)
+            
+            # Diameter type selection
+            diameter_type = st.radio("Diameter Type", ["Body Diameter", "Pitch Diameter"], 
+                                   help="Select whether to use body diameter or pitch diameter for calculation")
         
         with col2:
-            # Get size options
+            # Get size options based on standard
+            size_options = []
             if selected_standard == "ISO 4014":
                 df_source = df_iso4014
                 size_options = sorted(df_source['Size'].dropna().unique()) if not df_iso4014.empty else []
             elif selected_standard in thread_files:
                 df_thread = get_thread_data(selected_standard)
                 size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
-            else:
-                size_options = []
             
             selected_size = st.selectbox("Size Specification", size_options) if size_options else st.selectbox("Size Specification", ["No sizes available"])
             
@@ -1052,40 +1107,71 @@ def show_enhanced_calculations():
         st.markdown("---")
         if st.button("🚀 Calculate Weight", use_container_width=True, key="calculate_weight"):
             diameter_mm = None
+            diameter_source = ""
             
-            # Auto-detect diameter
-            if selected_standard == "ISO 4014" and selected_size != "No sizes available" and not df_iso4014.empty:
-                row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
-                if not row_iso.empty and 'Body Diameter' in row_iso.columns:
-                    diameter_mm = row_iso['Body Diameter'].values[0]
-                    st.info(f"Body Diameter from ISO 4014: {diameter_mm} mm")
-            elif selected_standard in thread_files and selected_size != "No sizes available":
-                df_thread = get_thread_data(selected_standard)
-                if not df_thread.empty:
-                    thread_row = df_thread[df_thread["Thread"] == selected_size]
-                    if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
-                        pitch_val = thread_row["Pitch Diameter (Min)"].values[0]
-                        diameter_mm = pitch_val if series == "Metric" else pitch_val * 25.4
-                        st.info(f"Pitch Diameter: {diameter_mm} mm")
-            
-            # Manual diameter input as fallback
-            if diameter_mm is None:
-                st.warning("Could not auto-detect diameter. Please enter manually:")
-                manual_col1, manual_col2 = st.columns(2)
-                with manual_col1:
-                    body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
-                with manual_col2:
-                    diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="diameter_unit")
-                diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
+            # Auto-detect diameter based on diameter type selection
+            if diameter_type == "Body Diameter":
+                # Try to get body diameter from data sources
+                if selected_standard == "ISO 4014" and selected_size != "No sizes available" and not df_iso4014.empty:
+                    row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
+                    if not row_iso.empty and 'Body Diameter' in row_iso.columns:
+                        diameter_mm = row_iso['Body Diameter'].values[0]
+                        diameter_source = f"Body Diameter from ISO 4014: {diameter_mm} mm"
+                        st.info(diameter_source)
+                
+                # If body diameter not found, allow manual input
+                if diameter_mm is None:
+                    st.warning("Body diameter not found in database. Please enter manually:")
+                    manual_col1, manual_col2 = st.columns(2)
+                    with manual_col1:
+                        body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
+                    with manual_col2:
+                        diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="diameter_unit")
+                    diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
+                    diameter_source = f"Manual Body Diameter: {diameter_mm:.2f} mm"
+                    
+            else:  # Pitch Diameter
+                # Get pitch diameter from thread data
+                if selected_standard in thread_files and selected_size != "No sizes available":
+                    df_thread = get_thread_data(selected_standard)
+                    if not df_thread.empty:
+                        thread_row = df_thread[df_thread["Thread"] == selected_size]
+                        if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                            pitch_val = thread_row["Pitch Diameter (Min)"].values[0]
+                            diameter_mm = pitch_val if series == "Metric" else pitch_val * 25.4
+                            diameter_source = f"Pitch Diameter from {selected_standard}: {diameter_mm:.2f} mm"
+                            st.info(diameter_source)
+                
+                # If pitch diameter not found, allow manual input
+                if diameter_mm is None:
+                    st.warning("Pitch diameter not found in database. Please enter manually:")
+                    manual_col1, manual_col2 = st.columns(2)
+                    with manual_col1:
+                        pitch_dia = st.number_input("Enter Pitch Diameter", min_value=0.1, step=0.1, value=4.5, key="pitch_dia")
+                    with manual_col2:
+                        diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="pitch_diameter_unit")
+                    diameter_mm = pitch_dia * 25.4 if diameter_unit == "inch" else pitch_dia
+                    diameter_source = f"Manual Pitch Diameter: {diameter_mm:.2f} mm"
 
             # Perform calculation
             if diameter_mm is not None and diameter_mm > 0:
                 length_mm = convert_length_to_mm(length_val, length_unit)
-                weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
+                weight_kg = calculate_weight_enhanced(selected_product, diameter_mm, length_mm, 
+                                                    diameter_type.lower().replace(" ", "_"))
                 if weight_kg > 0:
                     st.success(f"✅ **Calculation Result:**")
                     st.metric("Estimated Weight", f"{weight_kg} Kg", f"Class: {selected_class}")
-                    st.info(f"**Parameters Used:**\n- Product: {selected_product}\n- Diameter: {diameter_mm:.2f} mm\n- Length: {length_mm:.2f} mm\n- Standard: {selected_standard}")
+                    
+                    # Detailed information
+                    st.info(f"""
+                    **Parameters Used:**
+                    - Product: {selected_product}
+                    - {diameter_source}
+                    - Length: {length_mm:.2f} mm ({length_val} {length_unit})
+                    - Standard: {selected_standard}
+                    - Diameter Type: {diameter_type}
+                    - Thread Class: {selected_class}
+                    """)
                     
                     # Save to calculation history
                     calculation_data = {
@@ -1094,7 +1180,9 @@ def show_enhanced_calculations():
                         'weight': weight_kg,
                         'diameter': diameter_mm,
                         'length': length_mm,
-                        'standard': selected_standard
+                        'standard': selected_standard,
+                        'diameter_type': diameter_type,
+                        'class': selected_class
                     }
                     save_calculation_history(calculation_data)
                 else:
