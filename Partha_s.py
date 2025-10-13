@@ -6,9 +6,8 @@ from openpyxl import load_workbook, Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
 import re
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
+import plotly.express as px
 
 # ======================================================
 # 🔹 Enhanced Configuration & Error Handling
@@ -134,10 +133,6 @@ st.markdown("""
     .sidebar .sidebar-content {
         background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
     }
-    .dataframe {
-        border-radius: 10px;
-        overflow: hidden;
-    }
     .feature-badge {
         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         color: white;
@@ -145,6 +140,7 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
+        margin: 0.2rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -153,7 +149,7 @@ st.markdown("""
 initialize_session_state()
 
 # ======================================================
-# 🔹 Paths & Files
+# 🔹 Paths & Files - UPDATED WITH PROPER PATHS
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
@@ -163,10 +159,11 @@ me_chem_path = r"Mechanical and Chemical.xlsx"
 iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
 iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
 
+# Thread files - UPDATED WITH PROPER PATHS
 thread_files = {
-    "ASME B1.1": "ASME B1.1 New.xlsx",
-    "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
-    "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
+    "ASME B1.1": r"G:\My Drive\Streamlite\ASME B1.1 New.xlsx",
+    "ISO 965-2-98 Coarse": r"G:\My Drive\Streamlite\ISO 965-2-98 Coarse.xlsx",
+    "ISO 965-2-98 Fine": r"G:\My Drive\Streamlite\ISO 965-2-98 Fine.xlsx",
 }
 
 # ======================================================
@@ -199,11 +196,18 @@ if not df_iso4014.empty:
         df_iso4014 = df_iso4014.drop('Grade', axis=1)
 
 @st.cache_data
-def load_thread_data(file):
-    if os.path.exists(file):
-        return pd.read_excel(file)
-    else:
-        st.warning(f"Thread file {file} not found!")
+def load_thread_data(file_path):
+    """Load thread data with proper error handling"""
+    try:
+        if os.path.exists(file_path):
+            df_thread = pd.read_excel(file_path)
+            st.sidebar.success(f"✅ Loaded: {os.path.basename(file_path)} - {len(df_thread)} rows")
+            return df_thread
+        else:
+            st.sidebar.error(f"❌ File not found: {os.path.basename(file_path)}")
+            return pd.DataFrame()
+    except Exception as e:
+        st.sidebar.error(f"❌ Error loading {os.path.basename(file_path)}: {str(e)}")
         return pd.DataFrame()
 
 # ======================================================
@@ -375,10 +379,10 @@ def show_enhanced_home():
     # Key Metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    total_products = len(df) + len(df_iso4014)
+    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0)
     total_standards = len(df['Standards'].unique()) + 1 if not df.empty else 1
     total_threads = len(thread_files)
-    total_mecert = len(df_mechem)
+    total_mecert = len(df_mechem) if not df_mechem.empty else 0
     
     with col1:
         st.markdown(f"""
@@ -439,23 +443,19 @@ def show_enhanced_home():
                 }
                 st.session_state.selected_section = section_map.get(key, "📦 Product Database")
     
-    # Recent Activity & System Status
+    # System Status
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown('<h3 class="section-header">📈 System Status</h3>', unsafe_allow_html=True)
         
-        # Data Health Metrics
-        status_data = {
-            "Metric": ["Data Integrity", "ISO 4014 Load", "Thread Data", "ME&CERT Sync"],
-            "Status": ["✅ Optimal", "✅ Connected" if not df_iso4014.empty else "❌ Offline", 
-                      "✅ Available", "✅ Synchronized"],
-            "Value": [98, 95 if not df_iso4014.empty else 0, 100, 92]
-        }
-        status_df = pd.DataFrame(status_data)
-        
-        for _, row in status_df.iterrows():
-            st.progress(row["Value"]/100, text=f"{row['Metric']}: {row['Status']}")
+        # Check thread file status
+        st.write("**Thread Data Status:**")
+        for thread_std, file_path in thread_files.items():
+            if os.path.exists(file_path):
+                st.success(f"✅ {thread_std} - Available")
+            else:
+                st.error(f"❌ {thread_std} - File not found")
     
     with col2:
         st.markdown('<h3 class="section-header">🕒 Recent Features</h3>', unsafe_allow_html=True)
@@ -502,7 +502,8 @@ def show_enhanced_product_database():
     # Quick Stats
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Products", f"{len(df) + len(df_iso4014):,}")
+        total_records = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0)
+        st.metric("Total Products", f"{total_records:,}")
     with col2:
         st.metric("Active Standards", len(df['Standards'].unique()) + 1 if not df.empty else 1)
     with col3:
@@ -513,6 +514,14 @@ def show_enhanced_product_database():
     # Enhanced Filter Section
     with st.sidebar:
         st.markdown("### 🔍 Smart Filters")
+        
+        # Thread Data Status
+        st.markdown("**🔧 Thread Data Status**")
+        for thread_std, file_path in thread_files.items():
+            status = "✅" if os.path.exists(file_path) else "❌"
+            st.write(f"{status} {thread_std}")
+        
+        st.markdown("---")
         
         # Quick Filter Presets
         st.markdown("**🎯 Quick Presets**")
@@ -527,7 +536,7 @@ def show_enhanced_product_database():
         st.markdown("---")
         
         # Main Filters
-        product_types_from_df = list(df['Product'].dropna().unique())
+        product_types_from_df = list(df['Product'].dropna().unique()) if not df.empty else []
         unique_products = list(set(product_types_from_df))
         product_types = ["All"] + sorted(unique_products) + ["Threaded Rod", "Stud", "Hex Bolt"]
         
@@ -540,16 +549,40 @@ def show_enhanced_product_database():
         # Dynamic standards based on series
         dimensional_standards = ["All"]
         if series == "Inch":
-            inch_standards = [std for std in df['Standards'].dropna().unique() if "ISO" not in str(std)]
+            inch_standards = [std for std in df['Standards'].dropna().unique() if "ISO" not in str(std)] if not df.empty else []
             dimensional_standards.extend(sorted(inch_standards))
         else:
-            metric_standards = [std for std in df['Standards'].dropna().unique() if "ISO" in str(std)]
+            metric_standards = [std for std in df['Standards'].dropna().unique() if "ISO" in str(std)] if not df.empty else []
             dimensional_standards.extend(sorted(metric_standards))
             if "ISO 4014" not in dimensional_standards:
                 dimensional_standards.append("ISO 4014")
         
         dimensional_standard = st.selectbox("**Dimensional Standard**", dimensional_standards,
                                            help="Select applicable standard specification")
+        
+        # PRODUCT GRADE FILTER
+        product_grade_options = ["All"]
+        temp_df = df.copy()
+        if dimensional_standard == "ISO 4014":
+            temp_df = df_iso4014 if not df_iso4014.empty else pd.DataFrame()
+        else:
+            if product_type != "All":
+                temp_df = temp_df[temp_df['Product'] == product_type]
+            if dimensional_standard != "All":
+                temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
+        
+        if dimensional_standard == "ISO 4014":
+            if not temp_df.empty and 'Product Grade' in temp_df.columns:
+                grades = temp_df['Product Grade'].dropna().unique()
+                if len(grades) > 0:
+                    product_grade_options.extend(sorted(grades))
+        else:
+            if not temp_df.empty and 'Product Grade' in temp_df.columns:
+                grades = temp_df['Product Grade'].dropna().unique()
+                if len(grades) > 0:
+                    product_grade_options.extend(sorted(grades))
+        
+        selected_grade = st.selectbox("**Product Grade**", product_grade_options)
     
     # Main Content Area
     col1, col2 = st.columns([2, 1])
@@ -564,6 +597,13 @@ def show_enhanced_product_database():
                 temp_df = temp_df[temp_df['Product'] == product_type]
             if dimensional_standard != "All":
                 temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
+        
+        # Apply grade filter
+        if selected_grade != "All":
+            if dimensional_standard == "ISO 4014" and 'Product Grade' in temp_df.columns:
+                temp_df = temp_df[temp_df['Product Grade'] == selected_grade]
+            elif 'Product Grade' in temp_df.columns:
+                temp_df = temp_df[temp_df['Product Grade'] == selected_grade]
         
         # Size filter
         size_options = get_safe_size_options(temp_df)
@@ -596,6 +636,52 @@ def show_enhanced_product_database():
             )
         else:
             st.info("🤔 No records match your current filters. Try adjusting your search criteria.")
+        
+        # Thread Data Section - ALWAYS VISIBLE WHEN THREAD STANDARD IS SELECTED
+        st.markdown("---")
+        st.markdown("### 🔧 Thread Data")
+        
+        # Thread Standards
+        thread_standards = ["All"]
+        if series == "Inch":
+            thread_standards += ["ASME B1.1"]
+        else:
+            thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+        
+        thread_standard = st.selectbox("**Thread Standard**", thread_standards,
+                                      help="Select thread standard to view detailed data")
+        
+        # Thread Size and Class options
+        if thread_standard != "All":
+            df_thread = get_thread_data(thread_standard)
+            if not df_thread.empty:
+                thread_size_options = ["All"]
+                thread_class_options = ["All"]
+                
+                if "Thread" in df_thread.columns:
+                    thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+                if "Class" in df_thread.columns:
+                    thread_class_options += sorted(df_thread['Class'].dropna().unique())
+                
+                thread_size = st.selectbox("**Thread Size**", thread_size_options)
+                thread_class = st.selectbox("**Thread Class**", thread_class_options)
+                
+                # Apply thread filters
+                df_thread_filtered = df_thread.copy()
+                if thread_size != "All":
+                    df_thread_filtered = df_thread_filtered[df_thread_filtered['Thread'] == thread_size]
+                if thread_class != "All":
+                    df_thread_filtered = df_thread_filtered[df_thread_filtered['Class'] == thread_class]
+                
+                if not df_thread_filtered.empty:
+                    st.markdown(f"**Thread Data: {thread_standard}**")
+                    st.dataframe(df_thread_filtered, use_container_width=True)
+                else:
+                    st.info("No thread data matches the selected filters.")
+            else:
+                st.warning(f"No thread data available for {thread_standard}. Check if the file exists at: {thread_files.get(thread_standard, 'Unknown path')}")
+        else:
+            st.info("Select a thread standard to view detailed thread data.")
     
     with col2:
         st.markdown("### 🎯 Quick Insights")
@@ -608,18 +694,29 @@ def show_enhanced_product_database():
                 unique_sizes = filtered_df['Size'].nunique()
                 st.metric("Unique Sizes", unique_sizes)
             
-            # Size distribution chart
+            # Size distribution using Plotly
             if 'Size' in filtered_df.columns and len(filtered_df) > 1:
                 size_counts = filtered_df['Size'].value_counts().head(10)
                 if len(size_counts) > 0:
-                    fig = px.bar(
-                        x=size_counts.index,
-                        y=size_counts.values,
-                        title="Top Sizes Distribution",
-                        labels={'x': 'Size', 'y': 'Count'}
-                    )
-                    fig.update_layout(height=300)
-                    st.plotly_chart(fig, use_container_width=True)
+                    try:
+                        fig = px.bar(
+                            x=size_counts.index,
+                            y=size_counts.values,
+                            title="Top Sizes Distribution",
+                            labels={'x': 'Size', 'y': 'Count'}
+                        )
+                        fig.update_layout(height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                    except Exception as e:
+                        st.info("Chart visualization requires Plotly installation")
+        
+        # ME&CERT Data
+        st.markdown("### 🧪 ME&CERT Data")
+        filtered_mecert_df = df_mechem.copy()
+        if not filtered_mecert_df.empty:
+            st.metric("Available Properties", len(filtered_mecert_df))
+            if st.button("View ME&CERT Data"):
+                st.dataframe(filtered_mecert_df, use_container_width=True)
 
 # ======================================================
 # 🔹 Enhanced Calculations Section
@@ -646,7 +743,7 @@ def show_enhanced_calculations():
             series = st.selectbox("Measurement System", ["Inch", "Metric"], key="calc_series")
             
             if series == "Inch":
-                product_options_from_df = [p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p]
+                product_options_from_df = [p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p] if not df.empty else []
                 unique_products = list(set(product_options_from_df))
                 product_options = sorted(unique_products)
                 standard_options = ["ASME B1.1"]
@@ -661,7 +758,7 @@ def show_enhanced_calculations():
             # Get size options
             if selected_standard == "ISO 4014":
                 df_source = df_iso4014
-                size_options = sorted(df_source['Size'].dropna().unique())
+                size_options = sorted(df_source['Size'].dropna().unique()) if not df_iso4014.empty else []
             elif selected_standard in thread_files:
                 df_thread = get_thread_data(selected_standard)
                 size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
@@ -675,17 +772,53 @@ def show_enhanced_calculations():
         
         # Calculation and results
         if st.button("🚀 Calculate Weight", use_container_width=True):
-            # ... (rest of calculation logic remains the same)
-            st.success("Calculation completed! Check the results panel.")
+            diameter_mm = None
+            
+            if selected_standard == "ISO 4014" and selected_size != "No sizes available" and not df_iso4014.empty:
+                row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
+                if not row_iso.empty and 'Body Diameter' in row_iso.columns:
+                    diameter_mm = row_iso['Body Diameter'].values[0]
+                    st.info(f"Body Diameter from ISO 4014: {diameter_mm} mm")
+            
+            if diameter_mm is None:
+                st.warning("Could not auto-detect diameter. Please enter manually:")
+                body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0)
+                diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"])
+                diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
+
+            if diameter_mm is not None and diameter_mm > 0:
+                length_mm = convert_length_to_mm(length_val, length_unit)
+                weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
+                if weight_kg > 0:
+                    st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
+                else:
+                    st.error("❌ Failed to calculate weight. Please check inputs.")
     
     with tab2:
         st.markdown("### Batch Weight Processor")
-        st.info("Upload a CSV/Excel file with multiple products for batch processing")
-        # Batch processing implementation
+        st.info("📁 Upload a CSV/Excel file with columns: Product, Size, Length")
+        uploaded_file = st.file_uploader("Choose batch file", type=["csv", "xlsx"])
+        
+        if uploaded_file:
+            try:
+                if uploaded_file.name.endswith('.xlsx'):
+                    batch_df = pd.read_excel(uploaded_file)
+                else:
+                    batch_df = pd.read_csv(uploaded_file)
+                
+                st.write("Preview of uploaded data:")
+                st.dataframe(batch_df.head())
+                
+                if st.button("Process Batch", use_container_width=True):
+                    st.success("Batch processing started...")
+                    # Add batch processing logic here
+                    
+            except Exception as e:
+                st.error(f"Error reading file: {str(e)}")
     
     with tab3:
         st.markdown("### Calculation Analytics")
-        st.info("Visual insights and calculation history")
+        st.info("📈 Visual insights and calculation history coming soon...")
         # Analytics implementation
 
 # ======================================================
@@ -723,6 +856,57 @@ def show_enhanced_ai_assistant():
         with quick_col2:
             if st.button("Material Properties", use_container_width=True):
                 ai_query = "Explain mechanical and chemical properties of fastener materials"
+        
+        if st.button("🚀 Ask PiU", use_container_width=True) and ai_query.strip():
+            loading_placeholder = show_loading_placeholder("🤖 PiU is analyzing your query...")
+            
+            response_parts = []
+            
+            # Search in main product data
+            if not df.empty:
+                try:
+                    mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_prod = df[mask_prod]
+                    if not filtered_prod.empty:
+                        response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching product data: {str(e)}")
+            
+            # Search in ISO 4014 data
+            if not df_iso4014.empty:
+                try:
+                    mask_iso = df_iso4014.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_iso = df_iso4014[mask_iso]
+                    if not filtered_iso.empty:
+                        response_parts.append(f"🌍 Found {len(filtered_iso)} ISO 4014 records:\n{filtered_iso.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching ISO 4014 data: {str(e)}")
+            
+            # Search in thread data
+            for standard_name in thread_files.keys():
+                try:
+                    df_thread_temp = get_thread_data(standard_name)
+                    if not df_thread_temp.empty:
+                        mask_thread = df_thread_temp.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                        filtered_thread = df_thread_temp[mask_thread]
+                        if not filtered_thread.empty:
+                            response_parts.append(f"🔧 Found {len(filtered_thread)} Thread records in {standard_name}:\n{filtered_thread.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching thread data for {standard_name}: {str(e)}")
+            
+            # Search in ME&CERT data
+            if not df_mechem.empty:
+                try:
+                    mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_me = df_mechem[mask_me]
+                    if not filtered_me.empty:
+                        response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching ME&CERT data: {str(e)}")
+            
+            clear_loading(loading_placeholder)
+            response = "\n\n".join(response_parts) if response_parts else "❌ Sorry, no matching data found for your query."
+            st.text_area("PiU Response:", value=response, height=400)
     
     with col2:
         st.markdown("### 📚 Capabilities")
@@ -737,10 +921,6 @@ def show_enhanced_ai_assistant():
         
         for cap in capabilities:
             st.markdown(f"• {cap}")
-    
-    if st.button("🚀 Ask PiU", use_container_width=True) and ai_query.strip():
-        # AI response logic (existing implementation)
-        st.success("PiU is analyzing your query...")
 
 # ======================================================
 # 🔹 Section Dispatcher
