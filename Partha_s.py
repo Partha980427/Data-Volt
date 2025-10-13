@@ -10,19 +10,13 @@ import tempfile
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
-st.markdown("**App Version: 2.8 – ISO 4014 Integrated with Batch & AI ✅**")
+st.markdown("**App Version: 2.6 – ISO 4014 Integrated & Batch Weight Calculator ✅**")
 
 # ======================================================
 # 🔹 Paths & Files
 # ======================================================
-# ASME B18.2.1
-url_asme = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
-local_asme_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
-
-# ISO 4014
-url_iso4014 = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
-local_iso4014_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
-
+url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 me_chem_path = r"Mechanical and Chemical.xlsx"
 
 thread_files = {
@@ -30,6 +24,8 @@ thread_files = {
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
 }
+
+iso4014_file_url = "https://github.com/Partha980427/Data-Volt/raw/main/ISO%204014%20Hex%20Bolt.xlsx"
 
 # ======================================================
 # 🔹 Data Loading
@@ -42,24 +38,15 @@ def load_excel_file(path_or_url):
         st.warning(f"Failed to load {path_or_url}: {e}")
         return pd.DataFrame()
 
-# ASME Data
-df_asme = load_excel_file(url_asme)
-if df_asme.empty:
-    df_asme = load_excel_file(local_asme_path)
-
-# ISO 4014 Data
-df_iso4014 = load_excel_file(url_iso4014)
-if df_iso4014.empty:
-    df_iso4014 = load_excel_file(local_iso4014_path)
+df = load_excel_file(url) if url else load_excel_file(local_excel_path)
+df_mechem = load_excel_file(me_chem_path)
+df_iso4014 = load_excel_file(iso4014_file_url)
 
 if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
     df_iso4014['Standards'] = "ISO-4014-2011"
     if 'Grade' not in df_iso4014.columns:
         df_iso4014['Grade'] = "A"
-
-# ME & Chemical Data
-df_mechem = load_excel_file(me_chem_path)
 
 @st.cache_data
 def load_thread_data(file):
@@ -155,26 +142,30 @@ def show_home():
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
-    combined_df = pd.concat([df_asme, df_iso4014], ignore_index=True)
-    if combined_df.empty and df_mechem.empty:
+    if df.empty and df_mechem.empty and df_iso4014.empty:
         st.warning("No data available.")
         return
     
     st.sidebar.header("🔍 Filter Options")
-    product_types = ["All"] + sorted(list(combined_df['Product'].dropna().unique()))
+    product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     product_type = st.sidebar.selectbox("Select Product", product_types)
     
     series_options = ["Inch", "Metric"]
     series = st.sidebar.selectbox("Select Series", series_options)
     
-    dimensional_standards = ["All"] + sorted(combined_df['Standards'].dropna().unique())
+    dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
+    if "Metric" in series and "ISO 4014" not in dimensional_standards:
+        dimensional_standards.append("ISO 4014")
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
-    temp_df = combined_df.copy()
-    if dimensional_standard != "All":
-        temp_df = temp_df[temp_df['Standards']==dimensional_standard]
-    if product_type != "All":
-        temp_df = temp_df[temp_df['Product']==product_type]
+    temp_df = df.copy()
+    if dimensional_standard=="ISO 4014":
+        temp_df = df_iso4014
+    else:
+        if product_type != "All":
+            temp_df = temp_df[temp_df['Product']==product_type]
+        if dimensional_standard != "All":
+            temp_df = temp_df[temp_df['Standards']==dimensional_standard]
     
     size_options = ["All"] + sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
     dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
@@ -266,8 +257,7 @@ def show_product_database():
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
-    combined_df = pd.concat([df_asme, df_iso4014], ignore_index=True)
-    product_options = sorted(list(combined_df['Product'].dropna().unique()))
+    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     selected_product = st.selectbox("Select Product", product_options)
     series = st.selectbox("Select Series", ["Inch","Metric"])
     metric_type = st.selectbox("Select Thread Type", ["Coarse","Fine"]) if series=="Metric" else None
@@ -339,6 +329,7 @@ def show_calculations():
         required_cols = ["Product","Size","Length"]
         if all(col in batch_df.columns for col in required_cols):
             if st.button("Calculate Batch Weights", key="calc_batch_weights"):
+                df_dim_batch = df.copy()
                 weight_col_name = "Weight/pc (Kg)"
                 if weight_col_name not in batch_df.columns:
                     batch_df[weight_col_name] = 0
@@ -389,10 +380,9 @@ def show_ai_assistant():
             st.warning("Please type a question.")
         else:
             response_parts = []
-            combined_df = pd.concat([df_asme, df_iso4014], ignore_index=True)
-            if not combined_df.empty:
-                mask_prod = combined_df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                filtered_prod = combined_df[mask_prod]
+            if not df.empty:
+                mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                filtered_prod = df[mask_prod]
                 if not filtered_prod.empty:
                     response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
             for file in thread_files.values():
