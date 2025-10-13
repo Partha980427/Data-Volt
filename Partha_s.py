@@ -42,6 +42,15 @@ df = load_excel_file(url) if url else load_excel_file(local_excel_path)
 df_mechem = load_excel_file(me_chem_path)
 df_iso4014 = load_excel_file(iso4014_file_url)
 
+# ======================================================
+# 🔹 ISO 4014 Mapping & Grade Column
+# ======================================================
+if not df_iso4014.empty:
+    df_iso4014['Product'] = "Hex Bolt"
+    df_iso4014['Standards'] = "ISO-4014-2011"
+    if 'Grade' not in df_iso4014.columns:
+        df_iso4014['Grade'] = ""  # Empty grade column, user can fill/filter if needed
+
 @st.cache_data
 def load_thread_data(file):
     if os.path.exists(file):
@@ -175,7 +184,7 @@ def show_product_database():
     thread_size_options = ["All"]
     thread_class_options = ["All"]
     if thread_standard != "All":
-        df_thread = load_thread_data(thread_files[thread_standard])
+        df_thread = load_thread_data(thread_files.get(thread_standard,""))
         if not df_thread.empty:
             if "Thread" in df_thread.columns:
                 thread_size_options += sorted(df_thread['Thread'].dropna().unique())
