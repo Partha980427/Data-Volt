@@ -10,13 +10,13 @@ import tempfile
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
-st.markdown("**App Version: 2.8 – ISO 4014 Integrated & Batch Weight Calculator ✅**")
+st.markdown("**App Version: 2.6 – ISO 4014 Integrated & Batch Weight Calculator ✅**")
 
 # ======================================================
 # 🔹 Paths & Files
 # ======================================================
-local_excel_path_asme = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
-local_excel_path_iso4014 = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
+url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 me_chem_path = r"Mechanical and Chemical.xlsx"
 
 thread_files = {
@@ -25,28 +25,28 @@ thread_files = {
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
 }
 
+iso4014_file_url = "https://github.com/Partha980427/Data-Volt/raw/main/ISO%204014%20Hex%20Bolt.xlsx"
+
 # ======================================================
 # 🔹 Data Loading
 # ======================================================
 @st.cache_data
-def load_excel_file(path):
+def load_excel_file(path_or_url):
     try:
-        return pd.read_excel(path)
+        return pd.read_excel(path_or_url)
     except Exception as e:
-        st.warning(f"Failed to load {path}: {e}")
+        st.warning(f"Failed to load {path_or_url}: {e}")
         return pd.DataFrame()
 
-df_asme = load_excel_file(local_excel_path_asme)
-df_iso4014 = load_excel_file(local_excel_path_iso4014)
+df = load_excel_file(url) if url else load_excel_file(local_excel_path)
 df_mechem = load_excel_file(me_chem_path)
+df_iso4014 = load_excel_file(iso4014_file_url)
 
 if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
     df_iso4014['Standards'] = "ISO-4014-2011"
-    if 'Product Grade' not in df_iso4014.columns:
-        df_iso4014['Product Grade'] = "A"
-
-df = pd.concat([df_asme, df_iso4014], ignore_index=True)
+    if 'Grade' not in df_iso4014.columns:
+        df_iso4014['Grade'] = "A"
 
 @st.cache_data
 def load_thread_data(file):
@@ -142,25 +142,30 @@ def show_home():
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
-    if df.empty and df_mechem.empty:
+    if df.empty and df_mechem.empty and df_iso4014.empty:
         st.warning("No data available.")
         return
     
     st.sidebar.header("🔍 Filter Options")
-    product_types = ["All"] + sorted(df['Product'].dropna().unique())
+    product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     product_type = st.sidebar.selectbox("Select Product", product_types)
     
     series_options = ["Inch", "Metric"]
     series = st.sidebar.selectbox("Select Series", series_options)
     
     dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
+    if "Metric" in series and "ISO 4014" not in dimensional_standards:
+        dimensional_standards.append("ISO 4014")
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
     temp_df = df.copy()
-    if product_type != "All":
-        temp_df = temp_df[temp_df['Product']==product_type]
-    if dimensional_standard != "All":
-        temp_df = temp_df[temp_df['Standards']==dimensional_standard]
+    if dimensional_standard=="ISO 4014":
+        temp_df = df_iso4014
+    else:
+        if product_type != "All":
+            temp_df = temp_df[temp_df['Product']==product_type]
+        if dimensional_standard != "All":
+            temp_df = temp_df[temp_df['Standards']==dimensional_standard]
     
     size_options = ["All"] + sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
     dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
@@ -252,17 +257,18 @@ def show_product_database():
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
-    product_options = sorted(df['Product'].dropna().unique())
+    product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     selected_product = st.selectbox("Select Product", product_options)
     series = st.selectbox("Select Series", ["Inch","Metric"])
     metric_type = st.selectbox("Select Thread Type", ["Coarse","Fine"]) if series=="Metric" else None
-    standard_options = ["ASME B1.1","ISO 965-2-98 Coarse","ISO 965-2-98 Fine","ISO-4014-2011"]
+    standard_options = ["ASME B1.1","ISO 965-2-98 Coarse","ISO 965-2-98 Fine","ISO 4014"]
     selected_standard = st.selectbox("Select Standard", standard_options)
     
+    # Thread data
     df_thread = load_thread_data(thread_files[selected_standard]) if selected_standard in thread_files else pd.DataFrame()
     
     size_options = []
-    if selected_standard=="ISO-4014-2011":
+    if selected_standard=="ISO 4014":
         size_options = sorted(df_iso4014['Size'].dropna().unique())
     elif not df_thread.empty:
         size_options = sorted(df_thread['Thread'].dropna().unique())
@@ -273,7 +279,7 @@ def show_calculations():
     dia_type = st.selectbox("Select Diameter Type", ["Body Diameter","Pitch Diameter"])
     
     diameter_mm = None
-    if selected_standard=="ISO-4014-2011":
+    if selected_standard=="ISO 4014":
         row_iso = df_iso4014[df_iso4014['Size']==selected_size]
         if not row_iso.empty and 'Body Diameter' in row_iso.columns:
             diameter_mm = row_iso['Body Diameter'].values[0]
@@ -323,6 +329,7 @@ def show_calculations():
         required_cols = ["Product","Size","Length"]
         if all(col in batch_df.columns for col in required_cols):
             if st.button("Calculate Batch Weights", key="calc_batch_weights"):
+                df_dim_batch = df.copy()
                 weight_col_name = "Weight/pc (Kg)"
                 if weight_col_name not in batch_df.columns:
                     batch_df[weight_col_name] = 0
@@ -333,7 +340,7 @@ def show_calculations():
                     length_mm = convert_length_to_mm(length_val, batch_length_unit)
                     diameter_mm = None
 
-                    if batch_standard=="ISO-4014-2011":
+                    if batch_standard=="ISO 4014":
                         row_iso = df_iso4014[df_iso4014['Size']==size_val]
                         if not row_iso.empty:
                             diameter_mm = row_iso['Body Diameter'].values[0]
