@@ -149,7 +149,7 @@ st.markdown("""
 initialize_session_state()
 
 # ======================================================
-# 🔹 Paths & Files - UPDATED WITH PROPER PATHS
+# 🔹 Paths & Files - UPDATED WITH GOOGLE SHEETS LINKS
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
@@ -159,11 +159,11 @@ me_chem_path = r"Mechanical and Chemical.xlsx"
 iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
 iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
 
-# Thread files - UPDATED WITH PROPER PATHS
+# Thread files - UPDATED WITH GOOGLE SHEETS LINKS
 thread_files = {
-    "ASME B1.1": r"G:\My Drive\Streamlite\ASME B1.1 New.xlsx",
-    "ISO 965-2-98 Coarse": r"G:\My Drive\Streamlite\ISO 965-2-98 Coarse.xlsx",
-    "ISO 965-2-98 Fine": r"G:\My Drive\Streamlite\ISO 965-2-98 Fine.xlsx",
+    "ASME B1.1": "https://docs.google.com/spreadsheets/d/1YHgUloNsFudxxqhWQV66D2DtSSKWFP_w/export?format=xlsx",
+    "ISO 965-2-98 Coarse": "https://docs.google.com/spreadsheets/d/1be5eEy9hbVfMg2sl1-Cz1NNCGGF8EB-L/export?format=xlsx",
+    "ISO 965-2-98 Fine": "https://docs.google.com/spreadsheets/d/1QGQ6SMWBSTsah-vq3zYnhOC3NXaBdKPe/export?format=xlsx",
 }
 
 # ======================================================
@@ -199,15 +199,10 @@ if not df_iso4014.empty:
 def load_thread_data(file_path):
     """Load thread data with proper error handling"""
     try:
-        if os.path.exists(file_path):
-            df_thread = pd.read_excel(file_path)
-            st.sidebar.success(f"✅ Loaded: {os.path.basename(file_path)} - {len(df_thread)} rows")
-            return df_thread
-        else:
-            st.sidebar.error(f"❌ File not found: {os.path.basename(file_path)}")
-            return pd.DataFrame()
+        df_thread = pd.read_excel(file_path)
+        return df_thread
     except Exception as e:
-        st.sidebar.error(f"❌ Error loading {os.path.basename(file_path)}: {str(e)}")
+        st.sidebar.error(f"❌ Error loading thread data: {str(e)}")
         return pd.DataFrame()
 
 # ======================================================
@@ -449,13 +444,19 @@ def show_enhanced_home():
     with col1:
         st.markdown('<h3 class="section-header">📈 System Status</h3>', unsafe_allow_html=True)
         
-        # Check thread file status
-        st.write("**Thread Data Status:**")
-        for thread_std, file_path in thread_files.items():
-            if os.path.exists(file_path):
-                st.success(f"✅ {thread_std} - Available")
+        # Check data status
+        status_items = [
+            ("Main Product Data", not df.empty),
+            ("ISO 4014 Data", not df_iso4014.empty),
+            ("ME&CERT Data", not df_mechem.empty),
+            ("Thread Data", any(not load_thread_data(url).empty for url in thread_files.values()))
+        ]
+        
+        for item_name, status in status_items:
+            if status:
+                st.success(f"✅ {item_name} - Loaded")
             else:
-                st.error(f"❌ {thread_std} - File not found")
+                st.error(f"❌ {item_name} - Not Available")
     
     with col2:
         st.markdown('<h3 class="section-header">🕒 Recent Features</h3>', unsafe_allow_html=True)
@@ -514,14 +515,6 @@ def show_enhanced_product_database():
     # Enhanced Filter Section
     with st.sidebar:
         st.markdown("### 🔍 Smart Filters")
-        
-        # Thread Data Status
-        st.markdown("**🔧 Thread Data Status**")
-        for thread_std, file_path in thread_files.items():
-            status = "✅" if os.path.exists(file_path) else "❌"
-            st.write(f"{status} {thread_std}")
-        
-        st.markdown("---")
         
         # Quick Filter Presets
         st.markdown("**🎯 Quick Presets**")
@@ -637,7 +630,7 @@ def show_enhanced_product_database():
         else:
             st.info("🤔 No records match your current filters. Try adjusting your search criteria.")
         
-        # Thread Data Section - ALWAYS VISIBLE WHEN THREAD STANDARD IS SELECTED
+        # Thread Data Section
         st.markdown("---")
         st.markdown("### 🔧 Thread Data")
         
@@ -679,7 +672,7 @@ def show_enhanced_product_database():
                 else:
                     st.info("No thread data matches the selected filters.")
             else:
-                st.warning(f"No thread data available for {thread_standard}. Check if the file exists at: {thread_files.get(thread_standard, 'Unknown path')}")
+                st.warning(f"No thread data available for {thread_standard}")
         else:
             st.info("Select a thread standard to view detailed thread data.")
     
@@ -719,7 +712,7 @@ def show_enhanced_product_database():
                 st.dataframe(filtered_mecert_df, use_container_width=True)
 
 # ======================================================
-# 🔹 Enhanced Calculations Section
+# 🔹 Enhanced Calculations Section - FIXED WEIGHT CALCULATION
 # ======================================================
 def show_enhanced_calculations():
     st.markdown("""
@@ -769,35 +762,62 @@ def show_enhanced_calculations():
             
             length_val = st.number_input("Length Value", min_value=0.1, value=10.0, step=0.1)
             length_unit = st.selectbox("Length Unit", ["mm", "inch", "meter", "ft"])
-        
-        # Calculation and results
-        if st.button("🚀 Calculate Weight", use_container_width=True):
+            
+            # Class selection based on series
+            if series == "Inch":
+                class_options = ["1A", "2A", "3A"]
+            else:
+                class_options = ["6g", "6H", "4g", "4H", "8g", "8H"]
+            
+            selected_class = st.selectbox("Select Class", class_options)
+
+        # FIXED: Separate calculate button outside columns
+        st.markdown("---")
+        if st.button("🚀 Calculate Weight", use_container_width=True, key="calculate_weight"):
             diameter_mm = None
             
+            # Auto-detect diameter
             if selected_standard == "ISO 4014" and selected_size != "No sizes available" and not df_iso4014.empty:
                 row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
                 if not row_iso.empty and 'Body Diameter' in row_iso.columns:
                     diameter_mm = row_iso['Body Diameter'].values[0]
                     st.info(f"Body Diameter from ISO 4014: {diameter_mm} mm")
+            elif selected_standard in thread_files and selected_size != "No sizes available":
+                df_thread = get_thread_data(selected_standard)
+                if not df_thread.empty:
+                    thread_row = df_thread[df_thread["Thread"] == selected_size]
+                    if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                        pitch_val = thread_row["Pitch Diameter (Min)"].values[0]
+                        diameter_mm = pitch_val if series == "Metric" else pitch_val * 25.4
+                        st.info(f"Pitch Diameter: {diameter_mm} mm")
             
+            # Manual diameter input as fallback
             if diameter_mm is None:
                 st.warning("Could not auto-detect diameter. Please enter manually:")
-                body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0)
-                diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"])
+                manual_col1, manual_col2 = st.columns(2)
+                with manual_col1:
+                    body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
+                with manual_col2:
+                    diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="diameter_unit")
                 diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
 
+            # Perform calculation
             if diameter_mm is not None and diameter_mm > 0:
                 length_mm = convert_length_to_mm(length_val, length_unit)
                 weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
                 if weight_kg > 0:
-                    st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
+                    st.success(f"✅ **Calculation Result:**")
+                    st.metric("Estimated Weight", f"{weight_kg} Kg", f"Class: {selected_class}")
+                    st.info(f"**Parameters Used:**\n- Product: {selected_product}\n- Diameter: {diameter_mm:.2f} mm\n- Length: {length_mm:.2f} mm\n- Standard: {selected_standard}")
                 else:
                     st.error("❌ Failed to calculate weight. Please check inputs.")
+            else:
+                st.error("❌ Please provide valid diameter information.")
     
     with tab2:
         st.markdown("### Batch Weight Processor")
         st.info("📁 Upload a CSV/Excel file with columns: Product, Size, Length")
-        uploaded_file = st.file_uploader("Choose batch file", type=["csv", "xlsx"])
+        uploaded_file = st.file_uploader("Choose batch file", type=["csv", "xlsx"], key="batch_upload")
         
         if uploaded_file:
             try:
@@ -809,7 +829,7 @@ def show_enhanced_calculations():
                 st.write("Preview of uploaded data:")
                 st.dataframe(batch_df.head())
                 
-                if st.button("Process Batch", use_container_width=True):
+                if st.button("Process Batch", use_container_width=True, key="process_batch"):
                     st.success("Batch processing started...")
                     # Add batch processing logic here
                     
