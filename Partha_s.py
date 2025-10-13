@@ -110,9 +110,6 @@ if not df_iso4014.empty:
     if 'Grade' in df_iso4014.columns and 'Product Grade' in df_iso4014.columns:
         df_iso4014 = df_iso4014.drop('Grade', axis=1)
     st.success(f"✅ ISO 4014 data loaded successfully with {len(df_iso4014)} records")
-    
-    # Debug: Show column names
-    st.sidebar.info(f"ISO 4014 Columns: {list(df_iso4014.columns)}")
 else:
     st.warning("⚠️ Could not load ISO 4014 data from any source")
 
