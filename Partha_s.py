@@ -10,6 +10,15 @@ from datetime import datetime
 import plotly.express as px
 import time
 import json
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import chromadb
+from transformers import pipeline
+import spacy
+import torch
+import warnings
+warnings.filterwarnings('ignore')
 
 # ======================================================
 # 🔹 Paths & Files - UPDATED WITH GOOGLE SHEETS LINKS
@@ -107,7 +116,8 @@ def initialize_session_state():
         "calculation_history": [],
         "export_format": "csv",
         "chat_messages": [],
-        "ai_thinking": False
+        "ai_thinking": False,
+        "ai_model_loaded": False
     }
     
     for key, value in defaults.items():
@@ -348,6 +358,10 @@ st.markdown("""
         margin: 0.5rem 0;
         border-left: 4px solid #28a745;
     }
+    .data-table {
+        font-size: 0.8rem;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -394,6 +408,350 @@ def load_thread_data(file_path):
         return pd.DataFrame()
 
 # ======================================================
+# 🔹 ADVANCED AI ASSISTANT WITH SELF-LEARNING CAPABILITIES
+# ======================================================
+class AdvancedFastenerAI:
+    def __init__(self, df, df_iso4014, df_mechem, thread_files):
+        self.df = df
+        self.df_iso4014 = df_iso4014
+        self.df_mechem = df_mechem
+        self.thread_files = thread_files
+        
+        # Initialize AI components with error handling
+        try:
+            self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+            self.qa_pipeline = pipeline("question-answering", 
+                                      model="distilbert-base-cased-distilled-squad")
+            st.session_state.ai_model_loaded = True
+        except Exception as e:
+            st.warning(f"AI models loading issue: {str(e)}")
+            st.session_state.ai_model_loaded = False
+        
+        # Initialize vector database
+        try:
+            self.chroma_client = chromadb.Client()
+            self.collection = self.chroma_client.create_collection(name="fastener_knowledge")
+        except:
+            self.collection = None
+        
+        # Knowledge base and learning memory
+        self.knowledge_base = self._build_knowledge_base()
+        self.learning_memory = {}
+        self.conversation_history = []
+        
+        # Index all database content for semantic search
+        self._index_database_content()
+    
+    def _build_knowledge_base(self):
+        """Build comprehensive fastener knowledge base"""
+        return {
+            'technical_terms': {
+                'tensile_strength': "The maximum stress a material can withstand while being stretched or pulled before breaking",
+                'yield_strength': "The stress at which a material begins to deform plastically. Beyond this point, permanent deformation occurs",
+                'hardness': "Resistance to permanent indentation. Common scales: Rockwell (HRC, HRB), Brinell (HB)",
+                'thread_pitch': "Distance between thread peaks. In metric: distance in mm. In inch: threads per inch (TPI)",
+                'proof_load': "Maximum load a fastener can withstand without permanent deformation",
+                'carbon_content': "Carbon percentage in steel. Affects hardness and strength. C% typically 0.05-0.55% for fastener steels",
+                'manganese': "Mn% improves hardenability and strength. Typically 0.30-1.00% in fastener steels",
+                'phosphorus': "P% impurity that reduces toughness. Limited to 0.04% max in quality fasteners",
+                'sulfur': "S% impurity that reduces ductility. Limited to 0.05% max in quality fasteners",
+            },
+            'material_science': {
+                'carbon_steel': "Iron-carbon alloy with carbon content up to 2.1%. Most common fastener material. Grades: 2, 5, 8",
+                'stainless_steel': "Steel alloy with minimum 10.5% chromium for corrosion resistance. Types: 304, 316, 410",
+                'alloy_steel': "Steel with additional alloying elements like chromium, nickel, molybdenum for enhanced properties",
+                'brass': "Copper-zinc alloy with good corrosion resistance and electrical conductivity",
+            },
+            'grade_properties': {
+                'Grade 2': {
+                    'description': 'Low carbon steel for general purpose applications',
+                    'chemistry': 'C: 0.05-0.31%, Mn: 0.90% max, P: 0.04% max, S: 0.05% max',
+                    'mechanical': 'Tensile: 74,000 psi min, Yield: 57,000 psi min',
+                    'hardness': 'RB 70-100',
+                    'applications': 'General purpose, low stress applications'
+                },
+                'Grade 5': {
+                    'description': 'Medium carbon steel, quenched and tempered',
+                    'chemistry': 'C: 0.28-0.55%, Mn: 0.60% max, P: 0.04% max, S: 0.05% max',
+                    'mechanical': 'Tensile: 120,000 psi min, Yield: 92,000 psi min',
+                    'hardness': 'RC 25-34',
+                    'applications': 'Automotive, machinery, construction'
+                },
+                'Grade 8': {
+                    'description': 'Medium carbon alloy steel, quenched and tempered',
+                    'chemistry': 'C: 0.36-0.55%, Mn: 0.90% max, P: 0.04% max, S: 0.05% max',
+                    'mechanical': 'Tensile: 150,000 psi min, Yield: 130,000 psi min',
+                    'hardness': 'RC 33-39',
+                    'applications': 'High-strength applications, automotive suspension'
+                },
+                'Stainless 304': {
+                    'description': 'Austenitic stainless steel, excellent corrosion resistance',
+                    'chemistry': 'C: 0.08% max, Cr: 18-20%, Ni: 8-10.5%',
+                    'mechanical': 'Tensile: 75,000 psi min, Yield: 30,000 psi min',
+                    'applications': 'Corrosive environments, food processing'
+                }
+            },
+            'column_mappings': {
+                'carbon': ['C%', 'Carbon', 'Carbon Content', 'C'],
+                'manganese': ['Mn%', 'Manganese', 'Mn Content'],
+                'phosphorus': ['P%', 'Phosphorus', 'P Content'],
+                'sulfur': ['S%', 'Sulfur', 'S Content'],
+                'tensile': ['Tensile Strength', 'Tensile', 'UTS'],
+                'yield': ['Yield Strength', 'Yield', 'Proof Strength'],
+                'hardness': ['Hardness', 'HRC', 'HRB', 'Brinell'],
+                'grade': ['Grade', 'Product Grade', 'Class'],
+            }
+        }
+    
+    def _index_database_content(self):
+        """Index all database content for semantic search"""
+        if not st.session_state.ai_model_loaded:
+            return
+            
+        try:
+            # Index main database
+            if not self.df.empty:
+                for idx, row in self.df.iterrows():
+                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    self.collection.add(
+                        documents=[text_content],
+                        metadatas=[{"source": "main_db", "row_index": idx}],
+                        ids=[f"main_{idx}"]
+                    )
+            
+            # Index ISO 4014 database
+            if not self.df_iso4014.empty:
+                for idx, row in self.df_iso4014.iterrows():
+                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    self.collection.add(
+                        documents=[text_content],
+                        metadatas=[{"source": "iso_db", "row_index": idx}],
+                        ids=[f"iso_{idx}"]
+                    )
+            
+            # Index ME&CERT database
+            if not self.df_mechem.empty:
+                for idx, row in self.df_mechem.iterrows():
+                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    self.collection.add(
+                        documents=[text_content],
+                        metadatas=[{"source": "mecert_db", "row_index": idx}],
+                        ids=[f"mecert_{idx}"]
+                    )
+        except Exception as e:
+            st.warning(f"Database indexing issue: {str(e)}")
+    
+    def _semantic_search(self, query, n_results=5):
+        """Perform semantic search on database content"""
+        if not st.session_state.ai_model_loaded or self.collection is None:
+            return []
+            
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=n_results
+            )
+            return results
+        except:
+            return []
+    
+    def _extract_entities_advanced(self, query):
+        """Advanced entity extraction using multiple methods"""
+        entities = {
+            'property': None,
+            'material': None,
+            'grade': None,
+            'size': None,
+            'value_type': None,  # min, max, typical, range
+        }
+        
+        query_lower = query.lower()
+        
+        # Property extraction
+        property_keywords = {
+            'carbon': ['c%', 'carbon', 'carbon content'],
+            'tensile': ['tensile', 'ultimate strength', 'uts'],
+            'yield': ['yield', 'proof strength'],
+            'hardness': ['hardness', 'hrc', 'hrb', 'brinell'],
+            'elongation': ['elongation', 'ductility'],
+            'manganese': ['mn%', 'manganese'],
+            'phosphorus': ['p%', 'phosphorus'],
+            'sulfur': ['s%', 'sulfur'],
+        }
+        
+        for prop, keywords in property_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                entities['property'] = prop
+                break
+        
+        # Grade extraction
+        grade_patterns = [
+            r'grade\s+([2458]|B7|L7)',
+            r'([2458])\s+grade',
+            r'stainless\s+(304|316|410)',
+        ]
+        
+        for pattern in grade_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                entities['grade'] = f"Grade {match.group(1)}" if match.group(1).isdigit() else match.group(1)
+                break
+        
+        # Material extraction
+        if 'stainless' in query_lower:
+            entities['material'] = 'stainless steel'
+        elif 'carbon' in query_lower and 'steel' in query_lower:
+            entities['material'] = 'carbon steel'
+        elif 'alloy' in query_lower:
+            entities['material'] = 'alloy steel'
+        elif 'brass' in query_lower:
+            entities['material'] = 'brass'
+        
+        # Value type extraction
+        if 'minimum' in query_lower or 'min' in query_lower:
+            entities['value_type'] = 'min'
+        elif 'maximum' in query_lower or 'max' in query_lower:
+            entities['value_type'] = 'max'
+        elif 'typical' in query_lower or 'average' in query_lower:
+            entities['value_type'] = 'typical'
+        elif 'range' in query_lower:
+            entities['value_type'] = 'range'
+        
+        return entities
+    
+    def _search_database_for_property(self, entities):
+        """Search database for specific properties"""
+        results = []
+        
+        if entities.get('property') == 'carbon':
+            # Search in ME&CERT database for carbon content
+            if not self.df_mechem.empty:
+                carbon_cols = [col for col in self.df_mechem.columns if any(keyword in col.lower() for keyword in ['carbon', 'c%'])]
+                if carbon_cols:
+                    carbon_data = self.df_mechem[carbon_cols].dropna()
+                    if not carbon_data.empty:
+                        results.append(f"Carbon content data found in ME&CERT database:")
+                        for col in carbon_cols:
+                            unique_vals = carbon_data[col].unique()[:5]
+                            results.append(f"  {col}: {', '.join(map(str, unique_vals))}")
+        
+        return results
+    
+    def _get_technical_answer(self, query, entities):
+        """Generate technical answer based on knowledge base"""
+        response_parts = []
+        
+        # Handle chemical composition queries
+        if entities.get('property') in ['carbon', 'manganese', 'phosphorus', 'sulfur']:
+            prop_name = entities['property']
+            grade = entities.get('grade', 'general')
+            
+            if grade in self.knowledge_base['grade_properties']:
+                grade_info = self.knowledge_base['grade_properties'][grade]
+                chemistry = grade_info.get('chemistry', '')
+                
+                if prop_name == 'carbon' and 'C:' in chemistry:
+                    response_parts.append(f"**{grade} Carbon Content (C%):**")
+                    response_parts.append(f"Chemical composition: {chemistry}")
+                    response_parts.append(f"Description: {grade_info['description']}")
+                else:
+                    response_parts.append(f"**{grade} Properties:**")
+                    response_parts.append(f"Chemistry: {chemistry}")
+                    response_parts.append(f"Mechanical: {grade_info.get('mechanical', 'N/A')}")
+                    response_parts.append(f"Hardness: {grade_info.get('hardness', 'N/A')}")
+                    response_parts.append(f"Applications: {grade_info.get('applications', 'N/A')}")
+            else:
+                # General property information
+                if prop_name in self.knowledge_base['technical_terms']:
+                    response_parts.append(f"**{prop_name.title()} Content Information:**")
+                    response_parts.append(self.knowledge_base['technical_terms'][prop_name])
+        
+        # Handle mechanical properties queries
+        elif entities.get('property') in ['tensile', 'yield', 'hardness']:
+            prop_name = entities['property']
+            grade = entities.get('grade', 'general')
+            
+            if grade in self.knowledge_base['grade_properties']:
+                grade_info = self.knowledge_base['grade_properties'][grade]
+                response_parts.append(f"**{grade} Mechanical Properties:**")
+                
+                if prop_name == 'tensile':
+                    response_parts.append(f"Tensile Strength: {grade_info.get('mechanical', '').split(',')[0]}")
+                elif prop_name == 'yield':
+                    mech_parts = grade_info.get('mechanical', '').split(',')
+                    if len(mech_parts) > 1:
+                        response_parts.append(f"Yield Strength: {mech_parts[1]}")
+                elif prop_name == 'hardness':
+                    response_parts.append(f"Hardness: {grade_info.get('hardness', 'N/A')}")
+                
+                response_parts.append(f"Applications: {grade_info.get('applications', 'N/A')}")
+        
+        return response_parts
+    
+    def process_complex_query(self, query):
+        """Process complex technical queries with advanced reasoning"""
+        if not st.session_state.ai_model_loaded:
+            return "AI capabilities are currently limited. Please ensure all required models are installed."
+        
+        # Extract entities using advanced method
+        entities = self._extract_entities_advanced(query)
+        
+        # Perform semantic search
+        semantic_results = self._semantic_search(query)
+        
+        response_parts = []
+        
+        # Generate technical answer
+        technical_answer = self._get_technical_answer(query, entities)
+        if technical_answer:
+            response_parts.extend(technical_answer)
+        
+        # Add database search results
+        db_results = self._search_database_for_property(entities)
+        if db_results:
+            response_parts.extend([""] + db_results)
+        
+        # If no specific answer found, provide general information
+        if not response_parts:
+            # Try to answer using knowledge base
+            query_lower = query.lower()
+            
+            if any(word in query_lower for word in ['what is', 'what does', 'explain', 'define']):
+                for term, definition in self.knowledge_base['technical_terms'].items():
+                    if term in query_lower:
+                        response_parts.append(f"**{term.title()}:** {definition}")
+                        break
+            
+            if not response_parts:
+                response_parts.append("I understand you're asking about fastener properties. ")
+                response_parts.append("I can help with:")
+                response_parts.append("• Chemical composition (C%, Mn%, P%, S%)")
+                response_parts.append("• Mechanical properties (tensile, yield, hardness)")
+                response_parts.append("• Material grades and their specifications")
+                response_parts.append("• Database queries and calculations")
+                response_parts.append("\nTry asking: 'What is the carbon content in Grade 5?' or 'Show me tensile strength data'")
+        
+        return "\n".join(response_parts)
+    
+    def learn_from_interaction(self, query, response, was_helpful=True):
+        """Learn from user interactions to improve future responses"""
+        interaction_key = query.lower().strip()
+        
+        if interaction_key not in self.learning_memory:
+            self.learning_memory[interaction_key] = {
+                'response': response,
+                'helpful_count': 0,
+                'total_uses': 0,
+                'last_used': datetime.now().isoformat()
+            }
+        
+        self.learning_memory[interaction_key]['total_uses'] += 1
+        if was_helpful:
+            self.learning_memory[interaction_key]['helpful_count'] += 1
+        
+        self.learning_memory[interaction_key]['last_used'] = datetime.now().isoformat()
+
+# ======================================================
 # 🔹 Enhanced Data Quality Indicators
 # ======================================================
 def show_data_quality_indicators():
@@ -427,6 +785,12 @@ def show_data_quality_indicators():
         st.markdown(f'<div class="data-quality-indicator quality-good">Thread Data: Available</div>', unsafe_allow_html=True)
         for status in thread_status:
             st.markdown(f'<div style="font-size: 0.8rem; margin: 0.1rem 0;">{status}</div>', unsafe_allow_html=True)
+        
+        # AI Status
+        if st.session_state.ai_model_loaded:
+            st.markdown('<div class="data-quality-indicator quality-good">AI Assistant: Advanced Mode</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="data-quality-indicator quality-warning">AI Assistant: Basic Mode</div>', unsafe_allow_html=True)
 
 # ======================================================
 # 🔹 COMPLETELY BULLETPROOF SIZE HANDLING
@@ -616,224 +980,8 @@ def convert_length_to_mm(length_val, unit):
         return 0
 
 # ======================================================
-# 🔹 ENHANCED AI ASSISTANT WITH MESSENGER INTERFACE
+# 🔹 MESSENGER-STYLE CHAT INTERFACE WITH ADVANCED AI
 # ======================================================
-class FastenerAI:
-    def __init__(self, df, df_iso4014, df_mechem, thread_files):
-        self.df = df
-        self.df_iso4014 = df_iso4014
-        self.df_mechem = df_mechem
-        self.thread_files = thread_files
-        
-    def detect_intent(self, query):
-        """Detect user intent from query"""
-        query_lower = query.lower()
-        
-        intents = {
-            'weight_calculation': any(word in query_lower for word in ['weight', 'calculate', 'how much does', 'kg', 'weight of']),
-            'product_search': any(word in query_lower for word in ['find', 'search', 'show me', 'list', 'what']),
-            'comparison': any(word in query_lower for word in ['compare', 'difference', 'vs', 'versus']),
-            'specifications': any(word in query_lower for word in ['spec', 'properties', 'grade', 'material']),
-            'thread_data': any(word in query_lower for word in ['thread', 'pitch', 'tpi', 'class']),
-            'help': any(word in query_lower for word in ['help', 'how to', 'what can']),
-        }
-        
-        for intent, detected in intents.items():
-            if detected:
-                return intent
-        return 'general'
-    
-    def extract_entities(self, query):
-        """Extract key entities from query"""
-        entities = {
-            'product_type': [],
-            'size': [],
-            'grade': [],
-            'material': [],
-            'standard': [],
-            'length': None
-        }
-        
-        # Extract size patterns
-        size_patterns = [
-            r'M\d+(?:\.\d+)?',  # Metric sizes M12, M12.5
-            r'\d+/\d+',         # Fractional sizes 1/2, 3/4
-            r'\d+-\d+',         # Thread sizes 1/2-13, 3/4-10
-        ]
-        
-        for pattern in size_patterns:
-            matches = re.findall(pattern, query)
-            if matches:
-                entities['size'].extend(matches)
-        
-        # Extract product types
-        product_keywords = ['bolt', 'screw', 'nut', 'washer', 'threaded rod', 'stud', 'hex', 'socket']
-        for keyword in product_keywords:
-            if keyword in query.lower():
-                entities['product_type'].append(keyword)
-        
-        # Extract grades
-        grade_matches = re.findall(r'grade\s+([A-Z0-9]+)', query, re.IGNORECASE)
-        if grade_matches:
-            entities['grade'].extend(grade_matches)
-        
-        return entities
-    
-    def search_products(self, entities):
-        """Search products based on extracted entities"""
-        results = []
-        
-        # Search in main dataframe
-        if not self.df.empty:
-            temp_df = self.df.copy()
-            
-            # Apply filters
-            if entities['product_type']:
-                product_filter = '|'.join(entities['product_type'])
-                temp_df = temp_df[temp_df['Product'].str.contains(product_filter, case=False, na=False)]
-            
-            if entities['size']:
-                size_filter = '|'.join(entities['size'])
-                temp_df = temp_df[temp_df['Size'].str.contains(size_filter, case=False, na=False)]
-            
-            if not temp_df.empty:
-                results.append(("Main Database", temp_df))
-        
-        # Search in ISO 4014
-        if not self.df_iso4014.empty:
-            temp_iso = self.df_iso4014.copy()
-            
-            if entities['size']:
-                size_filter = '|'.join(entities['size'])
-                temp_iso = temp_iso[temp_iso['Size'].str.contains(size_filter, case=False, na=False)]
-            
-            if not temp_iso.empty:
-                results.append(("ISO 4014 Database", temp_iso))
-        
-        return results
-    
-    def calculate_weight_from_query(self, query, entities):
-        """Calculate weight based on query"""
-        try:
-            # Extract length information
-            length_match = re.search(r'(\d+(?:\.\d+)?)\s*(mm|inch|meter|ft|foot|feet)', query, re.IGNORECASE)
-            if not length_match:
-                return None
-            
-            length_val = float(length_match.group(1))
-            length_unit = length_match.group(2).lower()
-            
-            # Determine product type
-            product_type = "Hex Bolt"  # default
-            if entities['product_type']:
-                product_type = entities['product_type'][0].title()
-            
-            # Get diameter from size or use default
-            diameter_mm = 10.0  # default
-            if entities['size']:
-                size_str = entities['size'][0]
-                if size_str.startswith('M'):
-                    diameter_mm = float(size_str[1:])
-                elif '/' in size_str:
-                    diameter_inch = float(Fraction(size_str))
-                    diameter_mm = diameter_inch * 25.4
-            
-            # Convert length to mm
-            length_mm = convert_length_to_mm(length_val, length_unit)
-            
-            # Calculate weight
-            weight_kg = calculate_weight_enhanced(product_type, diameter_mm, length_mm)
-            
-            return {
-                'product': product_type,
-                'size': entities['size'][0] if entities['size'] else 'Unknown',
-                'length': f"{length_val} {length_unit}",
-                'weight': weight_kg,
-                'diameter_mm': diameter_mm
-            }
-        except:
-            return None
-    
-    def process_query(self, query):
-        """Main method to process user query"""
-        intent = self.detect_intent(query)
-        entities = self.extract_entities(query)
-        
-        response = ""
-        
-        if intent == 'weight_calculation':
-            weight_result = self.calculate_weight_from_query(query, entities)
-            if weight_result:
-                response = f"**Weight Calculation Result:**\n\n"
-                response += f"• Product: {weight_result['product']}\n"
-                response += f"• Size: {weight_result['size']}\n"
-                response += f"• Length: {weight_result['length']}\n"
-                response += f"• Estimated Weight: **{weight_result['weight']} kg**\n\n"
-                response += f"*Note: Calculation based on nominal diameter of {weight_result['diameter_mm']:.1f} mm*"
-            else:
-                response = "I couldn't calculate the weight. Please provide more details like:\n- Product type (bolt, threaded rod, etc.)\n- Size (M12, 1/2-13, etc.)\n- Length (50mm, 6ft, etc.)"
-        
-        elif intent == 'product_search':
-            search_results = self.search_products(entities)
-            if search_results:
-                response = "**Search Results:**\n\n"
-                for db_name, result_df in search_results:
-                    response += f"**From {db_name}:**\n"
-                    if len(result_df) > 5:
-                        response += f"Found {len(result_df)} records. Showing first 5:\n"
-                        result_df = result_df.head(5)
-                    response += result_df.to_string(index=False) + "\n\n"
-            else:
-                response = "No products found matching your criteria. Try adjusting your search terms."
-        
-        elif intent == 'comparison':
-            response = "I can help you compare different fastener standards, materials, or products. Please specify what you'd like to compare (e.g., 'ASME vs ISO', 'Grade 5 vs Grade 8')."
-        
-        elif intent == 'specifications':
-            response = "I can provide material specifications, mechanical properties, and grade information. Please be more specific about what properties you need."
-        
-        elif intent == 'thread_data':
-            response = "I have access to thread specifications including ASME B1.1 and ISO 965 standards. Ask about specific thread sizes or classes."
-        
-        elif intent == 'help':
-            response = self.get_help_message()
-        
-        else:
-            response = "I'm your fastener intelligence assistant! I can help you with:\n• Weight calculations\n• Product searches\n• Technical specifications\n• Thread data\n• Standards information\n\nTry asking something like 'What's the weight of M12x50mm bolt?' or 'Show me Grade 8 hex bolts'"
-        
-        return response
-    
-    def get_help_message(self):
-        """Get help message with examples"""
-        return """
-**I can help you with:**
-
-🔍 **Product Search**
-• "Show me all M12 bolts"
-• "Find Grade 8 hex bolts" 
-• "List stainless steel fasteners"
-
-🧮 **Weight Calculations**
-• "Weight of 3/4-10 x 6ft threaded rod"
-• "Calculate M12x50mm bolt weight"
-• "How much does 1/2-13 x 2ft stud weigh?"
-
-📊 **Technical Data**
-• "Thread specifications for 3/8-16"
-• "Material properties of Grade 5"
-• "Compare ASME vs ISO standards"
-
-🔧 **General Questions**
-• "What's the difference between hex bolt and hex cap screw?"
-• "Recommended torque for M10 bolts"
-• "Applications for socket head caps"
-
-**Try these examples:**
-• "Weight of 3/4-10 x 6ft threaded rod"
-• "Show me all M12 stainless steel bolts"
-• "Compare Grade 5 and Grade 8 properties"
-"""
-
 def add_message(role, content):
     """Add message to chat history"""
     timestamp = datetime.now().strftime("%H:%M")
@@ -854,41 +1002,53 @@ def show_typing_indicator():
     """, unsafe_allow_html=True)
 
 def show_chat_interface():
-    """Show messenger-style chat interface"""
+    """Show messenger-style chat interface with advanced AI"""
     
     # Initialize AI assistant
-    ai_assistant = FastenerAI(df, df_iso4014, df_mechem, thread_files)
+    ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files)
     
     st.markdown("""
     <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
                 padding: 2rem; border-radius: 15px; color: #2c3e50; margin-bottom: 1rem;">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            🤖 PiU - Fastener Intelligence Assistant
+            🤖 PiU - Advanced Fastener Intelligence
         </h1>
-        <p style="margin:0;">Ask me anything about fasteners, calculations, or technical data</p>
+        <p style="margin:0;">Ask complex technical questions about materials, properties, and specifications</p>
+        <div style="margin-top: 0.5rem;">
+            <span class="feature-badge">Semantic Search</span>
+            <span class="feature-badge">Technical AI</span>
+            <span class="feature-badge">Self-Learning</span>
+            <span class="feature-badge">Multi-Database</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Quick questions
-    st.markdown("### 💬 Quick Questions")
-    quick_questions = [
-        "Weight of 3/4-10 x 6ft threaded rod?",
-        "Show me M12 hex bolts",
-        "Compare Grade 5 vs Grade 8",
-        "Thread data for 1/2-13",
-        "Material properties of stainless steel"
+    # AI Status Indicator
+    if st.session_state.ai_model_loaded:
+        st.success("✅ Advanced AI Mode: Semantic search and technical reasoning enabled")
+    else:
+        st.warning("⚠️ Basic AI Mode: Install transformers, sentence-transformers, chromadb for full capabilities")
+    
+    # Quick questions for complex queries
+    st.markdown("### 🔬 Technical Questions")
+    technical_questions = [
+        "What is C% in Grade 5?",
+        "Compare Grade 5 vs Grade 8 mechanical properties",
+        "Chemical composition of stainless steel 304",
+        "Tensile strength range for different grades",
+        "Hardness specifications for alloy steels"
     ]
     
     cols = st.columns(5)
-    for idx, question in enumerate(quick_questions):
+    for idx, question in enumerate(technical_questions):
         with cols[idx]:
-            if st.button(question, use_container_width=True, key=f"quick_{idx}"):
+            if st.button(question, use_container_width=True, key=f"tech_{idx}"):
                 add_message("user", question)
                 st.session_state.ai_thinking = True
                 st.rerun()
     
     # Chat container
-    st.markdown("### 💬 Chat with PiU")
+    st.markdown("### 💬 Advanced AI Chat")
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
     # Display chat messages
@@ -921,7 +1081,7 @@ def show_chat_interface():
     col1, col2 = st.columns([4, 1])
     
     with col1:
-        user_input = st.text_input("Type your message...", key="chat_input", label_visibility="collapsed")
+        user_input = st.text_input("Ask complex technical questions...", key="chat_input", label_visibility="collapsed")
     
     with col2:
         send_button = st.button("Send", use_container_width=True)
@@ -942,17 +1102,26 @@ def show_chat_interface():
         # Simulate thinking delay
         time.sleep(1)
         
-        # Get AI response
-        ai_response = ai_assistant.process_query(last_user_message)
+        # Get AI response using advanced processing
+        ai_response = ai_assistant.process_complex_query(last_user_message)
         add_message("ai", ai_response)
+        
+        # Learn from this interaction
+        ai_assistant.learn_from_interaction(last_user_message, ai_response, was_helpful=True)
         
         st.session_state.ai_thinking = False
         st.rerun()
     
     # Clear chat button
-    if st.button("Clear Chat History", use_container_width=True):
-        st.session_state.chat_messages = []
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Clear Chat History", use_container_width=True):
+            st.session_state.chat_messages = []
+            st.rerun()
+    with col2:
+        if st.button("🔄 Reload AI Models", use_container_width=True):
+            st.session_state.ai_model_loaded = False
+            st.rerun()
 
 # ======================================================
 # 🔹 Enhanced Export Functionality
@@ -1093,12 +1262,12 @@ def show_enhanced_home():
     st.markdown("""
         <div class="main-header">
             <h1 style="margin:0; font-size: 2.5rem;">🔧 JSC Industries</h1>
-            <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Fastener Intelligence Platform v3.0</p>
+            <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Advanced Fastener Intelligence Platform v4.0</p>
             <div style="margin-top: 1rem;">
                 <span class="feature-badge">AI-Powered</span>
-                <span class="feature-badge">Real-Time Analytics</span>
+                <span class="feature-badge">Semantic Search</span>
+                <span class="feature-badge">Self-Learning</span>
                 <span class="feature-badge">Multi-Standard</span>
-                <span class="feature-badge">Enhanced Export</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -1156,7 +1325,7 @@ def show_enhanced_home():
         ("🧮 Batch Calculator", "Process multiple calculations with bulk upload", "calculator"),
         ("📊 Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("🔧 Compare Products", "Side-by-side product comparison tool", "compare"),
-        ("🤖 PiU Assistant", "AI-powered technical support", "ai"),
+        ("🤖 Advanced AI Assistant", "Semantic search and technical reasoning", "ai"),
         ("📋 Export Workspace", "Generate comprehensive reports", "export")
     ]
     
@@ -1182,32 +1351,37 @@ def show_enhanced_home():
             ("ISO 4014 Data", not df_iso4014.empty),
             ("ME&CERT Data", not df_mechem.empty),
             ("Thread Data", any(not load_thread_data(url).empty for url in thread_files.values())),
-            ("Export Features", True),
-            ("Batch Processing", True)
+            ("AI Assistant", st.session_state.ai_model_loaded),
+            ("Semantic Search", st.session_state.ai_model_loaded),
         ]
         
         for item_name, status in status_items:
             if status:
                 st.success(f"✅ {item_name} - Active")
             else:
-                st.error(f"❌ {item_name} - Not Available")
+                st.warning(f"⚠️ {item_name} - Limited")
     
     with col2:
-        st.markdown('<h3 class="section-header">🕒 Recent Features</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">🕒 Advanced Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "🎯 Smart filtering with AI suggestions",
-            "📱 Mobile-responsive design", 
-            "🔍 Advanced search capabilities",
-            "📊 Real-time analytics integration",
-            "🌙 Dark mode ready",
-            "🚀 Performance optimized",
-            "📤 Enhanced export functionality",
-            "📝 Calculation history tracking"
+            "🎯 Semantic search across all databases",
+            "🧠 Technical reasoning and property analysis", 
+            "🔍 Advanced entity extraction",
+            "📊 Multi-database knowledge integration",
+            "🤖 Self-learning from user interactions",
+            "💡 Complex query understanding"
         ]
         
         for feature in features:
             st.markdown(f"• {feature}")
+        
+        # Installation guide
+        with st.expander("🔧 Install AI Dependencies"):
+            st.code("""
+pip install transformers sentence-transformers chromadb scikit-learn
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+            """)
         
         # Show recent calculations if any
         show_calculation_history()
@@ -1216,8 +1390,8 @@ def show_enhanced_home():
     st.markdown("---")
     st.markdown("""
         <div style="text-align: center; color: #7f8c8d; padding: 1rem;">
-            <p><strong>JSC Industries Fastener Intelligence Platform v3.0</strong></p>
-            <p>Born to Perform • Engineered for Precision</p>
+            <p><strong>JSC Industries Advanced Fastener Intelligence Platform v4.0</strong></p>
+            <p>Born to Perform • Engineered for Precision • Powered by AI</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -1674,24 +1848,29 @@ def show_help_system():
     """Show contextual help system"""
     with st.sidebar:
         st.markdown("---")
-        with st.expander("ℹ️ Help & Tips"):
+        with st.expander("ℹ️ AI Capabilities Guide"):
             st.markdown("""
-            **Quick Tips:**
-            - Use presets for common filters
-            - Export data for offline analysis
-            - Use PiU for natural language queries
-            - Check the analytics tab for insights
+            **Advanced AI Features:**
             
-            **Export Features:**
-            - CSV for quick data sharing
-            - Excel for formatted reports
-            - Batch processing for multiple calculations
+            🧪 **Chemical Analysis**
+            - "What is C% in Grade 5?"
+            - "Chemical composition of stainless steel"
+            - "Mn% content in different grades"
             
-            **Data Sources:**
-            - Main product database
-            - ISO 4014 standards
-            - Thread specifications
-            - ME&CERT properties
+            🔧 **Mechanical Properties**  
+            - "Tensile strength of Grade 8"
+            - "Compare hardness of different materials"
+            - "Yield strength specifications"
+            
+            📊 **Database Queries**
+            - "Find all M12 bolts with specific properties"
+            - "Show me materials with high corrosion resistance"
+            - "List products by strength category"
+            
+            🔍 **Semantic Search**
+            - Natural language understanding
+            - Cross-database knowledge
+            - Technical term recognition
             """)
 
 # ======================================================
@@ -1714,7 +1893,7 @@ def show_section(title):
 # ======================================================
 # 🔹 Main Application
 # ======================================================
-st.markdown("**App Version: 3.0 – Professional Workspace Edition ✅**")
+st.markdown("**App Version: 4.0 – Advanced AI Edition ✅**")
 
 # Add help system to sidebar
 show_help_system()
@@ -1735,9 +1914,9 @@ st.markdown("""
             <span>⚡ Fast</span>
             <span>🎯 Precise</span>
             <span>🌍 Global</span>
-            <span>📊 Enhanced</span>
+            <span>🤖 AI-Powered</span>
         </div>
         <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-        <p style="font-size: 0.8rem;">Fastener Intelligence Platform v3.0 | Built with Streamlit</p>
+        <p style="font-size: 0.8rem;">Advanced Fastener Intelligence Platform v4.0 | Powered by Transformers AI</p>
     </div>
 """, unsafe_allow_html=True)
