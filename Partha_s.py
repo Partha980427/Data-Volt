@@ -10,7 +10,7 @@ import tempfile
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
-st.markdown("**App Version: 2.3 – Head Volume Weight Included ✅**")
+st.markdown("**App Version: 2.4 – Head Volume Weight Included & Manual Class ✅**")
 
 # ======================================================
 # 🔹 Paths & Files
@@ -62,26 +62,15 @@ def size_to_float(size_str):
         return None
 
 def calculate_weight(product, diameter_mm, length_mm):
-    """
-    Calculates total weight including shank + head.
-    product: product type string
-    diameter_mm: body or pitch diameter
-    length_mm: length of shank
-    """
     density = 0.00785  # g/mm^3
 
-    # ---------------------------
-    # 1️⃣ Shank Volume (cylinder)
-    # ---------------------------
+    # Shank Volume
     V_shank = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
 
-    # ---------------------------
-    # 2️⃣ Head Volume Approximation
-    # ---------------------------
+    # Head Volume Approximation
     head_volume = 0
     product_lower = product.lower()
     if "hex cap" in product_lower:
-        # Hex prism: a = 1.5*d, h = 0.8*d
         a = 1.5 * diameter_mm
         h = 0.8 * diameter_mm
         head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
@@ -98,14 +87,10 @@ def calculate_weight(product, diameter_mm, length_mm):
         r = 0.9 * diameter_mm / 2
         head_volume = 3.1416 * r ** 2 * h
     else:
-        # Default small head approximation
         head_volume = 0.5 * 3.1416 * (diameter_mm / 2) ** 2 * (0.5 * diameter_mm)
 
-    # ---------------------------
-    # 3️⃣ Total Volume and Weight
-    # ---------------------------
     total_volume = V_shank + head_volume
-    weight_kg = total_volume * density / 1000  # g/mm3 -> kg
+    weight_kg = total_volume * density / 1000
     return round(weight_kg, 4)
 
 def convert_length_to_mm(length_val, unit):
@@ -297,13 +282,19 @@ def show_calculations():
             else:
                 st.warning("⚠️ Pitch Diameter not found.")
 
+    # -----------------------------
+    # Manual Class Selection
+    # -----------------------------
+    class_options_manual = ["1A", "2A", "3A"] if series=="Inch" else ["6g", "6H"]
+    selected_class_manual = st.selectbox("Select Class (Manual Calculation)", class_options_manual)
+
     if st.button("Calculate Weight"):
         length_mm = convert_length_to_mm(length_val, length_unit)
         if diameter_mm is None:
             st.error("❌ Provide diameter.")
         else:
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
-            st.success(f"✅ Estimated Weight: **{weight_kg} Kg**")
+            st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
 
     # -------------------------
     # Batch Weight Calculator
@@ -345,7 +336,6 @@ def show_calculations():
                     length_val = float(row["Length"])
                     length_mm = convert_length_to_mm(length_val, batch_length_unit)
 
-                    # Determine diameter
                     diameter_mm = None
                     dim_row = df_dim_batch[df_dim_batch["Size"]==size_val] if not df_dim_batch.empty else pd.DataFrame()
                     if not dim_row.empty and "Body Diameter" in dim_row.columns:
