@@ -49,7 +49,7 @@ if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
     df_iso4014['Standards'] = "ISO-4014-2011"
     if 'Grade' not in df_iso4014.columns:
-        df_iso4014['Grade'] = ""  # Empty grade column, user can fill/filter if needed
+        df_iso4014['Grade'] = "A"  # Default grade, can be filtered later
 
 @st.cache_data
 def load_thread_data(file):
@@ -193,6 +193,12 @@ def show_product_database():
     thread_size = st.sidebar.selectbox("Thread Size", thread_size_options)
     thread_class = st.sidebar.selectbox("Class", thread_class_options)
     
+    # Grade filter for ISO 4014
+    grade_options = ["All"]
+    if dimensional_standard=="ISO 4014" and not df_iso4014.empty:
+        grade_options += sorted(df_iso4014['Grade'].dropna().unique())
+    grade_filter = st.sidebar.selectbox("Grade", grade_options)
+    
     # ME&CERT filters
     mecert_standards = ["All"]
     if not df_mechem.empty:
@@ -210,6 +216,8 @@ def show_product_database():
     filtered_df = temp_df.copy()
     if dimensional_size != "All":
         filtered_df = filtered_df[filtered_df['Size']==dimensional_size]
+    if grade_filter != "All" and "Grade" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['Grade']==grade_filter]
     
     st.subheader(f"Found {len(filtered_df)} records")
     st.dataframe(filtered_df, use_container_width=True)
@@ -292,7 +300,9 @@ def show_calculations():
             else:
                 st.warning("⚠️ Pitch Diameter not found.")
 
-    # Manual Class Selection
+    grade_options_single = ["A","B"] if selected_standard=="ISO 4014" else ["All"]
+    selected_grade = st.selectbox("Select Grade", grade_options_single)
+
     class_options_manual = ["1A", "2A", "3A"] if series=="Inch" else ["6g", "6H"]
     selected_class_manual = st.selectbox("Select Class (Manual Calculation)", class_options_manual)
 
@@ -302,7 +312,7 @@ def show_calculations():
             st.error("❌ Provide diameter.")
         else:
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
-            st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
+            st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual}, Grade: {selected_grade})")
 
     # --- Batch Weight Calculator ---
     st.subheader("Batch Weight Calculator")
@@ -318,6 +328,10 @@ def show_calculations():
     uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
 
     batch_class = None
+    batch_grade = None
+    if batch_series=="Metric" and batch_standard=="ISO 4014":
+        batch_grade = st.selectbox("Select Grade for Batch", ["A","B"], key="batch_grade")
+    
     if batch_series=="Inch":
         df_thread_batch = df_iso4014 if batch_standard=="ISO 4014" else load_thread_data(thread_files.get(batch_standard,""))
         class_options = ["All"]
@@ -371,6 +385,9 @@ def show_calculations():
 
                     weight = calculate_weight(prod, diameter_mm, length_mm)
                     batch_df.at[idx, weight_col_name] = weight
+                    # Add Grade column if ISO 4014
+                    if batch_standard=="ISO 4014":
+                        batch_df.at[idx, "Grade"] = batch_grade
 
                 st.session_state.batch_result_df = batch_df
                 st.dataframe(batch_df)
@@ -395,6 +412,21 @@ def show_ai_assistant():
         st.success("PiU Response: [Simulated Response Here]")
 
 # ======================================================
+# 🔹 Placeholder Sections
+# ======================================================
+def show_inspection():
+    st.header("🕵️ Inspection Section")
+    st.info("Inspection module coming soon.")
+
+def show_rnd():
+    st.header("🔬 Research & Development Section")
+    st.info("R&D module coming soon.")
+
+def show_team_chat():
+    st.header("💬 Team Chat Section")
+    st.info("Team Chat module coming soon.")
+
+# ======================================================
 # 🔹 Section Dispatcher / Main Loop
 # ======================================================
 def show_section():
@@ -407,6 +439,12 @@ def show_section():
         show_calculations()
     elif section=="🤖 PiU (AI Assistant)":
         show_ai_assistant()
+    elif section=="🕵️ Inspection":
+        show_inspection()
+    elif section=="🔬 Research & Development":
+        show_rnd()
+    elif section=="💬 Team Chat":
+        show_team_chat()
     else:
         st.warning(f"{section} is not yet implemented.")
 
