@@ -105,7 +105,9 @@ def initialize_session_state():
         "recent_searches": [],
         "favorite_products": [],
         "calculation_history": [],
-        "export_format": "csv"
+        "export_format": "csv",
+        "chat_messages": [],
+        "ai_thinking": False
     }
     
     for key, value in defaults.items():
@@ -143,7 +145,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern UI with mobile responsiveness
+# Custom CSS for modern UI with Messenger-style chat
 st.markdown("""
 <style>
     .main-header {
@@ -237,6 +239,90 @@ st.markdown("""
         color: #721c24;
         border-left: 4px solid #dc3545;
     }
+    
+    /* Messenger Style Chat CSS */
+    .chat-container {
+        background: #f0f2f5;
+        border-radius: 15px;
+        padding: 1rem;
+        height: 600px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+    }
+    .message {
+        margin: 0.5rem 0;
+        padding: 0.8rem 1rem;
+        border-radius: 18px;
+        max-width: 70%;
+        word-wrap: break-word;
+    }
+    .user-message {
+        background: #0084ff;
+        color: white;
+        margin-left: auto;
+        border-bottom-right-radius: 5px;
+    }
+    .ai-message {
+        background: white;
+        color: #1c1e21;
+        margin-right: auto;
+        border-bottom-left-radius: 5px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .message-time {
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-top: 0.2rem;
+    }
+    .typing-indicator {
+        display: inline-flex;
+        align-items: center;
+        background: white;
+        padding: 0.8rem 1rem;
+        border-radius: 18px;
+        border-bottom-left-radius: 5px;
+        margin-right: auto;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #999;
+        margin: 0 2px;
+        animation: typing 1.4s infinite;
+    }
+    .typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    .typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-5px); }
+    }
+    .quick-question {
+        background: #f0f2f5;
+        border: 1px solid #dddfe2;
+        border-radius: 18px;
+        padding: 0.5rem 1rem;
+        margin: 0.2rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+    }
+    .quick-question:hover {
+        background: #e4e6eb;
+    }
+    .chat-input-container {
+        background: white;
+        border-radius: 20px;
+        padding: 0.5rem;
+        margin-top: 1rem;
+        border: 1px solid #dddfe2;
+    }
+    
     @media (max-width: 768px) {
         .main-header {
             padding: 1.5rem !important;
@@ -247,6 +333,9 @@ st.markdown("""
         .quick-action {
             height: 100px;
             padding: 1rem 0.5rem;
+        }
+        .message {
+            max-width: 85%;
         }
     }
     .export-btn {
@@ -432,7 +521,6 @@ def get_safe_size_options(temp_df):
 def calculate_weight_enhanced(product, diameter_mm, length_mm, diameter_type="body"):
     """Enhanced weight calculation for all product types with diameter type support"""
     if diameter_mm <= 0 or length_mm <= 0:
-        st.error("❌ Diameter and length must be positive values")
         return 0
     
     try:
@@ -510,7 +598,6 @@ def calculate_weight_enhanced(product, diameter_mm, length_mm, diameter_type="bo
         return round(weight_kg, 4)
         
     except Exception as e:
-        st.error(f"Calculation error: {str(e)}")
         return 0
 
 def convert_length_to_mm(length_val, unit):
@@ -526,18 +613,346 @@ def convert_length_to_mm(length_val, unit):
             return length_val * 304.8
         return length_val
     except ValueError:
-        st.error("❌ Invalid length value")
         return 0
 
-def show_loading_placeholder(message="🔄 Processing your request..."):
-    """Show loading state"""
-    placeholder = st.empty()
-    placeholder.info(message)
-    return placeholder
+# ======================================================
+# 🔹 ENHANCED AI ASSISTANT WITH MESSENGER INTERFACE
+# ======================================================
+class FastenerAI:
+    def __init__(self, df, df_iso4014, df_mechem, thread_files):
+        self.df = df
+        self.df_iso4014 = df_iso4014
+        self.df_mechem = df_mechem
+        self.thread_files = thread_files
+        
+    def detect_intent(self, query):
+        """Detect user intent from query"""
+        query_lower = query.lower()
+        
+        intents = {
+            'weight_calculation': any(word in query_lower for word in ['weight', 'calculate', 'how much does', 'kg', 'weight of']),
+            'product_search': any(word in query_lower for word in ['find', 'search', 'show me', 'list', 'what']),
+            'comparison': any(word in query_lower for word in ['compare', 'difference', 'vs', 'versus']),
+            'specifications': any(word in query_lower for word in ['spec', 'properties', 'grade', 'material']),
+            'thread_data': any(word in query_lower for word in ['thread', 'pitch', 'tpi', 'class']),
+            'help': any(word in query_lower for word in ['help', 'how to', 'what can']),
+        }
+        
+        for intent, detected in intents.items():
+            if detected:
+                return intent
+        return 'general'
+    
+    def extract_entities(self, query):
+        """Extract key entities from query"""
+        entities = {
+            'product_type': [],
+            'size': [],
+            'grade': [],
+            'material': [],
+            'standard': [],
+            'length': None
+        }
+        
+        # Extract size patterns
+        size_patterns = [
+            r'M\d+(?:\.\d+)?',  # Metric sizes M12, M12.5
+            r'\d+/\d+',         # Fractional sizes 1/2, 3/4
+            r'\d+-\d+',         # Thread sizes 1/2-13, 3/4-10
+        ]
+        
+        for pattern in size_patterns:
+            matches = re.findall(pattern, query)
+            if matches:
+                entities['size'].extend(matches)
+        
+        # Extract product types
+        product_keywords = ['bolt', 'screw', 'nut', 'washer', 'threaded rod', 'stud', 'hex', 'socket']
+        for keyword in product_keywords:
+            if keyword in query.lower():
+                entities['product_type'].append(keyword)
+        
+        # Extract grades
+        grade_matches = re.findall(r'grade\s+([A-Z0-9]+)', query, re.IGNORECASE)
+        if grade_matches:
+            entities['grade'].extend(grade_matches)
+        
+        return entities
+    
+    def search_products(self, entities):
+        """Search products based on extracted entities"""
+        results = []
+        
+        # Search in main dataframe
+        if not self.df.empty:
+            temp_df = self.df.copy()
+            
+            # Apply filters
+            if entities['product_type']:
+                product_filter = '|'.join(entities['product_type'])
+                temp_df = temp_df[temp_df['Product'].str.contains(product_filter, case=False, na=False)]
+            
+            if entities['size']:
+                size_filter = '|'.join(entities['size'])
+                temp_df = temp_df[temp_df['Size'].str.contains(size_filter, case=False, na=False)]
+            
+            if not temp_df.empty:
+                results.append(("Main Database", temp_df))
+        
+        # Search in ISO 4014
+        if not self.df_iso4014.empty:
+            temp_iso = self.df_iso4014.copy()
+            
+            if entities['size']:
+                size_filter = '|'.join(entities['size'])
+                temp_iso = temp_iso[temp_iso['Size'].str.contains(size_filter, case=False, na=False)]
+            
+            if not temp_iso.empty:
+                results.append(("ISO 4014 Database", temp_iso))
+        
+        return results
+    
+    def calculate_weight_from_query(self, query, entities):
+        """Calculate weight based on query"""
+        try:
+            # Extract length information
+            length_match = re.search(r'(\d+(?:\.\d+)?)\s*(mm|inch|meter|ft|foot|feet)', query, re.IGNORECASE)
+            if not length_match:
+                return None
+            
+            length_val = float(length_match.group(1))
+            length_unit = length_match.group(2).lower()
+            
+            # Determine product type
+            product_type = "Hex Bolt"  # default
+            if entities['product_type']:
+                product_type = entities['product_type'][0].title()
+            
+            # Get diameter from size or use default
+            diameter_mm = 10.0  # default
+            if entities['size']:
+                size_str = entities['size'][0]
+                if size_str.startswith('M'):
+                    diameter_mm = float(size_str[1:])
+                elif '/' in size_str:
+                    diameter_inch = float(Fraction(size_str))
+                    diameter_mm = diameter_inch * 25.4
+            
+            # Convert length to mm
+            length_mm = convert_length_to_mm(length_val, length_unit)
+            
+            # Calculate weight
+            weight_kg = calculate_weight_enhanced(product_type, diameter_mm, length_mm)
+            
+            return {
+                'product': product_type,
+                'size': entities['size'][0] if entities['size'] else 'Unknown',
+                'length': f"{length_val} {length_unit}",
+                'weight': weight_kg,
+                'diameter_mm': diameter_mm
+            }
+        except:
+            return None
+    
+    def process_query(self, query):
+        """Main method to process user query"""
+        intent = self.detect_intent(query)
+        entities = self.extract_entities(query)
+        
+        response = ""
+        
+        if intent == 'weight_calculation':
+            weight_result = self.calculate_weight_from_query(query, entities)
+            if weight_result:
+                response = f"**Weight Calculation Result:**\n\n"
+                response += f"• Product: {weight_result['product']}\n"
+                response += f"• Size: {weight_result['size']}\n"
+                response += f"• Length: {weight_result['length']}\n"
+                response += f"• Estimated Weight: **{weight_result['weight']} kg**\n\n"
+                response += f"*Note: Calculation based on nominal diameter of {weight_result['diameter_mm']:.1f} mm*"
+            else:
+                response = "I couldn't calculate the weight. Please provide more details like:\n- Product type (bolt, threaded rod, etc.)\n- Size (M12, 1/2-13, etc.)\n- Length (50mm, 6ft, etc.)"
+        
+        elif intent == 'product_search':
+            search_results = self.search_products(entities)
+            if search_results:
+                response = "**Search Results:**\n\n"
+                for db_name, result_df in search_results:
+                    response += f"**From {db_name}:**\n"
+                    if len(result_df) > 5:
+                        response += f"Found {len(result_df)} records. Showing first 5:\n"
+                        result_df = result_df.head(5)
+                    response += result_df.to_string(index=False) + "\n\n"
+            else:
+                response = "No products found matching your criteria. Try adjusting your search terms."
+        
+        elif intent == 'comparison':
+            response = "I can help you compare different fastener standards, materials, or products. Please specify what you'd like to compare (e.g., 'ASME vs ISO', 'Grade 5 vs Grade 8')."
+        
+        elif intent == 'specifications':
+            response = "I can provide material specifications, mechanical properties, and grade information. Please be more specific about what properties you need."
+        
+        elif intent == 'thread_data':
+            response = "I have access to thread specifications including ASME B1.1 and ISO 965 standards. Ask about specific thread sizes or classes."
+        
+        elif intent == 'help':
+            response = self.get_help_message()
+        
+        else:
+            response = "I'm your fastener intelligence assistant! I can help you with:\n• Weight calculations\n• Product searches\n• Technical specifications\n• Thread data\n• Standards information\n\nTry asking something like 'What's the weight of M12x50mm bolt?' or 'Show me Grade 8 hex bolts'"
+        
+        return response
+    
+    def get_help_message(self):
+        """Get help message with examples"""
+        return """
+**I can help you with:**
 
-def clear_loading(placeholder):
-    """Clear loading placeholder"""
-    placeholder.empty()
+🔍 **Product Search**
+• "Show me all M12 bolts"
+• "Find Grade 8 hex bolts" 
+• "List stainless steel fasteners"
+
+🧮 **Weight Calculations**
+• "Weight of 3/4-10 x 6ft threaded rod"
+• "Calculate M12x50mm bolt weight"
+• "How much does 1/2-13 x 2ft stud weigh?"
+
+📊 **Technical Data**
+• "Thread specifications for 3/8-16"
+• "Material properties of Grade 5"
+• "Compare ASME vs ISO standards"
+
+🔧 **General Questions**
+• "What's the difference between hex bolt and hex cap screw?"
+• "Recommended torque for M10 bolts"
+• "Applications for socket head caps"
+
+**Try these examples:**
+• "Weight of 3/4-10 x 6ft threaded rod"
+• "Show me all M12 stainless steel bolts"
+• "Compare Grade 5 and Grade 8 properties"
+"""
+
+def add_message(role, content):
+    """Add message to chat history"""
+    timestamp = datetime.now().strftime("%H:%M")
+    st.session_state.chat_messages.append({
+        'role': role,
+        'content': content,
+        'time': timestamp
+    })
+
+def show_typing_indicator():
+    """Show typing indicator"""
+    st.markdown("""
+    <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_chat_interface():
+    """Show messenger-style chat interface"""
+    
+    # Initialize AI assistant
+    ai_assistant = FastenerAI(df, df_iso4014, df_mechem, thread_files)
+    
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
+                padding: 2rem; border-radius: 15px; color: #2c3e50; margin-bottom: 1rem;">
+        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
+            🤖 PiU - Fastener Intelligence Assistant
+        </h1>
+        <p style="margin:0;">Ask me anything about fasteners, calculations, or technical data</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Quick questions
+    st.markdown("### 💬 Quick Questions")
+    quick_questions = [
+        "Weight of 3/4-10 x 6ft threaded rod?",
+        "Show me M12 hex bolts",
+        "Compare Grade 5 vs Grade 8",
+        "Thread data for 1/2-13",
+        "Material properties of stainless steel"
+    ]
+    
+    cols = st.columns(5)
+    for idx, question in enumerate(quick_questions):
+        with cols[idx]:
+            if st.button(question, use_container_width=True, key=f"quick_{idx}"):
+                add_message("user", question)
+                st.session_state.ai_thinking = True
+                st.rerun()
+    
+    # Chat container
+    st.markdown("### 💬 Chat with PiU")
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Display chat messages
+    for msg in st.session_state.chat_messages:
+        if msg['role'] == 'user':
+            st.markdown(f"""
+            <div class="message user-message">
+                <div>{msg['content']}</div>
+                <div class="message-time">{msg['time']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Format AI response with proper line breaks
+            formatted_content = msg['content'].replace('\n', '<br>')
+            st.markdown(f"""
+            <div class="message ai-message">
+                <div>{formatted_content}</div>
+                <div class="message-time">{msg['time']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Show typing indicator if AI is thinking
+    if st.session_state.ai_thinking:
+        show_typing_indicator()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Chat input
+    st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
+    col1, col2 = st.columns([4, 1])
+    
+    with col1:
+        user_input = st.text_input("Type your message...", key="chat_input", label_visibility="collapsed")
+    
+    with col2:
+        send_button = st.button("Send", use_container_width=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Process user input
+    if send_button and user_input.strip():
+        add_message("user", user_input.strip())
+        st.session_state.ai_thinking = True
+        st.rerun()
+    
+    # Process AI response if thinking
+    if st.session_state.ai_thinking:
+        # Get the last user message
+        last_user_message = st.session_state.chat_messages[-1]['content']
+        
+        # Simulate thinking delay
+        time.sleep(1)
+        
+        # Get AI response
+        ai_response = ai_assistant.process_query(last_user_message)
+        add_message("ai", ai_response)
+        
+        st.session_state.ai_thinking = False
+        st.rerun()
+    
+    # Clear chat button
+    if st.button("Clear Chat History", use_container_width=True):
+        st.session_state.chat_messages = []
+        st.rerun()
 
 # ======================================================
 # 🔹 Enhanced Export Functionality
@@ -1111,24 +1526,15 @@ def show_enhanced_calculations():
             
             # Auto-detect diameter based on diameter type selection
             if diameter_type == "Body Diameter":
-                # Try to get body diameter from data sources
-                if selected_standard == "ISO 4014" and selected_size != "No sizes available" and not df_iso4014.empty:
-                    row_iso = df_iso4014[df_iso4014['Size'] == selected_size]
-                    if not row_iso.empty and 'Body Diameter' in row_iso.columns:
-                        diameter_mm = row_iso['Body Diameter'].values[0]
-                        diameter_source = f"Body Diameter from ISO 4014: {diameter_mm} mm"
-                        st.info(diameter_source)
-                
-                # If body diameter not found, allow manual input
-                if diameter_mm is None:
-                    st.warning("Body diameter not found in database. Please enter manually:")
-                    manual_col1, manual_col2 = st.columns(2)
-                    with manual_col1:
-                        body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
-                    with manual_col2:
-                        diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="diameter_unit")
-                    diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
-                    diameter_source = f"Manual Body Diameter: {diameter_mm:.2f} mm"
+                # Body diameter is always manual input
+                st.info("Please enter Body Diameter manually:")
+                manual_col1, manual_col2 = st.columns(2)
+                with manual_col1:
+                    body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
+                with manual_col2:
+                    diameter_unit = st.selectbox("Diameter Unit", ["mm", "inch"], key="diameter_unit")
+                diameter_mm = body_dia * 25.4 if diameter_unit == "inch" else body_dia
+                diameter_source = f"Manual Body Diameter: {diameter_mm:.2f} mm"
                     
             else:  # Pitch Diameter
                 # Get pitch diameter from thread data
@@ -1262,122 +1668,6 @@ def show_enhanced_calculations():
             st.info("No calculation history available. Perform some calculations to see analytics here.")
 
 # ======================================================
-# 🔹 Enhanced AI Assistant Section
-# ======================================================
-def show_enhanced_ai_assistant():
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
-                    padding: 2rem; border-radius: 15px; color: #2c3e50; margin-bottom: 2rem;">
-            <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-                🤖 PiU - Fastener Intelligence Assistant
-            </h1>
-            <p style="margin:0;">AI-powered insights and technical support</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("### 💬 Ask PiU Anything")
-        
-        # Enhanced query input
-        ai_query = st.text_area(
-            "Your technical question...",
-            placeholder="e.g., 'Show me all M12 bolts with Grade B properties' or 'Compare ISO 4014 vs ASME standards'",
-            height=100
-        )
-        
-        # Quick question templates
-        st.markdown("**🎯 Quick Questions**")
-        quick_col1, quick_col2 = st.columns(2)
-        with quick_col1:
-            if st.button("Standards Comparison", use_container_width=True):
-                ai_query = "Compare different fastener standards and their applications"
-        with quick_col2:
-            if st.button("Material Properties", use_container_width=True):
-                ai_query = "Explain mechanical and chemical properties of fastener materials"
-        
-        if st.button("🚀 Ask PiU", use_container_width=True) and ai_query.strip():
-            loading_placeholder = show_loading_placeholder("🤖 PiU is analyzing your query...")
-            
-            response_parts = []
-            
-            # Search in main product data
-            if not df.empty:
-                try:
-                    mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                    filtered_prod = df[mask_prod]
-                    if not filtered_prod.empty:
-                        response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
-                except Exception as e:
-                    st.warning(f"Error searching product data: {str(e)}")
-            
-            # Search in ISO 4014 data
-            if not df_iso4014.empty:
-                try:
-                    mask_iso = df_iso4014.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                    filtered_iso = df_iso4014[mask_iso]
-                    if not filtered_iso.empty:
-                        response_parts.append(f"🌍 Found {len(filtered_iso)} ISO 4014 records:\n{filtered_iso.to_string(index=False)}")
-                except Exception as e:
-                    st.warning(f"Error searching ISO 4014 data: {str(e)}")
-            
-            # Search in thread data
-            for standard_name in thread_files.keys():
-                try:
-                    df_thread_temp = get_thread_data(standard_name)
-                    if not df_thread_temp.empty:
-                        mask_thread = df_thread_temp.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                        filtered_thread = df_thread_temp[mask_thread]
-                        if not filtered_thread.empty:
-                            response_parts.append(f"🔧 Found {len(filtered_thread)} Thread records in {standard_name}:\n{filtered_thread.to_string(index=False)}")
-                except Exception as e:
-                    st.warning(f"Error searching thread data for {standard_name}: {str(e)}")
-            
-            # Search in ME&CERT data
-            if not df_mechem.empty:
-                try:
-                    mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                    filtered_me = df_mechem[mask_me]
-                    if not filtered_me.empty:
-                        response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
-                except Exception as e:
-                    st.warning(f"Error searching ME&CERT data: {str(e)}")
-            
-            clear_loading(loading_placeholder)
-            response = "\n\n".join(response_parts) if response_parts else "❌ Sorry, no matching data found for your query."
-            st.text_area("PiU Response:", value=response, height=400)
-            
-            # Export AI results
-            if response_parts:
-                st.markdown("### 📤 Export AI Results")
-                if st.button("💾 Save AI Search Results", use_container_width=True):
-                    search_results_df = pd.DataFrame([{"query": ai_query, "results": response, "timestamp": datetime.now()}])
-                    enhanced_export_data(search_results_df, "CSV")
-    
-    with col2:
-        st.markdown("### 📚 Capabilities")
-        capabilities = [
-            "🔍 Smart product search",
-            "📊 Data analysis", 
-            "🔧 Technical specifications",
-            "📈 Performance insights",
-            "🌍 Standards guidance",
-            "💡 Engineering advice"
-        ]
-        
-        for cap in capabilities:
-            st.markdown(f"• {cap}")
-        
-        st.markdown("---")
-        st.markdown("### 📖 Recent Searches")
-        if 'ai_history' in st.session_state and st.session_state.ai_history:
-            for i, search in enumerate(reversed(st.session_state.ai_history[-5:])):
-                st.markdown(f"_{i+1}. {search}_")
-        else:
-            st.markdown("_No recent searches_")
-
-# ======================================================
 # 🔹 Help System
 # ======================================================
 def show_help_system():
@@ -1413,7 +1703,7 @@ def show_section(title):
     elif title == "🧮 Calculations":
         show_enhanced_calculations()
     elif title == "🤖 PiU (AI Assistant)":
-        show_enhanced_ai_assistant()
+        show_chat_interface()
     else:
         st.info(f"⚠️ Section {title} is coming soon!")
     
