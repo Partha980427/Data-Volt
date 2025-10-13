@@ -291,7 +291,7 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 Product Database Section - WITH PRODUCT GRADE DROPDOWN
+# 🔹 Product Database Section - WITH WORKING GRADE FILTER
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
@@ -322,38 +322,34 @@ def show_product_database():
     
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
-    # PRODUCT GRADE FILTER - ADDED FOR ISO 4014
-    product_grade_options = ["All"]
-    if dimensional_standard == "ISO 4014":
-        # For ISO 4014, use the 'Grade' column
-        if not df_iso4014.empty and 'Grade' in df_iso4014.columns:
-            product_grade_options.extend(sorted(df_iso4014['Grade'].dropna().unique()))
-    else:
-        # For other standards, use 'Product Grade' column if it exists
-        if dimensional_standard != "All":
-            temp_grade_df = df[df['Standards'] == dimensional_standard]
-            if 'Product Grade' in temp_grade_df.columns:
-                product_grade_options.extend(sorted(temp_grade_df['Product Grade'].dropna().unique()))
-    
-    selected_grade = st.sidebar.selectbox("Product Grade", product_grade_options)
-    
-    # Get the appropriate dataframe
+    # Get the appropriate dataframe FIRST (without grade filter)
     temp_df = df.copy()
     if dimensional_standard == "ISO 4014":
         temp_df = df_iso4014
-        # Apply grade filter for ISO 4014
-        if selected_grade != "All":
-            temp_df = temp_df[temp_df['Grade'] == selected_grade]
     else:
         if product_type != "All":
             temp_df = temp_df[temp_df['Product'] == product_type]
         if dimensional_standard != "All":
             temp_df = temp_df[temp_df['Standards'] == dimensional_standard]
-        # Apply grade filter for other standards
-        if selected_grade != "All" and 'Product Grade' in temp_df.columns:
-            temp_df = temp_df[temp_df['Product Grade'] == selected_grade]
     
-    # USE THE COMPLETELY SAFE SIZE OPTIONS FUNCTION
+    # PRODUCT GRADE FILTER - FIXED VERSION
+    product_grade_options = ["All"]
+    if dimensional_standard == "ISO 4014":
+        # For ISO 4014, use the 'Grade' column from the filtered temp_df
+        if not temp_df.empty and 'Grade' in temp_df.columns:
+            grades = temp_df['Grade'].dropna().unique()
+            if len(grades) > 0:
+                product_grade_options.extend(sorted(grades))
+    else:
+        # For other standards, use 'Product Grade' column
+        if not temp_df.empty and 'Product Grade' in temp_df.columns:
+            grades = temp_df['Product Grade'].dropna().unique()
+            if len(grades) > 0:
+                product_grade_options.extend(sorted(grades))
+    
+    selected_grade = st.sidebar.selectbox("Product Grade", product_grade_options)
+    
+    # USE THE COMPLETELY SAFE SIZE OPTIONS FUNCTION (before grade filter)
     size_options = get_safe_size_options(temp_df)
     dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
     
@@ -393,13 +389,23 @@ def show_product_database():
             mecert_property_options += sorted(temp_me['Property class'].dropna().unique())
     mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
     
-    # Apply final size filter
+    # APPLY ALL FILTERS TO FINAL DATAFRAME
     filtered_df = temp_df.copy()
+    
+    # Apply grade filter
+    if selected_grade != "All":
+        if dimensional_standard == "ISO 4014" and 'Grade' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Grade'] == selected_grade]
+        elif 'Product Grade' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Product Grade'] == selected_grade]
+    
+    # Apply size filter
     if dimensional_size != "All":
         filtered_df = filtered_df[filtered_df['Size'] == dimensional_size]
     
     # Display Results
     st.subheader(f"Found {len(filtered_df)} records")
+    
     if not filtered_df.empty:
         st.dataframe(filtered_df, use_container_width=True)
     else:
