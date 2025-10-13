@@ -7,10 +7,61 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import tempfile
 
 # ======================================================
+# 🔹 Enhanced Configuration & Error Handling
+# ======================================================
+def safe_load_excel_file(path_or_url):
+    """Enhanced loading with better error handling"""
+    try:
+        if path_or_url.startswith('http'):
+            return pd.read_excel(path_or_url)
+        else:
+            if os.path.exists(path_or_url):
+                return pd.read_excel(path_or_url)
+            else:
+                st.error(f"File not found: {path_or_url}")
+                return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading {path_or_url}: {str(e)}")
+        return pd.DataFrame()
+
+def initialize_session_state():
+    """Initialize all session state variables"""
+    defaults = {
+        "selected_section": None,
+        "batch_result_df": None,
+        "ai_history": [],
+        "current_filters": {}
+    }
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+def get_thread_data(standard, thread_size=None, thread_class=None):
+    """Centralized thread data retrieval"""
+    if standard not in thread_files:
+        return pd.DataFrame()
+    
+    df_thread = load_thread_data(thread_files[standard])
+    if df_thread.empty:
+        return pd.DataFrame()
+    
+    # Apply filters
+    if thread_size and "Thread" in df_thread.columns:
+        df_thread = df_thread[df_thread["Thread"] == thread_size]
+    if thread_class and "Class" in df_thread.columns:
+        df_thread = df_thread[df_thread["Class"] == thread_class]
+    
+    return df_thread
+
+# ======================================================
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
 st.markdown("**App Version: 2.6 – ISO 4014 Integrated & Batch Weight Calculator ✅**")
+
+# Initialize session state
+initialize_session_state()
 
 # ======================================================
 # 🔹 Paths & Files
@@ -28,7 +79,7 @@ thread_files = {
 iso4014_file_url = "https://github.com/Partha980427/Data-Volt/raw/main/ISO%204014%20Hex%20Bolt.xlsx"
 
 # ======================================================
-# 🔹 Data Loading
+# 🔹 Data Loading with Enhanced Error Handling
 # ======================================================
 @st.cache_data
 def load_excel_file(path_or_url):
@@ -38,9 +89,9 @@ def load_excel_file(path_or_url):
         st.warning(f"Failed to load {path_or_url}: {e}")
         return pd.DataFrame()
 
-df = load_excel_file(url) if url else load_excel_file(local_excel_path)
-df_mechem = load_excel_file(me_chem_path)
-df_iso4014 = load_excel_file(iso4014_file_url)
+df = safe_load_excel_file(url) if url else safe_load_excel_file(local_excel_path)
+df_mechem = safe_load_excel_file(me_chem_path)
+df_iso4014 = safe_load_excel_file(iso4014_file_url)
 
 if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
@@ -57,7 +108,7 @@ def load_thread_data(file):
         return pd.DataFrame()
 
 # ======================================================
-# 🔹 Helper Functions
+# 🔹 Enhanced Helper Functions
 # ======================================================
 def size_to_float(size_str):
     try:
@@ -71,49 +122,66 @@ def size_to_float(size_str):
         return None
 
 def calculate_weight(product, diameter_mm, length_mm):
-    density = 0.00785  # g/mm^3
-    V_shank = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
-    head_volume = 0
-    product_lower = product.lower()
-    if "hex cap" in product_lower:
-        a = 1.5 * diameter_mm
-        h = 0.8 * diameter_mm
-        head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
-    elif "heavy hex" in product_lower:
-        a = 2 * diameter_mm
-        h = 1.2 * diameter_mm
-        head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
-    elif "socket head" in product_lower or "low head cap" in product_lower:
-        h = 0.6 * diameter_mm
-        r = 0.8 * diameter_mm / 2
-        head_volume = 3.1416 * r ** 2 * h
-    elif "button head" in product_lower:
-        h = 0.4 * diameter_mm
-        r = 0.9 * diameter_mm / 2
-        head_volume = 3.1416 * r ** 2 * h
-    else:
-        head_volume = 0.5 * 3.1416 * (diameter_mm / 2) ** 2 * (0.5 * diameter_mm)
-    total_volume = V_shank + head_volume
-    weight_kg = total_volume * density / 1000
-    return round(weight_kg, 4)
+    """Enhanced with validation"""
+    if diameter_mm <= 0 or length_mm <= 0:
+        st.error("❌ Diameter and length must be positive values")
+        return 0
+    
+    try:
+        density = 0.00785  # g/mm^3
+        V_shank = 3.1416 * (diameter_mm / 2) ** 2 * length_mm
+        head_volume = 0
+        product_lower = product.lower()
+        if "hex cap" in product_lower:
+            a = 1.5 * diameter_mm
+            h = 0.8 * diameter_mm
+            head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+        elif "heavy hex" in product_lower:
+            a = 2 * diameter_mm
+            h = 1.2 * diameter_mm
+            head_volume = (3 * (3 ** 0.5) / 2) * a ** 2 * h
+        elif "socket head" in product_lower or "low head cap" in product_lower:
+            h = 0.6 * diameter_mm
+            r = 0.8 * diameter_mm / 2
+            head_volume = 3.1416 * r ** 2 * h
+        elif "button head" in product_lower:
+            h = 0.4 * diameter_mm
+            r = 0.9 * diameter_mm / 2
+            head_volume = 3.1416 * r ** 2 * h
+        else:
+            head_volume = 0.5 * 3.1416 * (diameter_mm / 2) ** 2 * (0.5 * diameter_mm)
+        total_volume = V_shank + head_volume
+        weight_kg = total_volume * density / 1000
+        return round(weight_kg, 4)
+    except Exception as e:
+        st.error(f"Calculation error: {str(e)}")
+        return 0
 
 def convert_length_to_mm(length_val, unit):
-    unit = unit.lower()
-    if unit=="inch":
-        return length_val * 25.4
-    elif unit=="meter":
-        return length_val * 1000
-    elif unit=="ft":
-        return length_val * 304.8
-    return length_val
+    """Enhanced length conversion with validation"""
+    try:
+        length_val = float(length_val)
+        unit = unit.lower()
+        if unit=="inch":
+            return length_val * 25.4
+        elif unit=="meter":
+            return length_val * 1000
+        elif unit=="ft":
+            return length_val * 304.8
+        return length_val
+    except ValueError:
+        st.error("❌ Invalid length value")
+        return 0
 
-# ======================================================
-# 🔹 Session State Initialization
-# ======================================================
-if "selected_section" not in st.session_state:
-    st.session_state.selected_section = None
-if "batch_result_df" not in st.session_state:
-    st.session_state.batch_result_df = None
+def show_loading_placeholder(message="🔄 Processing your request..."):
+    """Show loading state"""
+    placeholder = st.empty()
+    placeholder.info(message)
+    return placeholder
+
+def clear_loading(placeholder):
+    """Clear loading placeholder"""
+    placeholder.empty()
 
 # ======================================================
 # 🔹 Home Dashboard
@@ -181,7 +249,7 @@ def show_product_database():
     thread_size_options = ["All"]
     thread_class_options = ["All"]
     if thread_standard != "All":
-        df_thread = load_thread_data(thread_files.get(thread_standard,""))
+        df_thread = get_thread_data(thread_standard)
         if not df_thread.empty:
             if "Thread" in df_thread.columns:
                 thread_size_options += sorted(df_thread['Thread'].dropna().unique())
@@ -212,14 +280,11 @@ def show_product_database():
     st.dataframe(filtered_df, use_container_width=True)
     
     # Thread data
-    if thread_standard != "All" and not df_thread.empty:
-        df_thread_filtered = df_thread.copy()
-        if thread_size != "All":
-            df_thread_filtered = df_thread_filtered[df_thread_filtered['Thread']==thread_size]
-        if thread_class != "All":
-            df_thread_filtered = df_thread_filtered[df_thread_filtered['Class']==thread_class]
-        st.subheader(f"Thread Data: {thread_standard}")
-        st.dataframe(df_thread_filtered, use_container_width=True)
+    if thread_standard != "All":
+        df_thread_filtered = get_thread_data(thread_standard, thread_size, thread_class)
+        if not df_thread_filtered.empty:
+            st.subheader(f"Thread Data: {thread_standard}")
+            st.dataframe(df_thread_filtered, use_container_width=True)
     
     # ME&CERT data
     filtered_mecert_df = df_mechem.copy()
@@ -232,31 +297,48 @@ def show_product_database():
     
     # Download all filtered data
     if st.button("📥 Download All Filtered Data"):
-        wb = Workbook()
-        ws_dim = wb.active
-        ws_dim.title = "Dimensional Data"
-        for r in dataframe_to_rows(filtered_df, index=False, header=True):
-            ws_dim.append(r)
-        if thread_standard != "All" and not df_thread.empty:
-            ws_thread = wb.create_sheet("Thread Data")
-            for r in dataframe_to_rows(df_thread_filtered, index=False, header=True):
-                ws_thread.append(r)
-        if not filtered_mecert_df.empty:
-            ws_me = wb.create_sheet("ME&CERT Data")
-            for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
-                ws_me.append(r)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        wb.save(temp_file.name)
-        temp_file.close()
-        with open(temp_file.name, "rb") as f:
-            st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", 
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        loading_placeholder = show_loading_placeholder("📥 Preparing download...")
+        try:
+            wb = Workbook()
+            ws_dim = wb.active
+            ws_dim.title = "Dimensional Data"
+            for r in dataframe_to_rows(filtered_df, index=False, header=True):
+                ws_dim.append(r)
+            
+            if thread_standard != "All":
+                df_thread_filtered = get_thread_data(thread_standard, thread_size, thread_class)
+                if not df_thread_filtered.empty:
+                    ws_thread = wb.create_sheet("Thread Data")
+                    for r in dataframe_to_rows(df_thread_filtered, index=False, header=True):
+                        ws_thread.append(r)
+            
+            if not filtered_mecert_df.empty:
+                ws_me = wb.create_sheet("ME&CERT Data")
+                for r in dataframe_to_rows(filtered_mecert_df, index=False, header=True):
+                    ws_me.append(r)
+            
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+            wb.save(temp_file.name)
+            temp_file.close()
+            
+            with open(temp_file.name, "rb") as f:
+                st.download_button("⬇️ Download Excel", f, file_name="Filtered_Fastener_Data.xlsx", 
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            clear_loading(loading_placeholder)
+            st.success("✅ Download ready!")
+            
+        except Exception as e:
+            clear_loading(loading_placeholder)
+            st.error(f"❌ Error preparing download: {str(e)}")
 
 # ======================================================
 # 🔹 Calculations Section (with Batch + ISO 4014)
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
+    
+    # Single Item Calculation
+    st.subheader("Single Item Weight Calculation")
     product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
     selected_product = st.selectbox("Select Product", product_options)
     series = st.selectbox("Select Series", ["Inch","Metric"])
@@ -265,43 +347,44 @@ def show_calculations():
     selected_standard = st.selectbox("Select Standard", standard_options)
     
     # Thread data
-    df_thread = load_thread_data(thread_files[selected_standard]) if selected_standard in thread_files else pd.DataFrame()
+    df_thread = get_thread_data(selected_standard)
     
     size_options = []
     if selected_standard=="ISO 4014":
         size_options = sorted(df_iso4014['Size'].dropna().unique())
     elif not df_thread.empty:
         size_options = sorted(df_thread['Thread'].dropna().unique())
-    selected_size = st.selectbox("Select Size", size_options)
+    selected_size = st.selectbox("Select Size", size_options) if size_options else st.selectbox("Select Size", [])
     
     length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
-    length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
+    length_val = st.number_input("Enter Length", min_value=0.1, step=0.1, value=10.0)
     dia_type = st.selectbox("Select Diameter Type", ["Body Diameter","Pitch Diameter"])
     
     diameter_mm = None
-    if selected_standard=="ISO 4014":
+    if selected_standard=="ISO 4014" and selected_size:
         row_iso = df_iso4014[df_iso4014['Size']==selected_size]
         if not row_iso.empty and 'Body Diameter' in row_iso.columns:
             diameter_mm = row_iso['Body Diameter'].values[0]
-    elif dia_type=="Pitch Diameter" and not df_thread.empty:
+    elif dia_type=="Pitch Diameter" and not df_thread.empty and selected_size:
         row = df_thread[df_thread["Thread"]==selected_size]
         if not row.empty and "Pitch Diameter (Min)" in row.columns:
             pitch_val = row["Pitch Diameter (Min)"].values[0]
             diameter_mm = pitch_val if series=="Metric" else pitch_val*25.4
     elif dia_type=="Body Diameter":
-        body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1)
+        body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0)
         diameter_mm = body_dia*25.4 if length_unit=="inch" else body_dia
 
     class_options_manual = ["1A","2A","3A"] if series=="Inch" else ["6g","6H"]
     selected_class_manual = st.selectbox("Select Class (Manual Calculation)", class_options_manual)
 
     if st.button("Calculate Weight"):
-        length_mm = convert_length_to_mm(length_val, length_unit)
         if diameter_mm is None:
-            st.error("❌ Provide diameter.")
+            st.error("❌ Please provide diameter information.")
         else:
+            length_mm = convert_length_to_mm(length_val, length_unit)
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
-            st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
+            if weight_kg > 0:
+                st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
 
     # -------------------------
     # Batch Weight Calculator
@@ -314,59 +397,82 @@ def show_calculations():
     uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
 
     batch_class = None
-    df_thread_batch = pd.DataFrame()
-    if batch_standard in thread_files:
-        df_thread_batch = load_thread_data(thread_files[batch_standard])
+    df_thread_batch = get_thread_data(batch_standard)
+    if not df_thread_batch.empty:
         class_options = ["All"]
         if "Class" in df_thread_batch.columns:
             class_options += sorted(df_thread_batch["Class"].dropna().unique())
         batch_class = st.selectbox("Select Class", class_options, key="batch_class")
 
     if uploaded_file_batch:
-        batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
-        st.write("Uploaded File Preview:")
-        st.dataframe(batch_df.head())
-        required_cols = ["Product","Size","Length"]
-        if all(col in batch_df.columns for col in required_cols):
-            if st.button("Calculate Batch Weights", key="calc_batch_weights"):
-                df_dim_batch = df.copy()
-                weight_col_name = "Weight/pc (Kg)"
-                if weight_col_name not in batch_df.columns:
-                    batch_df[weight_col_name] = 0
-                for idx, row in batch_df.iterrows():
-                    prod = row["Product"]
-                    size_val = row["Size"]
-                    length_val = float(row["Length"])
-                    length_mm = convert_length_to_mm(length_val, batch_length_unit)
-                    diameter_mm = None
-
-                    if batch_standard=="ISO 4014":
-                        row_iso = df_iso4014[df_iso4014['Size']==size_val]
-                        if not row_iso.empty:
-                            diameter_mm = row_iso['Body Diameter'].values[0]
-                    elif not df_thread_batch.empty:
-                        thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
-                        if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
-                            diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
-                            if batch_series=="Inch":
-                                diameter_mm *= 25.4
-                    if diameter_mm is None:
+        try:
+            batch_df = pd.read_excel(uploaded_file_batch) if uploaded_file_batch.name.endswith(".xlsx") else pd.read_csv(uploaded_file_batch)
+            st.write("Uploaded File Preview:")
+            st.dataframe(batch_df.head())
+            required_cols = ["Product","Size","Length"]
+            if all(col in batch_df.columns for col in required_cols):
+                if st.button("Calculate Batch Weights", key="calc_batch_weights"):
+                    loading_placeholder = show_loading_placeholder("🧮 Calculating batch weights...")
+                    df_dim_batch = df.copy()
+                    weight_col_name = "Weight/pc (Kg)"
+                    if weight_col_name not in batch_df.columns:
+                        batch_df[weight_col_name] = 0.0
+                    
+                    success_count = 0
+                    for idx, row in batch_df.iterrows():
                         try:
-                            diameter_mm = float(size_val)
-                        except:
-                            diameter_mm = 0
-                    batch_df.at[idx, weight_col_name] = calculate_weight(prod, diameter_mm, length_mm)
+                            prod = row["Product"]
+                            size_val = str(row["Size"])
+                            length_val = float(row["Length"])
+                            length_mm = convert_length_to_mm(length_val, batch_length_unit)
+                            diameter_mm = None
 
-                st.session_state.batch_result_df = batch_df
-                st.dataframe(batch_df)
+                            if batch_standard=="ISO 4014":
+                                row_iso = df_iso4014[df_iso4014['Size']==size_val]
+                                if not row_iso.empty and 'Body Diameter' in row_iso.columns:
+                                    diameter_mm = row_iso['Body Diameter'].values[0]
+                            elif not df_thread_batch.empty:
+                                thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
+                                if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
+                                    diameter_mm = thread_row["Pitch Diameter (Min)"].values[0]
+                                    if batch_series=="Inch":
+                                        diameter_mm *= 25.4
+                            
+                            if diameter_mm is None:
+                                try:
+                                    diameter_mm = float(size_val)
+                                except:
+                                    diameter_mm = 0
+                            
+                            weight = calculate_weight(prod, diameter_mm, length_mm)
+                            batch_df.at[idx, weight_col_name] = weight
+                            if weight > 0:
+                                success_count += 1
+                                
+                        except Exception as e:
+                            st.warning(f"Error processing row {idx}: {str(e)}")
+                            batch_df.at[idx, weight_col_name] = 0
+
+                    st.session_state.batch_result_df = batch_df
+                    clear_loading(loading_placeholder)
+                    st.success(f"✅ Successfully calculated weights for {success_count}/{len(batch_df)} items")
+                    st.dataframe(batch_df)
+                    
+            else:
+                st.error(f"❌ Required columns missing. Need: {required_cols}")
+        except Exception as e:
+            st.error(f"❌ Error reading uploaded file: {str(e)}")
 
     if st.session_state.batch_result_df is not None:
-        temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        st.session_state.batch_result_df.to_excel(temp_file_batch.name, index=False)
-        temp_file_batch.close()
-        with open(temp_file_batch.name,"rb") as f:
-            st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        try:
+            temp_file_batch = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+            st.session_state.batch_result_df.to_excel(temp_file_batch.name, index=False)
+            temp_file_batch.close()
+            with open(temp_file_batch.name,"rb") as f:
+                st.download_button("⬇️ Download Batch Excel", f, file_name="Batch_Weight.xlsx",
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        except Exception as e:
+            st.error(f"❌ Error creating download file: {str(e)}")
 
 # ======================================================
 # 🔹 AI Assistant Section
@@ -375,29 +481,48 @@ def show_ai_assistant():
     st.header("🤖 PiU – AI Assistant")
     st.info("You can ask questions about your products, threads, or ME&CERT data.")
     ai_query = st.text_area("Enter your question for the AI:")
+    
     if st.button("Ask AI"):
-        if ai_query.strip() == "":
+        if not ai_query.strip():
             st.warning("Please type a question.")
         else:
+            loading_placeholder = show_loading_placeholder("🤖 Searching through data...")
             response_parts = []
+            
+            # Search in main product data
             if not df.empty:
-                mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                filtered_prod = df[mask_prod]
-                if not filtered_prod.empty:
-                    response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
-            for file in thread_files.values():
-                df_thread_temp = load_thread_data(file)
-                if not df_thread_temp.empty:
-                    mask_thread = df_thread_temp.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                    filtered_thread = df_thread_temp[mask_thread]
-                    if not filtered_thread.empty:
-                        response_parts.append(f"🔧 Found {len(filtered_thread)} Thread records in {file}:\n{filtered_thread.to_string(index=False)}")
+                try:
+                    mask_prod = df.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_prod = df[mask_prod]
+                    if not filtered_prod.empty:
+                        response_parts.append(f"✅ Found {len(filtered_prod)} Product records:\n{filtered_prod.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching product data: {str(e)}")
+            
+            # Search in thread data
+            for standard_name in thread_files.keys():
+                try:
+                    df_thread_temp = get_thread_data(standard_name)
+                    if not df_thread_temp.empty:
+                        mask_thread = df_thread_temp.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                        filtered_thread = df_thread_temp[mask_thread]
+                        if not filtered_thread.empty:
+                            response_parts.append(f"🔧 Found {len(filtered_thread)} Thread records in {standard_name}:\n{filtered_thread.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching thread data for {standard_name}: {str(e)}")
+            
+            # Search in ME&CERT data
             if not df_mechem.empty:
-                mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
-                filtered_me = df_mechem[mask_me]
-                if not filtered_me.empty:
-                    response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
-            response = "\n\n".join(response_parts) if response_parts else "❌ Sorry, no matching data found."
+                try:
+                    mask_me = df_mechem.apply(lambda row: row.astype(str).str.contains(ai_query, case=False, na=False).any(), axis=1)
+                    filtered_me = df_mechem[mask_me]
+                    if not filtered_me.empty:
+                        response_parts.append(f"🧪 Found {len(filtered_me)} ME&CERT records:\n{filtered_me.to_string(index=False)}")
+                except Exception as e:
+                    st.warning(f"Error searching ME&CERT data: {str(e)}")
+            
+            clear_loading(loading_placeholder)
+            response = "\n\n".join(response_parts) if response_parts else "❌ Sorry, no matching data found for your query."
             st.text_area("AI Response:", value=response, height=400)
 
 # ======================================================
