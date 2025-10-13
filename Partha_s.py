@@ -293,7 +293,7 @@ def show_home():
                 st.session_state.selected_section = title
 
 # ======================================================
-# 🔹 Product Database Section - FIXED GRADE COLUMN
+# 🔹 Product Database Section - FIXED DUPLICATE HEX NUT
 # ======================================================
 def show_product_database():
     st.header("📦 Product Database Search Panel")
@@ -303,8 +303,12 @@ def show_product_database():
     
     st.sidebar.header("🔍 Filter Options")
     
-    # Product Type Selection
-    product_types = ["All"] + sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud", "Hex Bolt"])
+    # Product Type Selection - FIXED: Remove duplicate "Hex Nut"
+    product_types_from_df = list(df['Product'].dropna().unique())
+    # Remove duplicates by converting to set and back to list
+    unique_products = list(set(product_types_from_df))
+    product_types = ["All"] + sorted(unique_products) + ["Threaded Rod", "Stud", "Hex Bolt"]
+    
     product_type = st.sidebar.selectbox("Select Product", product_types)
     
     # Series Selection
@@ -481,13 +485,15 @@ def show_calculations():
     
     # Product and standard options based on series
     if series == "Inch":
-        product_options = sorted([p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p])
-        standard_options = ["ASME B1.1"]
+        # FIXED: Remove duplicate products here too
+        product_options_from_df = [p for p in df['Product'].dropna().unique() if "Hex" in p or "Bolt" in p]
+        unique_products = list(set(product_options_from_df))
+        product_options = sorted(unique_products)
     else:  # Metric
         product_options = ["Hex Bolt"]  # ISO 4014 is specifically for hex bolts
-        standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014"]
     
     selected_product = st.selectbox("Select Product", product_options)
+    standard_options = ["ASME B1.1"] if series == "Inch" else ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014"]
     selected_standard = st.selectbox("Select Standard", standard_options)
     
     # Get appropriate data source
