@@ -70,13 +70,15 @@ url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 me_chem_path = r"Mechanical and Chemical.xlsx"
 
+# ISO 4014 paths - local and Google Sheets
+iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
+iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
+
 thread_files = {
     "ASME B1.1": "ASME B1.1 New.xlsx",
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
 }
-
-iso4014_file_url = "https://github.com/Partha980427/Data-Volt/raw/main/ISO%204014%20Hex%20Bolt.xlsx"
 
 # ======================================================
 # 🔹 Data Loading with Enhanced Error Handling
@@ -89,15 +91,24 @@ def load_excel_file(path_or_url):
         st.warning(f"Failed to load {path_or_url}: {e}")
         return pd.DataFrame()
 
+# Load main data
 df = safe_load_excel_file(url) if url else safe_load_excel_file(local_excel_path)
 df_mechem = safe_load_excel_file(me_chem_path)
-df_iso4014 = safe_load_excel_file(iso4014_file_url)
+
+# Load ISO 4014 data - try Google Sheets first, then fallback to local
+df_iso4014 = safe_load_excel_file(iso4014_file_url)  # Try Google Sheets first
+if df_iso4014.empty:
+    st.info("🔄 Online ISO 4014 file not accessible, trying local version...")
+    df_iso4014 = safe_load_excel_file(iso4014_local_path)  # Fallback to local file
 
 if not df_iso4014.empty:
     df_iso4014['Product'] = "Hex Bolt"
     df_iso4014['Standards'] = "ISO-4014-2011"
     if 'Grade' not in df_iso4014.columns:
         df_iso4014['Grade'] = "A"
+    st.success(f"✅ ISO 4014 data loaded successfully with {len(df_iso4014)} records")
+else:
+    st.warning("⚠️ Could not load ISO 4014 data from any source")
 
 @st.cache_data
 def load_thread_data(file):
