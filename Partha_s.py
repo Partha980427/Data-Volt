@@ -10,7 +10,7 @@ import tempfile
 # 🔹 Page Setup
 # ======================================================
 st.set_page_config(page_title="JSC Industries – Advanced Fastener Intelligence", layout="wide")
-st.markdown("**App Version: 2.4 – Head Volume Weight Included & Manual Class ✅**")
+st.markdown("**App Version: 2.5 – Head Volume Weight + Manual Class + ISO 4014 ✅**")
 
 # ======================================================
 # 🔹 Paths & Files
@@ -19,10 +19,17 @@ url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 me_chem_path = r"Mechanical and Chemical.xlsx"
 
+# Thread standards
 thread_files = {
     "ASME B1.1": "ASME B1.1 New.xlsx",
     "ISO 965-2-98 Coarse": "ISO 965-2-98 Coarse.xlsx",
     "ISO 965-2-98 Fine": "ISO 965-2-98 Fine.xlsx",
+}
+
+# Dimensional standards files
+dimensional_files = {
+    "ASME B18.2.1": local_excel_path,
+    "ISO 4014-2011": r"G:\My Drive\Streamlite\ISO 4014-2011.xlsx"
 }
 
 # ======================================================
@@ -150,14 +157,20 @@ def show_product_database():
     series_options = ["Inch", "Metric"]
     series = st.sidebar.selectbox("Select Series", series_options)
     
+    # Dimensional Standards: include ISO 4014-2011 for Metric Hex Bolt (Partially Threaded)
     dimensional_standards = ["All"] + sorted(df['Standards'].dropna().unique())
+    if product_type.lower() == "hex bolt (partially threaded)" and series == "Metric":
+        dimensional_standards += ["ISO 4014-2011"]
     dimensional_standard = st.sidebar.selectbox("Dimensional Standard", dimensional_standards)
     
-    temp_df = df.copy()
-    if product_type != "All":
-        temp_df = temp_df[temp_df['Product']==product_type]
+    # Load correct dataframe for selected dimensional standard
     if dimensional_standard != "All":
-        temp_df = temp_df[temp_df['Standards']==dimensional_standard]
+        if dimensional_standard in dimensional_files:
+            temp_df = load_excel_file(dimensional_files[dimensional_standard])
+        else:
+            temp_df = df[df['Standards'] == dimensional_standard]
+    else:
+        temp_df = df.copy()
     
     size_options = ["All"] + sorted(temp_df['Size'].dropna().unique(), key=size_to_float)
     dimensional_size = st.sidebar.selectbox("Dimensional Size", size_options)
@@ -197,11 +210,9 @@ def show_product_database():
     mecert_property = st.sidebar.selectbox("Property Class", mecert_property_options)
     
     # Apply filters
-    filtered_df = df.copy()
+    filtered_df = temp_df.copy()
     if product_type != "All":
         filtered_df = filtered_df[filtered_df['Product']==product_type]
-    if dimensional_standard != "All":
-        filtered_df = filtered_df[filtered_df['Standards']==dimensional_standard]
     if dimensional_size != "All":
         filtered_df = filtered_df[filtered_df['Size']==dimensional_size]
     
@@ -259,10 +270,25 @@ def show_calculations():
     selected_product = st.selectbox("Select Product", product_options)
     series = st.selectbox("Select Series", ["Inch", "Metric"])
     metric_type = st.selectbox("Select Thread Type", ["Coarse", "Fine"]) if series=="Metric" else None
-    selected_standard = "ASME B1.1" if series=="Inch" else ("ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine")
+    
+    # Assign standard based on selection
+    if series=="Inch":
+        selected_standard = "ASME B1.1"
+    else:
+        if selected_product.lower() == "hex bolt (partially threaded)":
+            selected_standard = "ISO 4014-2011"
+        else:
+            selected_standard = "ISO 965-2-98 Coarse" if metric_type=="Coarse" else "ISO 965-2-98 Fine"
+
     st.info(f"📏 Standard: **{selected_standard}** (used only for pitch diameter)")
 
-    df_thread = load_thread_data(thread_files[selected_standard])
+    if selected_standard in thread_files:
+        df_thread = load_thread_data(thread_files[selected_standard])
+    elif selected_standard in dimensional_files:
+        df_thread = load_excel_file(dimensional_files[selected_standard])
+    else:
+        df_thread = pd.DataFrame()
+
     size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
     selected_size = st.selectbox("Select Size", size_options)
     length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
@@ -303,7 +329,13 @@ def show_calculations():
     batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
     batch_series = st.selectbox("Select Series", ["Inch", "Metric"], key="batch_series")
     batch_metric_type = st.selectbox("Select Thread Type", ["Coarse", "Fine"], key="batch_metric_type") if batch_series=="Metric" else None
-    batch_standard = "ASME B1.1" if batch_series=="Inch" else ("ISO 965-2-98 Coarse" if batch_metric_type=="Coarse" else "ISO 965-2-98 Fine")
+    if batch_series=="Inch":
+        batch_standard = "ASME B1.1"
+    else:
+        if batch_selected_product.lower() == "hex bolt (partially threaded)":
+            batch_standard = "ISO 4014-2011"
+        else:
+            batch_standard = "ISO 965-2-98 Coarse" if batch_metric_type=="Coarse" else "ISO 965-2-98 Fine"
     st.info(f"📏 Standard: **{batch_standard}** (used only for pitch diameter)")
 
     batch_length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"], key="batch_length_unit")
@@ -324,7 +356,13 @@ def show_calculations():
         required_cols = ["Product","Size","Length"]
         if all(col in batch_df.columns for col in required_cols):
             if st.button("Calculate Batch Weights", key="calc_batch_weights"):
-                df_thread_batch = load_thread_data(thread_files[batch_standard])
+                if batch_standard in thread_files:
+                    df_thread_batch = load_thread_data(thread_files[batch_standard])
+                elif batch_standard in dimensional_files:
+                    df_thread_batch = load_excel_file(dimensional_files[batch_standard])
+                else:
+                    df_thread_batch = pd.DataFrame()
+                
                 df_dim_batch = df[df['Product']==batch_selected_product]
                 weight_col_name = "Weight/pc (Kg)"
                 if weight_col_name not in batch_df.columns:
