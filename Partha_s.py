@@ -9,8 +9,25 @@ import re
 from datetime import datetime
 import plotly.express as px
 import time
-import yaml
 import json
+
+# ======================================================
+# 🔹 Paths & Files - UPDATED WITH GOOGLE SHEETS LINKS
+# ======================================================
+url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
+local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
+me_chem_path = r"Mechanical and Chemical.xlsx"
+
+# ISO 4014 paths - local and Google Sheets
+iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
+iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
+
+# Thread files - UPDATED WITH GOOGLE SHEETS LINKS
+thread_files = {
+    "ASME B1.1": "https://docs.google.com/spreadsheets/d/1YHgUloNsFudxxqhWQV66D2DtSSKWFP_w/export?format=xlsx",
+    "ISO 965-2-98 Coarse": "https://docs.google.com/spreadsheets/d/1be5eEy9hbVfMg2sl1-Cz1NNCGGF8EB-L/export?format=xlsx",
+    "ISO 965-2-98 Fine": "https://docs.google.com/spreadsheets/d/1QGQ6SMWBSTsah-vq3zYnhOC3NXaBdKPe/export?format=xlsx",
+}
 
 # ======================================================
 # 🔹 Enhanced Configuration & Error Handling
@@ -247,24 +264,6 @@ st.markdown("""
 
 # Initialize session state
 initialize_session_state()
-
-# ======================================================
-# 🔹 Paths & Files - UPDATED WITH GOOGLE SHEETS LINKS
-# ======================================================
-url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
-local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
-me_chem_path = r"Mechanical and Chemical.xlsx"
-
-# ISO 4014 paths - local and Google Sheets
-iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
-iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
-
-# Thread files - UPDATED WITH GOOGLE SHEETS LINKS
-thread_files = {
-    "ASME B1.1": "https://docs.google.com/spreadsheets/d/1YHgUloNsFudxxqhWQV66D2DtSSKWFP_w/export?format=xlsx",
-    "ISO 965-2-98 Coarse": "https://docs.google.com/spreadsheets/d/1be5eEy9hbVfMg2sl1-Cz1NNCGGF8EB-L/export?format=xlsx",
-    "ISO 965-2-98 Fine": "https://docs.google.com/spreadsheets/d/1QGQ6SMWBSTsah-vq3zYnhOC3NXaBdKPe/export?format=xlsx",
-}
 
 # ======================================================
 # 🔹 Data Loading with Enhanced Error Handling
