@@ -247,12 +247,12 @@ def show_product_database():
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ======================================================
-# 🔹 Calculations Section (Single & Batch) – Existing logic unchanged, includes ISO 4014 support
+# 🔹 Calculations Section (Single & Batch)
 # ======================================================
 def show_calculations():
     st.header("🧮 Engineering Calculations")
     
-    # Single weight calculation
+    # --- Single Weight Calculation ---
     product_options = sorted(list(df['Product'].dropna().unique()) + ["Threaded Rod", "Stud"])
     selected_product = st.selectbox("Select Product", product_options)
     series = st.selectbox("Select Series", ["Inch", "Metric"])
@@ -265,6 +265,7 @@ def show_calculations():
     df_thread = df_iso4014 if selected_standard=="ISO 4014" else load_thread_data(thread_files.get(selected_standard,""))
     size_options = sorted(df_thread["Thread"].dropna().unique()) if not df_thread.empty else []
     selected_size = st.selectbox("Select Size", size_options)
+    
     length_unit = st.selectbox("Select Length Unit", ["mm","inch","meter","ft"])
     length_val = st.number_input("Enter Length", min_value=0.1, step=0.1)
     dia_type = st.selectbox("Select Diameter Type", ["Body Diameter", "Pitch Diameter"])
@@ -294,7 +295,7 @@ def show_calculations():
             weight_kg = calculate_weight(selected_product, diameter_mm, length_mm)
             st.success(f"✅ Estimated Weight: **{weight_kg} Kg** (Class: {selected_class_manual})")
 
-    # Batch Weight Calculator (same logic, works for ISO 4014 if selected)
+    # --- Batch Weight Calculator ---
     st.subheader("Batch Weight Calculator")
     batch_selected_product = st.selectbox("Select Product for Batch", product_options, key="batch_product")
     batch_series = st.selectbox("Select Series", ["Inch", "Metric"], key="batch_series")
@@ -308,10 +309,10 @@ def show_calculations():
     uploaded_file_batch = st.file_uploader("Upload Excel/CSV for Batch", type=["xlsx","csv"], key="batch_file")
 
     batch_class = None
-    if batch_series=="Inch" and not df_thread.empty:
+    if batch_series=="Inch":
         df_thread_batch = df_iso4014 if batch_standard=="ISO 4014" else load_thread_data(thread_files.get(batch_standard,""))
         class_options = ["All"]
-        if "Class" in df_thread_batch.columns:
+        if not df_thread_batch.empty and "Class" in df_thread_batch.columns:
             class_options += sorted(df_thread_batch["Class"].dropna().unique())
         batch_class = st.selectbox("Select Class", class_options, key="batch_class")
 
@@ -341,7 +342,7 @@ def show_calculations():
 
                     thread_row = pd.DataFrame()
                     if batch_series=="Inch":
-                        if batch_class != "All" and df_thread_batch is not None:
+                        if batch_class != "All" and not df_thread_batch.empty:
                             thread_row = df_thread_batch[(df_thread_batch["Thread"]==size_val) & (df_thread_batch["Class"]==batch_class)]
                         else:
                             thread_row = df_thread_batch[df_thread_batch["Thread"]==size_val]
@@ -382,7 +383,6 @@ def show_ai_assistant():
     query = st.text_area("Enter your question for PiU")
     if st.button("Ask PiU"):
         st.info(f"Processing your query: **{query}**")
-        # Placeholder for AI logic
         st.success("PiU Response: [Simulated Response Here]")
 
 # ======================================================
