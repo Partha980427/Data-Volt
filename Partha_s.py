@@ -34,6 +34,10 @@ me_chem_path = r"G:\My Drive\Streamlite\Mechanical and Chemical.xlsx"
 iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
 iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c125Uy0ujB6QsV_/export?format=xlsx"
 
+# NEW: DIN-7991 paths - local and Google Sheets
+din7991_local_path = r"G:\My Drive\Streamlite\DIN-7991.xlsx"
+din7991_file_url = "https://docs.google.com/spreadsheets/d/1PjptIbFfebdF1h_Aj124fNgw5jNBWlvn/export?format=xlsx"
+
 # Thread files - UPDATED WITH GOOGLE SHEETS LINKS
 thread_files = {
     "ASME B1.1": "https://docs.google.com/spreadsheets/d/1YHgUloNsFudxxqhWQV66D2DtSSKWFP_w/export?format=xlsx",
@@ -81,8 +85,9 @@ def load_config():
         st.session_state.app_config = {
             'data_sources': {
                 'main_data': url,
-                'me_chem_data': me_chem_google_url,  # Updated
+                'me_chem_data': me_chem_google_url,
                 'iso4014': iso4014_file_url,
+                'din7991': din7991_file_url,  # NEW: Added DIN-7991
                 'thread_files': thread_files
             },
             'ui': {
@@ -127,8 +132,9 @@ def initialize_session_state():
         "current_filters_thread": {},
         "current_filters_material": {},
         "product_intelligence_filters": {},
-        "me_chem_columns": [],  # New: Store Mechanical & Chemical columns
-        "property_classes": []   # New: Store available property classes
+        "me_chem_columns": [],
+        "property_classes": [],
+        "din7991_loaded": False  # NEW: Track DIN-7991 loading status
     }
     
     for key, value in defaults.items():
@@ -615,7 +621,7 @@ def load_excel_file(path_or_url):
 # Load main data
 df = safe_load_excel_file(url) if url else safe_load_excel_file(local_excel_path)
 
-# UPDATED: Load Mechanical and Chemical data - try Google Sheets first, then fallback to local
+# Load Mechanical and Chemical data - try Google Sheets first, then fallback to local
 df_mechem = safe_load_excel_file(me_chem_google_url)  # Try Google Sheets first
 if df_mechem.empty:
     st.info("🔄 Online Mechanical & Chemical file not accessible, trying local version...")
@@ -626,6 +632,23 @@ df_iso4014 = safe_load_excel_file(iso4014_file_url)  # Try Google Sheets first
 if df_iso4014.empty:
     st.info("🔄 Online ISO 4014 file not accessible, trying local version...")
     df_iso4014 = safe_load_excel_file(iso4014_local_path)  # Fallback to local file
+
+# NEW: Load DIN-7991 data - try Google Sheets first, then fallback to local
+df_din7991 = safe_load_excel_file(din7991_file_url)  # Try Google Sheets first
+if df_din7991.empty:
+    st.info("🔄 Online DIN-7991 file not accessible, trying local version...")
+    df_din7991 = safe_load_excel_file(din7991_local_path)  # Fallback to local file
+
+# Process DIN-7991 data if loaded
+if not df_din7991.empty:
+    # Add product name and standard if not present
+    if 'Product' not in df_din7991.columns:
+        df_din7991['Product'] = "Hexagon Socket Countersunk Head Cap Screw"
+    if 'Standards' not in df_din7991.columns:
+        df_din7991['Standards'] = "DIN-7991"
+    st.session_state.din7991_loaded = True
+else:
+    st.session_state.din7991_loaded = False
 
 # FIXED: Use correct column name "Product Grade" instead of "Grade"
 if not df_iso4014.empty:
@@ -939,6 +962,12 @@ def calculate_weight_enhanced(product, diameter_mm, length_mm, diameter_type="bo
             r = 0.9 * diameter_mm / 2
             head_volume = 3.1416 * r ** 2 * h
             
+        elif "countersunk" in product_lower or "counter sunk" in product_lower:
+            # Countersunk head screw - conical head volume
+            h = 0.6 * diameter_mm  # head height
+            r = diameter_mm  # head radius
+            head_volume = (1/3) * 3.1416 * r ** 2 * h  # Cone volume
+            
         elif "threaded rod" in product_lower or "stud" in product_lower:
             # Threaded rod or stud - no head, just threaded portion
             # For threaded rods, we calculate based on nominal diameter
@@ -1001,10 +1030,11 @@ def convert_length_to_mm(length_val, unit):
 # 🔹 ADVANCED AI ASSISTANT WITH SELF-LEARNING CAPABILITIES
 # ======================================================
 class AdvancedFastenerAI:
-    def __init__(self, df, df_iso4014, df_mechem, thread_files):
+    def __init__(self, df, df_iso4014, df_mechem, thread_files, df_din7991=None):
         self.df = df
         self.df_iso4014 = df_iso4014
         self.df_mechem = df_mechem
+        self.df_din7991 = df_din7991  # NEW: Added DIN-7991 data
         self.thread_files = thread_files
         
         # Initialize AI components with error handling
@@ -1127,6 +1157,16 @@ class AdvancedFastenerAI:
                         documents=[text_content],
                         metadatas=[{"source": "mecert_db", "row_index": idx}],
                         ids=[f"mecert_{idx}"]
+                    )
+            
+            # NEW: Index DIN-7991 database
+            if self.df_din7991 is not None and not self.df_din7991.empty:
+                for idx, row in self.df_din7991.iterrows():
+                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    self.collection.add(
+                        documents=[text_content],
+                        metadatas=[{"source": "din7991_db", "row_index": idx}],
+                        ids=[f"din7991_{idx}"]
                     )
         except Exception as e:
             st.warning(f"Database indexing issue: {str(e)}")
@@ -1363,6 +1403,12 @@ def show_data_quality_indicators():
         else:
             st.markdown('<div class="data-quality-indicator quality-warning">ISO 4014: Limited Access</div>', unsafe_allow_html=True)
         
+        # NEW: DIN-7991 data quality
+        if st.session_state.din7991_loaded:
+            st.markdown(f'<div class="data-quality-indicator quality-good">DIN-7991: {len(df_din7991)} Records</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="data-quality-indicator quality-warning">DIN-7991: Limited Access</div>', unsafe_allow_html=True)
+        
         # Mechanical & Chemical data quality
         if not df_mechem.empty:
             st.markdown(f'<div class="data-quality-indicator quality-good">Mech & Chem: {len(df_mechem)} Records</div>', unsafe_allow_html=True)
@@ -1414,8 +1460,8 @@ def show_typing_indicator():
 def show_chat_interface():
     """Show messenger-style chat interface with advanced AI"""
     
-    # Initialize AI assistant
-    ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files)
+    # Initialize AI assistant with DIN-7991 data
+    ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files, df_din7991)
     
     st.markdown("""
     <div class="engineering-header">
@@ -1684,14 +1730,14 @@ def show_enhanced_product_database():
     </div>
     """, unsafe_allow_html=True)
     
-    if df.empty and df_mechem.empty and df_iso4014.empty:
+    if df.empty and df_mechem.empty and df_iso4014.empty and not st.session_state.din7991_loaded:
         st.error("🚫 No data sources available. Please check your data connections.")
         return
     
     # Quick Stats
     col1, col2, col3, col4 = st.columns(4)
     
-    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0)
+    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0) + (len(df_din7991) if st.session_state.din7991_loaded else 0)
     total_standards = len(df['Standards'].unique()) + 1 if not df.empty else 1
     total_threads = len(thread_files)
     total_mecert = len(df_mechem) if not df_mechem.empty else 0
@@ -1776,8 +1822,11 @@ def show_enhanced_product_database():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # Product Type
+        # Product Type - UPDATED: Added Hexagon Socket Countersunk Head Cap Screw
         product_types = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
+        # Add DIN-7991 product if available
+        if st.session_state.din7991_loaded and "Hexagon Socket Countersunk Head Cap Screw" not in product_types:
+            product_types.append("Hexagon Socket Countersunk Head Cap Screw")
         dimensional_product = st.selectbox("Product Type", product_types, key="dimensional_product")
     
     with col2:
@@ -1785,7 +1834,7 @@ def show_enhanced_product_database():
         series_system = st.radio("Series System", ["Inch", "Metric"], key="dimensional_series", horizontal=True)
     
     with col3:
-        # Dimensional Standards
+        # Dimensional Standards - UPDATED: Added DIN-7991 for Metric series
         dimensional_standards = ["All"]
         if series_system == "Inch":
             inch_standards = [std for std in df['Standards'].dropna().unique() if "ISO" not in str(std)] if not df.empty else []
@@ -1795,6 +1844,9 @@ def show_enhanced_product_database():
             dimensional_standards.extend(sorted(metric_standards))
             if "ISO 4014" not in dimensional_standards:
                 dimensional_standards.append("ISO 4014")
+            # NEW: Add DIN-7991 for Metric series
+            if "DIN-7991" not in dimensional_standards and st.session_state.din7991_loaded:
+                dimensional_standards.append("DIN-7991")
         
         dimensional_standard = st.selectbox("Dimensional Standard", dimensional_standards, key="dimensional_standard")
     
@@ -1973,9 +2025,14 @@ def configure_product_search(index, product):
     col1, col2, col3 = st.columns(3)
     
     with col1:
+        # UPDATED: Added Hexagon Socket Countersunk Head Cap Screw to product options
+        product_options = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
+        if st.session_state.din7991_loaded and "Hexagon Socket Countersunk Head Cap Screw" not in product_options:
+            product_options.append("Hexagon Socket Countersunk Head Cap Screw")
+        
         product['filters']['type'] = st.selectbox(
             "Product Type", 
-            ["All"] + sorted(df['Product'].dropna().unique().tolist()), 
+            product_options, 
             key=f"prod_type_{index}"
         )
     
@@ -2005,6 +2062,10 @@ def get_filtered_dataframe(product_type, standard):
     
     if standard == "ISO 4014":
         return df_iso4014 if not df_iso4014.empty else pd.DataFrame()
+    
+    # NEW: Handle DIN-7991 standard
+    if standard == "DIN-7991":
+        return df_din7991 if st.session_state.din7991_loaded else pd.DataFrame()
     
     if product_type != "All":
         temp_df = temp_df[temp_df['Product'] == product_type]
@@ -2154,6 +2215,22 @@ def apply_all_filters():
         if not iso_filtered.empty:
             filtered_df = pd.concat([filtered_df, iso_filtered], ignore_index=True)
     
+    # NEW: Handle DIN-7991 data separately
+    if (dim_filters.get('standard') == "DIN-7991" or 
+        (mat_filters.get('standard') and "DIN-7991" in mat_filters['standard'])):
+        din7991_filtered = df_din7991.copy() if st.session_state.din7991_loaded else pd.DataFrame()
+        
+        if not din7991_filtered.empty:
+            if dim_filters.get('size') and dim_filters['size'] != "All":
+                din7991_filtered = din7991_filtered[din7991_filtered['Size'] == dim_filters['size']]
+            
+            if mat_filters.get('property_class') and mat_filters['property_class'] != "All" and 'Product Grade' in din7991_filtered.columns:
+                din7991_filtered = din7991_filtered[din7991_filtered['Product Grade'] == mat_filters['property_class']]
+            
+            # Combine with main results
+            if not din7991_filtered.empty:
+                filtered_df = pd.concat([filtered_df, din7991_filtered], ignore_index=True)
+    
     return filtered_df
 
 def export_filtered_data(filtered_df, format_type, include_analysis=True):
@@ -2248,7 +2325,7 @@ def show_enhanced_home():
     # Professional Key Metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0)
+    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0) + (len(df_din7991) if st.session_state.din7991_loaded else 0)
     total_standards = len(df['Standards'].unique()) + 1 if not df.empty else 1
     total_threads = len(thread_files)
     total_mecert = len(df_mechem) if not df_mechem.empty else 0
@@ -2322,8 +2399,9 @@ def show_enhanced_home():
         status_items = [
             ("Main Product Data", not df.empty, "engineering-badge"),
             ("ISO 4014 Data", not df_iso4014.empty, "technical-badge"),
-            ("ME&CERT Data", not df_mechem.empty, "material-badge"),
-            ("Thread Data", any(not load_thread_data(url).empty for url in thread_files.values()), "grade-badge"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "material-badge"),
+            ("ME&CERT Data", not df_mechem.empty, "grade-badge"),
+            ("Thread Data", any(not load_thread_data(url).empty for url in thread_files.values()), "engineering-badge"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -2389,15 +2467,16 @@ def show_enhanced_calculations():
         with col1:
             series = st.selectbox("Measurement System", ["Inch", "Metric"], key="calc_series")
             
-            # Enhanced product options including threaded rod and stud
+            # Enhanced product options including threaded rod and stud - UPDATED: Added Hexagon Socket Countersunk Head Cap Screw
             if series == "Inch":
                 product_options_from_df = [p for p in df['Product'].dropna().unique() if any(x in p.lower() for x in ['hex', 'bolt', 'screw', 'nut'])] if not df.empty else []
                 unique_products = list(set(product_options_from_df))
                 product_options = sorted(unique_products) + ["Threaded Rod", "Stud", "Washer"]
                 standard_options = ["ASME B1.1"]
             else:
-                product_options = ["Hex Bolt", "Threaded Rod", "Stud", "Nut", "Washer"]
-                standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014"]
+                # UPDATED: Added Hexagon Socket Countersunk Head Cap Screw to metric products
+                product_options = ["Hex Bolt", "Hexagon Socket Countersunk Head Cap Screw", "Threaded Rod", "Stud", "Nut", "Washer"]
+                standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014", "DIN-7991"]  # UPDATED: Added DIN-7991
             
             selected_product = st.selectbox("Product Type", product_options)
             selected_standard = st.selectbox("Applicable Standard", standard_options)
@@ -2412,6 +2491,9 @@ def show_enhanced_calculations():
             if selected_standard == "ISO 4014":
                 df_source = df_iso4014
                 size_options = sorted(df_source['Size'].dropna().unique()) if not df_iso4014.empty else []
+            elif selected_standard == "DIN-7991":  # NEW: Handle DIN-7991 sizes
+                df_source = df_din7991
+                size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.din7991_loaded else []
             elif selected_standard in thread_files:
                 df_thread = get_thread_data(selected_standard)
                 size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
