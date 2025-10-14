@@ -25,7 +25,10 @@ warnings.filterwarnings('ignore')
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
-me_chem_path = r"Mechanical and Chemical.xlsx"
+
+# UPDATED: Mechanical and Chemical Properties paths
+me_chem_google_url = "https://docs.google.com/spreadsheets/d/12lBzI67Wb0yZyJKYxpDCLzHF9zvS2Fha/export?format=xlsx"
+me_chem_path = r"G:\My Drive\Streamlite\Mechanical and Chemical.xlsx"
 
 # ISO 4014 paths - local and Google Sheets
 iso4014_local_path = r"G:\My Drive\Streamlite\ISO 4014 Hex Bolt.xlsx"
@@ -78,6 +81,7 @@ def load_config():
         st.session_state.app_config = {
             'data_sources': {
                 'main_data': url,
+                'me_chem_data': me_chem_google_url,  # Updated
                 'iso4014': iso4014_file_url,
                 'thread_files': thread_files
             },
@@ -122,7 +126,9 @@ def initialize_session_state():
         "current_filters_dimensional": {},
         "current_filters_thread": {},
         "current_filters_material": {},
-        "product_intelligence_filters": {}
+        "product_intelligence_filters": {},
+        "me_chem_columns": [],  # New: Store Mechanical & Chemical columns
+        "property_classes": []   # New: Store available property classes
     }
     
     for key, value in defaults.items():
@@ -608,7 +614,12 @@ def load_excel_file(path_or_url):
 
 # Load main data
 df = safe_load_excel_file(url) if url else safe_load_excel_file(local_excel_path)
-df_mechem = safe_load_excel_file(me_chem_path)
+
+# UPDATED: Load Mechanical and Chemical data - try Google Sheets first, then fallback to local
+df_mechem = safe_load_excel_file(me_chem_google_url)  # Try Google Sheets first
+if df_mechem.empty:
+    st.info("🔄 Online Mechanical & Chemical file not accessible, trying local version...")
+    df_mechem = safe_load_excel_file(me_chem_path)  # Fallback to local file
 
 # Load ISO 4014 data - try Google Sheets first, then fallback to local
 df_iso4014 = safe_load_excel_file(iso4014_file_url)  # Try Google Sheets first
@@ -633,6 +644,171 @@ def load_thread_data(file_path):
     except Exception as e:
         st.sidebar.error(f"❌ Error loading thread data: {str(e)}")
         return pd.DataFrame()
+
+# ======================================================
+# 🔹 ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING
+# ======================================================
+def process_mechanical_chemical_data():
+    """Process and extract property classes from Mechanical & Chemical data"""
+    if df_mechem.empty:
+        return [], []
+    
+    try:
+        # Store column names for analysis
+        me_chem_columns = df_mechem.columns.tolist()
+        
+        # Identify property class column (looking for grade/class identifiers)
+        property_class_col = None
+        possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation']
+        
+        for col in me_chem_columns:
+            col_lower = col.lower()
+            for possible in possible_class_cols:
+                if possible.lower() in col_lower:
+                    property_class_col = col
+                    break
+            if property_class_col:
+                break
+        
+        # If no specific column found, use first column as default
+        if not property_class_col and len(me_chem_columns) > 0:
+            property_class_col = me_chem_columns[0]
+        
+        # Extract unique property classes
+        property_classes = []
+        if property_class_col and property_class_col in df_mechem.columns:
+            property_classes = df_mechem[property_class_col].dropna().unique().tolist()
+            property_classes = [str(pc) for pc in property_classes if str(pc).strip() != '']
+        
+        # Store in session state
+        st.session_state.me_chem_columns = me_chem_columns
+        st.session_state.property_classes = property_classes
+        
+        return me_chem_columns, property_classes
+        
+    except Exception as e:
+        st.error(f"Error processing Mechanical & Chemical data: {str(e)}")
+        return [], []
+
+def get_standards_for_property_class(property_class):
+    """Get available standards for a specific property class"""
+    if df_mechem.empty or not property_class:
+        return []
+    
+    try:
+        # Identify property class column
+        property_class_col = None
+        for col in st.session_state.me_chem_columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
+                property_class_col = col
+                break
+        
+        if not property_class_col:
+            return []
+        
+        # Filter data for the selected property class
+        filtered_data = df_mechem[df_mechem[property_class_col] == property_class]
+        
+        # Look for standards columns
+        standards = []
+        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type']
+        
+        for col in filtered_data.columns:
+            col_lower = col.lower()
+            for possible in possible_standard_cols:
+                if possible.lower() in col_lower:
+                    # Get unique standards from this column
+                    col_standards = filtered_data[col].dropna().unique()
+                    standards.extend([str(std) for std in col_standards if str(std).strip() != ''])
+                    break
+        
+        # Remove duplicates and return
+        return list(set(standards))
+        
+    except Exception as e:
+        st.error(f"Error getting standards for {property_class}: {str(e)}")
+        return []
+
+def show_mechanical_chemical_details(property_class):
+    """Show detailed mechanical and chemical properties for a selected property class"""
+    if df_mechem.empty or not property_class:
+        return
+    
+    try:
+        # Identify property class column
+        property_class_col = None
+        for col in st.session_state.me_chem_columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
+                property_class_col = col
+                break
+        
+        if not property_class_col:
+            return
+        
+        # Filter data for the selected property class
+        filtered_data = df_mechem[df_mechem[property_class_col] == property_class]
+        
+        if filtered_data.empty:
+            st.info(f"No detailed data found for {property_class}")
+            return
+        
+        # Display the data
+        st.markdown(f"### 🧪 Detailed Properties for {property_class}")
+        
+        # Show as dataframe
+        st.dataframe(
+            filtered_data,
+            use_container_width=True,
+            height=400
+        )
+        
+        # Show key properties in a nice format
+        st.markdown("#### 📊 Key Properties")
+        
+        # Group properties by type
+        mechanical_props = []
+        chemical_props = []
+        other_props = []
+        
+        for col in filtered_data.columns:
+            col_lower = col.lower()
+            # Skip the property class column itself
+            if col == property_class_col:
+                continue
+            
+            # Categorize columns
+            if any(keyword in col_lower for keyword in ['tensile', 'yield', 'hardness', 'strength', 'elongation', 'proof']):
+                mechanical_props.append(col)
+            elif any(keyword in col_lower for keyword in ['carbon', 'manganese', 'phosphorus', 'sulfur', 'chromium', 'nickel', 'chemical']):
+                chemical_props.append(col)
+            else:
+                other_props.append(col)
+        
+        # Display mechanical properties
+        if mechanical_props:
+            st.markdown("**Mechanical Properties:**")
+            mech_cols = st.columns(min(3, len(mechanical_props)))
+            for idx, prop in enumerate(mechanical_props):
+                with mech_cols[idx % len(mech_cols)]:
+                    value = filtered_data[prop].iloc[0] if not filtered_data[prop].isna().all() else "N/A"
+                    st.metric(prop, value)
+        
+        # Display chemical properties
+        if chemical_props:
+            st.markdown("**Chemical Composition (%):**")
+            chem_cols = st.columns(min(4, len(chemical_props)))
+            for idx, prop in enumerate(chemical_props):
+                with chem_cols[idx % len(chem_cols)]:
+                    value = filtered_data[prop].iloc[0] if not filtered_data[prop].isna().all() else "N/A"
+                    st.metric(prop, value)
+                    
+    except Exception as e:
+        st.error(f"Error displaying mechanical/chemical details: {str(e)}")
+
+# Initialize Mechanical & Chemical data processing
+me_chem_columns, property_classes = process_mechanical_chemical_data()
 
 # ======================================================
 # 🔹 COMPLETELY BULLETPROOF SIZE HANDLING
@@ -1187,6 +1363,13 @@ def show_data_quality_indicators():
         else:
             st.markdown('<div class="data-quality-indicator quality-warning">ISO 4014: Limited Access</div>', unsafe_allow_html=True)
         
+        # Mechanical & Chemical data quality
+        if not df_mechem.empty:
+            st.markdown(f'<div class="data-quality-indicator quality-good">Mech & Chem: {len(df_mechem)} Records</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size: 0.8rem; margin: 0.1rem 0;">Property Classes: {len(st.session_state.property_classes)}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="data-quality-indicator quality-warning">Mech & Chem: Limited Access</div>', unsafe_allow_html=True)
+        
         # Thread data quality
         thread_status = []
         for standard, url in thread_files.items():
@@ -1662,7 +1845,7 @@ def show_enhanced_product_database():
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Section C: Material Properties
+    # Section C: Material Properties - UPDATED WITH MECHANICAL & CHEMICAL DATA
     st.markdown("""
     <div class="filter-section">
         <h3 class="filter-header">🧪 Section C - Material Properties</h3>
@@ -1671,36 +1854,60 @@ def show_enhanced_product_database():
     col1, col2 = st.columns(2)
     
     with col1:
-        # Property Class (Grades)
+        # Property Class (Grades) - FROM MECHANICAL & CHEMICAL DATA
         property_classes = ["All"]
-        if not df.empty and 'Product Grade' in df.columns:
-            grades = df['Product Grade'].dropna().unique()
-            property_classes.extend(sorted(grades))
-        if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-            iso_grades = df_iso4014['Product Grade'].dropna().unique()
-            for grade in iso_grades:
-                if grade not in property_classes:
-                    property_classes.append(grade)
+        
+        # Add property classes from Mechanical & Chemical data
+        if st.session_state.property_classes:
+            property_classes.extend(sorted(st.session_state.property_classes))
+        else:
+            # Fallback to main database if Mechanical & Chemical data not available
+            if not df.empty and 'Product Grade' in df.columns:
+                grades = df['Product Grade'].dropna().unique()
+                property_classes.extend(sorted(grades))
+            if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
+                iso_grades = df_iso4014['Product Grade'].dropna().unique()
+                for grade in iso_grades:
+                    if grade not in property_classes:
+                        property_classes.append(grade)
         
         property_class = st.selectbox("Property Class (Grade)", property_classes, key="property_class")
+        
+        # Show Mechanical & Chemical details when a property class is selected
+        if property_class != "All":
+            with st.expander(f"🔬 View Mechanical & Chemical Details for {property_class}", expanded=False):
+                show_mechanical_chemical_details(property_class)
     
     with col2:
-        # Standards based on Property Class
+        # Standards based on Property Class - FROM MECHANICAL & CHEMICAL DATA
         material_standards = ["All"]
+        
         if property_class != "All":
-            # Get standards that have this grade
-            grade_standards = []
-            if not df.empty and 'Product Grade' in df.columns:
-                grade_df = df[df['Product Grade'] == property_class]
-                grade_standards.extend(grade_df['Standards'].dropna().unique().tolist())
-            if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-                iso_grade_df = df_iso4014[df_iso4014['Product Grade'] == property_class]
-                if not iso_grade_df.empty:
-                    grade_standards.append("ISO 4014")
-            
-            material_standards.extend(sorted(set(grade_standards)))
+            # Get standards from Mechanical & Chemical data
+            mechem_standards = get_standards_for_property_class(property_class)
+            if mechem_standards:
+                material_standards.extend(sorted(mechem_standards))
+            else:
+                # Fallback to main database standards
+                grade_standards = []
+                if not df.empty and 'Product Grade' in df.columns:
+                    grade_df = df[df['Product Grade'] == property_class]
+                    grade_standards.extend(grade_df['Standards'].dropna().unique().tolist())
+                if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
+                    iso_grade_df = df_iso4014[df_iso4014['Product Grade'] == property_class]
+                    if not iso_grade_df.empty:
+                        grade_standards.append("ISO 4014")
+                
+                material_standards.extend(sorted(set(grade_standards)))
         
         material_standard = st.selectbox("Material Standard", material_standards, key="material_standard")
+        
+        # Data source indicator
+        if property_class != "All":
+            if mechem_standards:
+                st.success("✅ Data from Mechanical & Chemical Properties")
+            else:
+                st.info("ℹ️ Data from main product database")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -2427,6 +2634,9 @@ st.markdown("**Professional Engineering Edition v4.0 ✅**")
 
 # Add help system to sidebar
 show_help_system()
+
+# Add data quality indicators to sidebar
+show_data_quality_indicators()
 
 if st.session_state.selected_section is None:
     show_enhanced_home()
