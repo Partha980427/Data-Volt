@@ -1039,6 +1039,26 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
+# 🔹 FIXED DATA CLEANING - LESS AGGRESSIVE
+# ======================================================
+def clean_dataframe_columns(df):
+    """Remove only completely empty columns - LESS AGGRESSIVE VERSION"""
+    if df.empty:
+        return df
+    
+    # Remove only columns with ALL NaN values (completely empty)
+    df = df.dropna(axis=1, how='all')
+    
+    # Remove columns that are completely empty strings or whitespace only
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            # Check if all values are empty strings or whitespace
+            if df[col].str.strip().replace('', pd.NA).isna().all():
+                df = df.drop(col, axis=1)
+    
+    return df
+
+# ======================================================
 # 🔹 ENHANCED WEIGHT CALCULATION WITH ALL PRODUCT TYPES
 # ======================================================
 def calculate_weight_enhanced(product, diameter_mm, length_mm, diameter_type="body"):
@@ -1793,21 +1813,17 @@ def get_series_for_standard(standard):
     return "All"
 
 def clean_dataframe_columns(df):
-    """Remove empty columns and clean dataframe"""
+    """Remove only completely empty columns - LESS AGGRESSIVE VERSION"""
     if df.empty:
         return df
     
+    # Remove only columns with ALL NaN values (completely empty)
     df = df.dropna(axis=1, how='all')
     
-    for col in df.columns:
-        if df[col].nunique() <= 1:
-            df = df.drop(col, axis=1)
-    
-    threshold = len(df) * 0.1
-    df = df.dropna(axis=1, thresh=threshold)
-    
+    # Remove columns that are completely empty strings or whitespace only
     for col in df.columns:
         if df[col].dtype == 'object':
+            # Check if all values are empty strings or whitespace
             if df[col].str.strip().replace('', pd.NA).isna().all():
                 df = df.drop(col, axis=1)
     
@@ -2187,6 +2203,17 @@ def show_enhanced_product_database():
     
     st.markdown("---")
     
+    # Initialize all variables with default values
+    dimensional_product = "All"
+    dimensional_series = "All"
+    dimensional_standard = "All"
+    dimensional_size = "All"
+    thread_standard = "All"
+    thread_size = "All"
+    tolerance_class = "All"
+    property_class = "All"
+    material_standard = "All"
+    
     # SECTION A - DIMENSIONAL SPECIFICATIONS
     if st.session_state.section_a_view:
         st.markdown("""
@@ -2370,21 +2397,34 @@ def show_enhanced_product_database():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("🚀 APPLY FILTERS & SEARCH", use_container_width=True, type="primary"):
-            st.session_state.current_filters_dimensional = {
-                'product': dimensional_product,
-                'series': dimensional_series,
-                'standard': dimensional_standard,
-                'size': dimensional_size
-            }
-            st.session_state.current_filters_thread = {
-                'standard': thread_standard,
-                'size': thread_size,
-                'class': tolerance_class
-            }
-            st.session_state.current_filters_material = {
-                'property_class': property_class,
-                'standard': material_standard
-            }
+            # Only save filters from visible sections
+            if st.session_state.section_a_view:
+                st.session_state.current_filters_dimensional = {
+                    'product': dimensional_product,
+                    'series': dimensional_series,
+                    'standard': dimensional_standard,
+                    'size': dimensional_size
+                }
+            else:
+                st.session_state.current_filters_dimensional = {}
+            
+            if st.session_state.section_b_view:
+                st.session_state.current_filters_thread = {
+                    'standard': thread_standard,
+                    'size': thread_size,
+                    'class': tolerance_class
+                }
+            else:
+                st.session_state.current_filters_thread = {}
+            
+            if st.session_state.section_c_view:
+                st.session_state.current_filters_material = {
+                    'property_class': property_class,
+                    'standard': material_standard
+                }
+            else:
+                st.session_state.current_filters_material = {}
+                
             st.rerun()
     
     if (st.session_state.current_filters_dimensional or 
