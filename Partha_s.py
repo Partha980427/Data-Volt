@@ -2288,83 +2288,111 @@ def show_filtered_results():
                     st.plotly_chart(fig_sizes, use_container_width=True)
 
 def apply_all_filters():
-    """Apply all dimensional, thread, and material filters"""
+    """Apply all dimensional, thread, and material filters - FIXED SIZE FILTERING"""
     
     filtered_dfs = []
-    
-    # Apply dimensional filters
     dim_filters = st.session_state.current_filters_dimensional
+    
+    # Helper function to apply size filter safely
+    def apply_size_filter(df_temp, size_filter):
+        if size_filter == "All" or 'Size' not in df_temp.columns:
+            return df_temp
+        try:
+            # Convert both to string for safe comparison
+            return df_temp[df_temp['Size'].astype(str) == str(size_filter)]
+        except:
+            return pd.DataFrame()
     
     # Handle ASME B18.2.1 data
     if not df.empty:
-        temp_df = df.copy()
+        asme_temp = df.copy()
+        include_asme = False
         
-        if dim_filters.get('standard') and dim_filters['standard'] != "All":
-            if dim_filters['standard'] == "ASME B18.2.1":
-                # Apply product filter
-                if dim_filters.get('product') and dim_filters['product'] != "All":
-                    temp_df = temp_df[temp_df['Product'] == dim_filters['product']]
-                
-                # Apply size filter
-                if dim_filters.get('size') and dim_filters['size'] != "All":
-                    temp_df = temp_df[temp_df['Size'] == dim_filters['size']]
-                
-                if not temp_df.empty:
-                    filtered_dfs.append(temp_df)
-        
-        elif dim_filters.get('standard') == "All":
+        # Check if ASME B18.2.1 should be included
+        if dim_filters.get('standard') in ["All", "ASME B18.2.1"]:
+            include_asme = True
+            
             # Apply product filter
             if dim_filters.get('product') and dim_filters['product'] != "All":
-                temp_df = temp_df[temp_df['Product'] == dim_filters['product']]
+                asme_temp = asme_temp[asme_temp['Product'] == dim_filters['product']]
             
             # Apply size filter
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                temp_df = temp_df[temp_df['Size'] == dim_filters['size']]
+            asme_temp = apply_size_filter(asme_temp, dim_filters.get('size'))
             
-            if not temp_df.empty:
-                filtered_dfs.append(temp_df)
+        if include_asme and not asme_temp.empty:
+            filtered_dfs.append(asme_temp)
     
     # Handle ISO 4014 data
     if not df_iso4014.empty:
-        if (dim_filters.get('standard') in ["All", "ISO 4014"] or 
-            (dim_filters.get('product') == "Hex Bolt" and dim_filters.get('standard') == "All")):
+        iso_temp = df_iso4014.copy()
+        include_iso = False
+        
+        # Check if ISO 4014 should be included
+        if dim_filters.get('standard') in ["All", "ISO 4014"]:
+            include_iso = True
             
-            iso_temp = df_iso4014.copy()
+            # Apply product filter (ISO 4014 only has Hex Bolt)
+            if dim_filters.get('product') and dim_filters['product'] != "All":
+                if dim_filters['product'] == "Hex Bolt":
+                    # ISO 4014 only contains Hex Bolt, so include it
+                    pass
+                else:
+                    include_iso = False
             
             # Apply size filter
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                iso_temp = iso_temp[iso_temp['Size'] == dim_filters['size']]
+            if include_iso:
+                iso_temp = apply_size_filter(iso_temp, dim_filters.get('size'))
             
-            if not iso_temp.empty:
-                filtered_dfs.append(iso_temp)
+        if include_iso and not iso_temp.empty:
+            filtered_dfs.append(iso_temp)
     
     # Handle DIN-7991 data
     if st.session_state.din7991_loaded:
-        if (dim_filters.get('standard') in ["All", "DIN-7991"] or 
-            (dim_filters.get('product') == "Hexagon Socket Countersunk Head Cap Screw" and dim_filters.get('standard') == "All")):
+        din_temp = df_din7991.copy()
+        include_din = False
+        
+        # Check if DIN-7991 should be included
+        if dim_filters.get('standard') in ["All", "DIN-7991"]:
+            include_din = True
             
-            din_temp = df_din7991.copy()
+            # Apply product filter (DIN-7991 only has Hexagon Socket Countersunk Head Cap Screw)
+            if dim_filters.get('product') and dim_filters['product'] != "All":
+                if dim_filters['product'] == "Hexagon Socket Countersunk Head Cap Screw":
+                    # DIN-7991 only contains this product, so include it
+                    pass
+                else:
+                    include_din = False
             
             # Apply size filter
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                din_temp = din_temp[din_temp['Size'] == dim_filters['size']]
+            if include_din:
+                din_temp = apply_size_filter(din_temp, dim_filters.get('size'))
             
-            if not din_temp.empty:
-                filtered_dfs.append(din_temp)
+        if include_din and not din_temp.empty:
+            filtered_dfs.append(din_temp)
     
     # Handle ASME B18.3 data
     if st.session_state.asme_b18_3_loaded:
-        if (dim_filters.get('standard') in ["All", "ASME B18.3"] or 
-            (dim_filters.get('product') == "Hexagon Socket Head Cap Screws" and dim_filters.get('standard') == "All")):
+        asme_b18_3_temp = df_asme_b18_3.copy()
+        include_asme_b18_3 = False
+        
+        # Check if ASME B18.3 should be included
+        if dim_filters.get('standard') in ["All", "ASME B18.3"]:
+            include_asme_b18_3 = True
             
-            asme_temp = df_asme_b18_3.copy()
+            # Apply product filter (ASME B18.3 only has Hexagon Socket Head Cap Screws)
+            if dim_filters.get('product') and dim_filters['product'] != "All":
+                if dim_filters['product'] == "Hexagon Socket Head Cap Screws":
+                    # ASME B18.3 only contains this product, so include it
+                    pass
+                else:
+                    include_asme_b18_3 = False
             
             # Apply size filter
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                asme_temp = asme_temp[asme_temp['Size'] == dim_filters['size']]
+            if include_asme_b18_3:
+                asme_b18_3_temp = apply_size_filter(asme_b18_3_temp, dim_filters.get('size'))
             
-            if not asme_temp.empty:
-                filtered_dfs.append(asme_temp)
+        if include_asme_b18_3 and not asme_b18_3_temp.empty:
+            filtered_dfs.append(asme_b18_3_temp)
     
     # Apply material filters
     mat_filters = st.session_state.current_filters_material
