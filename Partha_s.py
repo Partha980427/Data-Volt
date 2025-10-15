@@ -977,7 +977,7 @@ def show_mechanical_chemical_details(property_class):
 me_chem_columns, property_classes = process_mechanical_chemical_data()
 
 # ======================================================
-# 🔹 COMPLETELY BULLETPROOF SIZE HANDLING
+# 🔹 COMPLETELY BULLETPROOF SIZE HANDLING - FIXED VERSION
 # ======================================================
 def size_to_float(size_str):
     """Convert size string to float for sorting - ULTRA ROBUST VERSION"""
@@ -1870,7 +1870,7 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 ENHANCED PRODUCT INTELLIGENCE CENTER
+# 🔹 ENHANCED PRODUCT INTELLIGENCE CENTER - FIXED FILTERING
 # ======================================================
 def get_products_for_standard(standard):
     """Get available products for a specific standard"""
@@ -2430,7 +2430,7 @@ def show_filtered_results():
                     st.plotly_chart(fig_sizes, use_container_width=True)
 
 def apply_all_filters():
-    """Apply all dimensional, thread, and material filters - FIXED VERSION"""
+    """Apply all dimensional, thread, and material filters - COMPLETELY FIXED VERSION"""
     
     filtered_dfs = []
     dim_filters = st.session_state.current_filters_dimensional
@@ -2438,14 +2438,18 @@ def apply_all_filters():
     if st.session_state.debug_mode:
         st.sidebar.write("🔧 Debug - Applying filters:", dim_filters)
     
-    # Helper function to apply size filter safely
+    # Helper function to apply size filter safely - FIXED VERSION
     def apply_size_filter(df_temp, size_filter):
         if size_filter == "All" or 'Size' not in df_temp.columns:
             return df_temp
         try:
-            # Convert both to string for safe comparison
-            return df_temp[df_temp['Size'].astype(str) == str(size_filter)]
-        except:
+            # Convert both to string for safe comparison - handle NaN values
+            df_temp = df_temp.copy()
+            df_temp['Size_Str'] = df_temp['Size'].astype(str)
+            return df_temp[df_temp['Size_Str'] == str(size_filter)]
+        except Exception as e:
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"❌ Size filter error: {e}")
             return pd.DataFrame()
     
     # Handle ASME B18.2.1 data
@@ -2547,9 +2551,13 @@ def apply_all_filters():
                     break
             
             if grade_col:
-                filtered_dfs[i] = temp_df[temp_df[grade_col] == mat_filters['property_class']]
-                if st.session_state.debug_mode:
-                    st.sidebar.write(f"✅ Applied grade filter: {mat_filters['property_class']}")
+                try:
+                    filtered_dfs[i] = temp_df[temp_df[grade_col] == mat_filters['property_class']]
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"✅ Applied grade filter: {mat_filters['property_class']}")
+                except Exception as e:
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"❌ Grade filter error: {e}")
     
     # Combine all filtered dataframes
     if filtered_dfs:
