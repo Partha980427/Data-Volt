@@ -174,7 +174,8 @@ def initialize_session_state():
         "asme_b18_3_loaded": False,
         "dimensional_standards_count": 0,
         "available_products": {},
-        "available_series": {}
+        "available_series": {},
+        "debug_mode": False
     }
     
     for key, value in defaults.items():
@@ -718,8 +719,15 @@ def process_standard_data():
     
     # Process ISO 4014 Data
     if not df_iso4014.empty:
-        if 'Product' in df_iso4014.columns:
-            iso_products = df_iso4014['Product'].dropna().unique().tolist()
+        # Handle different column names for ISO 4014
+        product_col = None
+        for col in df_iso4014.columns:
+            if 'product' in col.lower():
+                product_col = col
+                break
+        
+        if product_col:
+            iso_products = df_iso4014[product_col].dropna().unique().tolist()
             standard_products['ISO 4014'] = ["All"] + sorted(iso_products)
         else:
             standard_products['ISO 4014'] = ["All", "Hex Bolt"]
@@ -769,10 +777,29 @@ else:
 
 # Process ISO 4014 data
 if not df_iso4014.empty:
-    df_iso4014['Product'] = "Hex Bolt"
+    # Handle different column names for ISO 4014
+    product_col = None
+    for col in df_iso4014.columns:
+        if 'product' in col.lower():
+            product_col = col
+            break
+    
+    if product_col:
+        df_iso4014['Product'] = df_iso4014[product_col]
+    else:
+        df_iso4014['Product'] = "Hex Bolt"
+    
     df_iso4014['Standards'] = "ISO-4014-2011"
-    if 'Grade' in df_iso4014.columns and 'Product Grade' in df_iso4014.columns:
-        df_iso4014 = df_iso4014.drop('Grade', axis=1)
+    
+    # Handle grade column
+    grade_col = None
+    for col in df_iso4014.columns:
+        if 'grade' in col.lower():
+            grade_col = col
+            break
+    
+    if grade_col and grade_col != 'Product Grade':
+        df_iso4014['Product Grade'] = df_iso4014[grade_col]
 
 @st.cache_data
 def load_thread_data(file_path):
@@ -1951,6 +1978,10 @@ def show_enhanced_product_database():
     
     st.markdown("---")
     
+    # Debug mode toggle
+    with st.sidebar:
+        st.session_state.debug_mode = st.checkbox("🔧 Debug Mode", value=st.session_state.debug_mode)
+    
     # Multi-Product Search System
     st.markdown("### 🔍 Multi-Product Search System")
     st.info("💡 Search up to 10 different products simultaneously with individual specifications")
@@ -2287,6 +2318,19 @@ def show_filtered_results():
     # Apply all filters
     filtered_df = apply_all_filters()
     
+    if st.session_state.debug_mode:
+        st.markdown("### 🐛 Debug Information")
+        st.write("Current Filters:", {
+            'dimensional': st.session_state.current_filters_dimensional,
+            'thread': st.session_state.current_filters_thread,
+            'material': st.session_state.current_filters_material
+        })
+        st.write("DataFrame Info:")
+        st.write(f"Shape: {filtered_df.shape}")
+        st.write("Columns:", filtered_df.columns.tolist() if not filtered_df.empty else "No columns")
+        st.write("First few rows:")
+        st.dataframe(filtered_df.head() if not filtered_df.empty else pd.DataFrame())
+    
     if filtered_df.empty:
         st.warning("🚫 No products match the current filters. Try adjusting your search criteria.")
         return
@@ -2386,10 +2430,13 @@ def show_filtered_results():
                     st.plotly_chart(fig_sizes, use_container_width=True)
 
 def apply_all_filters():
-    """Apply all dimensional, thread, and material filters"""
+    """Apply all dimensional, thread, and material filters - FIXED VERSION"""
     
     filtered_dfs = []
     dim_filters = st.session_state.current_filters_dimensional
+    
+    if st.session_state.debug_mode:
+        st.sidebar.write("🔧 Debug - Applying filters:", dim_filters)
     
     # Helper function to apply size filter safely
     def apply_size_filter(df_temp, size_filter):
@@ -2419,6 +2466,8 @@ def apply_all_filters():
             
         if include_asme and not asme_temp.empty:
             filtered_dfs.append(asme_temp)
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"✅ ASME B18.2.1: {len(asme_temp)} records")
     
     # Handle ISO 4014 data
     if not df_iso4014.empty:
@@ -2439,6 +2488,8 @@ def apply_all_filters():
             
         if include_iso and not iso_temp.empty:
             filtered_dfs.append(iso_temp)
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"✅ ISO 4014: {len(iso_temp)} records")
     
     # Handle DIN-7991 data
     if st.session_state.din7991_loaded:
@@ -2459,6 +2510,8 @@ def apply_all_filters():
             
         if include_din and not din_temp.empty:
             filtered_dfs.append(din_temp)
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"✅ DIN-7991: {len(din_temp)} records")
     
     # Handle ASME B18.3 data
     if st.session_state.asme_b18_3_loaded:
@@ -2479,19 +2532,34 @@ def apply_all_filters():
             
         if include_asme_b18_3 and not asme_b18_3_temp.empty:
             filtered_dfs.append(asme_b18_3_temp)
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"✅ ASME B18.3: {len(asme_b18_3_temp)} records")
     
     # Apply material filters
     mat_filters = st.session_state.current_filters_material
     if mat_filters and mat_filters.get('property_class') and mat_filters['property_class'] != "All":
         for i, temp_df in enumerate(filtered_dfs):
-            if 'Product Grade' in temp_df.columns:
-                filtered_dfs[i] = temp_df[temp_df['Product Grade'] == mat_filters['property_class']]
+            # Handle different grade column names
+            grade_col = None
+            for col in temp_df.columns:
+                if 'grade' in col.lower():
+                    grade_col = col
+                    break
+            
+            if grade_col:
+                filtered_dfs[i] = temp_df[temp_df[grade_col] == mat_filters['property_class']]
+                if st.session_state.debug_mode:
+                    st.sidebar.write(f"✅ Applied grade filter: {mat_filters['property_class']}")
     
     # Combine all filtered dataframes
     if filtered_dfs:
         final_df = pd.concat(filtered_dfs, ignore_index=True)
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"🎯 Final combined: {len(final_df)} records")
         return final_df
     else:
+        if st.session_state.debug_mode:
+            st.sidebar.write("❌ No dataframes to combine")
         return pd.DataFrame()
 
 def export_filtered_data(filtered_df, format_type, include_analysis=True):
