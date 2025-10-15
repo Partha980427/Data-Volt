@@ -140,7 +140,8 @@ def initialize_session_state():
         "me_chem_columns": [],
         "property_classes": [],
         "din7991_loaded": False,
-        "asme_b18_3_loaded": False  # NEW: Track ASME B18.3 loading status
+        "asme_b18_3_loaded": False,  # NEW: Track ASME B18.3 loading status
+        "dimensional_standards_count": 0  # NEW: Track dimensional standards count
     }
     
     for key, value in defaults.items():
@@ -680,6 +681,19 @@ if not df_iso4014.empty:
     # Remove the old 'Grade' column if it exists and use 'Product Grade'
     if 'Grade' in df_iso4014.columns and 'Product Grade' in df_iso4014.columns:
         df_iso4014 = df_iso4014.drop('Grade', axis=1)
+
+# NEW: Count dimensional standards
+dimensional_standards_count = 0
+if not df.empty:
+    dimensional_standards_count += 1  # ASME B18.2.1
+if not df_iso4014.empty:
+    dimensional_standards_count += 1  # ISO 4014
+if st.session_state.din7991_loaded:
+    dimensional_standards_count += 1  # DIN-7991
+if st.session_state.asme_b18_3_loaded:
+    dimensional_standards_count += 1  # ASME B18.3
+
+st.session_state.dimensional_standards_count = dimensional_standards_count
 
 @st.cache_data
 def load_thread_data(file_path):
@@ -1752,6 +1766,45 @@ def show_calculation_history():
 # ======================================================
 # 🔹 ENHANCED PRODUCT INTELLIGENCE CENTER
 # ======================================================
+def get_products_for_standard(standard):
+    """Get available products for a specific standard"""
+    if standard == "ASME B18.2.1":
+        return ["Hex Bolt", "Heavy Hex Bolt", "Hex Screw", "Heavy Hex Screw"]
+    elif standard == "ASME B18.3":
+        return ["Hexagon Socket Head Cap Screws"]
+    elif standard == "DIN-7991":
+        return ["Hexagon Socket Countersunk Head Cap Screw"]
+    elif standard == "ISO 4014":
+        return ["Hex Bolt"]
+    return ["All"]
+
+def get_series_for_standard(standard):
+    """Get series for a specific standard"""
+    if standard in ["ASME B18.2.1", "ASME B18.3"]:
+        return "Inch"
+    elif standard in ["DIN-7991", "ISO 4014"]:
+        return "Metric"
+    return "All"
+
+def clean_dataframe_columns(df):
+    """Remove empty columns and clean dataframe"""
+    if df.empty:
+        return df
+    
+    # Remove completely empty columns
+    df = df.dropna(axis=1, how='all')
+    
+    # Remove columns with all the same value
+    for col in df.columns:
+        if df[col].nunique() == 1:
+            df = df.drop(col, axis=1)
+    
+    # Remove columns that are mostly empty (>90% NaN)
+    threshold = len(df) * 0.1  # Keep columns with at least 10% data
+    df = df.dropna(axis=1, thresh=threshold)
+    
+    return df
+
 def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with comprehensive filtering"""
     
@@ -1862,39 +1915,37 @@ def show_enhanced_product_database():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # Product Type - UPDATED: Added Hexagon Socket Head Cap Screws
-        product_types = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
-        # Add DIN-7991 product if available
-        if st.session_state.din7991_loaded and "Hexagon Socket Countersunk Head Cap Screw" not in product_types:
-            product_types.append("Hexagon Socket Countersunk Head Cap Screw")
-        # NEW: Add ASME B18.3 product if available
-        if st.session_state.asme_b18_3_loaded and "Hexagon Socket Head Cap Screws" not in product_types:
-            product_types.append("Hexagon Socket Head Cap Screws")
-        dimensional_product = st.selectbox("Product Type", product_types, key="dimensional_product")
-    
-    with col2:
-        # Series System
-        series_system = st.radio("Series System", ["Inch", "Metric"], key="dimensional_series", horizontal=True)
-    
-    with col3:
-        # Dimensional Standards - UPDATED: Added ASME B18.3 for Inch series
+        # Dimensional Standards - UPDATED: All four dimensional standards
         dimensional_standards = ["All"]
-        if series_system == "Inch":
-            inch_standards = [std for std in df['Standards'].dropna().unique() if "ISO" not in str(std)] if not df.empty else []
-            dimensional_standards.extend(sorted(inch_standards))
-            # NEW: Add ASME B18.3 for Inch series
-            if "ASME B18.3" not in dimensional_standards and st.session_state.asme_b18_3_loaded:
-                dimensional_standards.append("ASME B18.3")
-        else:
-            metric_standards = [std for std in df['Standards'].dropna().unique() if "ISO" in str(std)] if not df.empty else []
-            dimensional_standards.extend(sorted(metric_standards))
-            if "ISO 4014" not in dimensional_standards:
-                dimensional_standards.append("ISO 4014")
-            # Add DIN-7991 for Metric series
-            if "DIN-7991" not in dimensional_standards and st.session_state.din7991_loaded:
-                dimensional_standards.append("DIN-7991")
+        if not df.empty:
+            dimensional_standards.append("ASME B18.2.1")
+        if not df_iso4014.empty:
+            dimensional_standards.append("ISO 4014")
+        if st.session_state.din7991_loaded:
+            dimensional_standards.append("DIN-7991")
+        if st.session_state.asme_b18_3_loaded:
+            dimensional_standards.append("ASME B18.3")
         
         dimensional_standard = st.selectbox("Dimensional Standard", dimensional_standards, key="dimensional_standard")
+    
+    with col2:
+        # Product Type - Based on selected standard
+        if dimensional_standard == "All":
+            product_types = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
+        else:
+            product_types = ["All"] + get_products_for_standard(dimensional_standard)
+        
+        dimensional_product = st.selectbox("Product Type", product_types, key="dimensional_product")
+    
+    with col3:
+        # Series System - Based on selected standard
+        if dimensional_standard == "All":
+            series_options = ["All", "Inch", "Metric"]
+        else:
+            series_system = get_series_for_standard(dimensional_standard)
+            series_options = [series_system]
+        
+        dimensional_series = st.selectbox("Series System", series_options, key="dimensional_series")
     
     with col4:
         # Size Filter
@@ -1915,9 +1966,9 @@ def show_enhanced_product_database():
     with col1:
         # Thread Standards
         thread_standards = ["All"]
-        if series_system == "Inch":
+        if dimensional_series == "Inch" or dimensional_series == "All":
             thread_standards += ["ASME B1.1"]
-        else:
+        if dimensional_series == "Metric" or dimensional_series == "All":
             thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
         
         thread_standard = st.selectbox("Thread Standard", thread_standards, key="thread_standard")
@@ -1934,9 +1985,9 @@ def show_enhanced_product_database():
     with col3:
         # Tolerance Class
         tolerance_options = ["All"]
-        if series_system == "Inch":
+        if dimensional_series == "Inch" or dimensional_series == "All":
             tolerance_options += ["1A", "2A", "3A"]
-        else:
+        if dimensional_series == "Metric" or dimensional_series == "All":
             tolerance_options += ["6g", "6H", "4g", "4H", "8g", "8H"]
         
         tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="tolerance_class")
@@ -2017,7 +2068,7 @@ def show_enhanced_product_database():
             # Store current filters
             st.session_state.current_filters_dimensional = {
                 'product': dimensional_product,
-                'series': series_system,
+                'series': dimensional_series,
                 'standard': dimensional_standard,
                 'size': dimensional_size
             }
@@ -2071,26 +2122,34 @@ def configure_product_search(index, product):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # UPDATED: Added Hexagon Socket Head Cap Screws to product options
-        product_options = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
-        if st.session_state.din7991_loaded and "Hexagon Socket Countersunk Head Cap Screw" not in product_options:
-            product_options.append("Hexagon Socket Countersunk Head Cap Screw")
-        # NEW: Add ASME B18.3 product if available
-        if st.session_state.asme_b18_3_loaded and "Hexagon Socket Head Cap Screws" not in product_options:
-            product_options.append("Hexagon Socket Head Cap Screws")
+        # UPDATED: All dimensional standards
+        standard_options = ["All"]
+        if not df.empty:
+            standard_options.append("ASME B18.2.1")
+        if not df_iso4014.empty:
+            standard_options.append("ISO 4014")
+        if st.session_state.din7991_loaded:
+            standard_options.append("DIN-7991")
+        if st.session_state.asme_b18_3_loaded:
+            standard_options.append("ASME B18.3")
+        
+        product['filters']['standard'] = st.selectbox(
+            "Standard", 
+            standard_options, 
+            key=f"prod_std_{index}"
+        )
+    
+    with col2:
+        # Product types based on selected standard
+        if product['filters']['standard'] == "All":
+            product_options = ["All"] + sorted(df['Product'].dropna().unique().tolist()) if not df.empty else ["All"]
+        else:
+            product_options = ["All"] + get_products_for_standard(product['filters']['standard'])
         
         product['filters']['type'] = st.selectbox(
             "Product Type", 
             product_options, 
             key=f"prod_type_{index}"
-        )
-    
-    with col2:
-        product['filters']['series'] = st.radio(
-            "Series System", 
-            ["Inch", "Metric"], 
-            key=f"prod_series_{index}",
-            horizontal=True
         )
     
     with col3:
@@ -2107,26 +2166,22 @@ def configure_product_search(index, product):
 
 def get_filtered_dataframe(product_type, standard):
     """Get filtered dataframe based on product type and standard"""
-    temp_df = df.copy()
+    if standard == "ASME B18.2.1":
+        temp_df = df.copy()
+        if product_type != "All":
+            temp_df = temp_df[temp_df['Product'] == product_type]
+        return temp_df
     
-    if standard == "ISO 4014":
+    elif standard == "ISO 4014":
         return df_iso4014 if not df_iso4014.empty else pd.DataFrame()
     
-    # Handle DIN-7991 standard
-    if standard == "DIN-7991":
+    elif standard == "DIN-7991":
         return df_din7991 if st.session_state.din7991_loaded else pd.DataFrame()
     
-    # NEW: Handle ASME B18.3 standard
-    if standard == "ASME B18.3":
+    elif standard == "ASME B18.3":
         return df_asme_b18_3 if st.session_state.asme_b18_3_loaded else pd.DataFrame()
     
-    if product_type != "All":
-        temp_df = temp_df[temp_df['Product'] == product_type]
-    
-    if standard != "All":
-        temp_df = temp_df[temp_df['Standards'] == standard]
-    
-    return temp_df
+    return pd.DataFrame()
 
 def show_filtered_results():
     """Display filtered results in professional format"""
@@ -2137,6 +2192,9 @@ def show_filtered_results():
     if filtered_df.empty:
         st.warning("🚫 No products match the current filters. Try adjusting your search criteria.")
         return
+    
+    # Clean the dataframe - remove empty columns
+    filtered_df = clean_dataframe_columns(filtered_df)
     
     # Results Header
     st.markdown(f"""
@@ -2232,75 +2290,95 @@ def show_filtered_results():
 def apply_all_filters():
     """Apply all dimensional, thread, and material filters"""
     
-    # Start with main dataframe
-    filtered_df = df.copy()
+    filtered_dfs = []
     
     # Apply dimensional filters
     dim_filters = st.session_state.current_filters_dimensional
-    if dim_filters:
-        if dim_filters.get('product') and dim_filters['product'] != "All":
-            filtered_df = filtered_df[filtered_df['Product'] == dim_filters['product']]
+    
+    # Handle ASME B18.2.1 data
+    if not df.empty:
+        temp_df = df.copy()
         
         if dim_filters.get('standard') and dim_filters['standard'] != "All":
-            filtered_df = filtered_df[filtered_df['Standards'] == dim_filters['standard']]
+            if dim_filters['standard'] == "ASME B18.2.1":
+                # Apply product filter
+                if dim_filters.get('product') and dim_filters['product'] != "All":
+                    temp_df = temp_df[temp_df['Product'] == dim_filters['product']]
+                
+                # Apply size filter
+                if dim_filters.get('size') and dim_filters['size'] != "All":
+                    temp_df = temp_df[temp_df['Size'] == dim_filters['size']]
+                
+                if not temp_df.empty:
+                    filtered_dfs.append(temp_df)
         
-        if dim_filters.get('size') and dim_filters['size'] != "All":
-            filtered_df = filtered_df[filtered_df['Size'] == dim_filters['size']]
+        elif dim_filters.get('standard') == "All":
+            # Apply product filter
+            if dim_filters.get('product') and dim_filters['product'] != "All":
+                temp_df = temp_df[temp_df['Product'] == dim_filters['product']]
+            
+            # Apply size filter
+            if dim_filters.get('size') and dim_filters['size'] != "All":
+                temp_df = temp_df[temp_df['Size'] == dim_filters['size']]
+            
+            if not temp_df.empty:
+                filtered_dfs.append(temp_df)
+    
+    # Handle ISO 4014 data
+    if not df_iso4014.empty:
+        if (dim_filters.get('standard') in ["All", "ISO 4014"] or 
+            (dim_filters.get('product') == "Hex Bolt" and dim_filters.get('standard') == "All")):
+            
+            iso_temp = df_iso4014.copy()
+            
+            # Apply size filter
+            if dim_filters.get('size') and dim_filters['size'] != "All":
+                iso_temp = iso_temp[iso_temp['Size'] == dim_filters['size']]
+            
+            if not iso_temp.empty:
+                filtered_dfs.append(iso_temp)
+    
+    # Handle DIN-7991 data
+    if st.session_state.din7991_loaded:
+        if (dim_filters.get('standard') in ["All", "DIN-7991"] or 
+            (dim_filters.get('product') == "Hexagon Socket Countersunk Head Cap Screw" and dim_filters.get('standard') == "All")):
+            
+            din_temp = df_din7991.copy()
+            
+            # Apply size filter
+            if dim_filters.get('size') and dim_filters['size'] != "All":
+                din_temp = din_temp[din_temp['Size'] == dim_filters['size']]
+            
+            if not din_temp.empty:
+                filtered_dfs.append(din_temp)
+    
+    # Handle ASME B18.3 data
+    if st.session_state.asme_b18_3_loaded:
+        if (dim_filters.get('standard') in ["All", "ASME B18.3"] or 
+            (dim_filters.get('product') == "Hexagon Socket Head Cap Screws" and dim_filters.get('standard') == "All")):
+            
+            asme_temp = df_asme_b18_3.copy()
+            
+            # Apply size filter
+            if dim_filters.get('size') and dim_filters['size'] != "All":
+                asme_temp = asme_temp[asme_temp['Size'] == dim_filters['size']]
+            
+            if not asme_temp.empty:
+                filtered_dfs.append(asme_temp)
     
     # Apply material filters
     mat_filters = st.session_state.current_filters_material
-    if mat_filters:
-        if mat_filters.get('property_class') and mat_filters['property_class'] != "All":
-            filtered_df = filtered_df[filtered_df['Product Grade'] == mat_filters['property_class']]
+    if mat_filters and mat_filters.get('property_class') and mat_filters['property_class'] != "All":
+        for i, temp_df in enumerate(filtered_dfs):
+            if 'Product Grade' in temp_df.columns:
+                filtered_dfs[i] = temp_df[temp_df['Product Grade'] == mat_filters['property_class']]
     
-    # Handle ISO 4014 data separately
-    if (dim_filters.get('standard') == "ISO 4014" or 
-        (mat_filters.get('standard') and "ISO 4014" in mat_filters['standard'])):
-        iso_filtered = df_iso4014.copy()
-        
-        if dim_filters.get('size') and dim_filters['size'] != "All":
-            iso_filtered = iso_filtered[iso_filtered['Size'] == dim_filters['size']]
-        
-        if mat_filters.get('property_class') and mat_filters['property_class'] != "All":
-            iso_filtered = iso_filtered[iso_filtered['Product Grade'] == mat_filters['property_class']]
-        
-        # Combine with main results
-        if not iso_filtered.empty:
-            filtered_df = pd.concat([filtered_df, iso_filtered], ignore_index=True)
-    
-    # Handle DIN-7991 data separately
-    if (dim_filters.get('standard') == "DIN-7991" or 
-        (mat_filters.get('standard') and "DIN-7991" in mat_filters['standard'])):
-        din7991_filtered = df_din7991.copy() if st.session_state.din7991_loaded else pd.DataFrame()
-        
-        if not din7991_filtered.empty:
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                din7991_filtered = din7991_filtered[din7991_filtered['Size'] == dim_filters['size']]
-            
-            if mat_filters.get('property_class') and mat_filters['property_class'] != "All" and 'Product Grade' in din7991_filtered.columns:
-                din7991_filtered = din7991_filtered[din7991_filtered['Product Grade'] == mat_filters['property_class']]
-            
-            # Combine with main results
-            if not din7991_filtered.empty:
-                filtered_df = pd.concat([filtered_df, din7991_filtered], ignore_index=True)
-    
-    # NEW: Handle ASME B18.3 data separately
-    if (dim_filters.get('standard') == "ASME B18.3" or 
-        (mat_filters.get('standard') and "ASME B18.3" in mat_filters['standard'])):
-        asme_b18_3_filtered = df_asme_b18_3.copy() if st.session_state.asme_b18_3_loaded else pd.DataFrame()
-        
-        if not asme_b18_3_filtered.empty:
-            if dim_filters.get('size') and dim_filters['size'] != "All":
-                asme_b18_3_filtered = asme_b18_3_filtered[asme_b18_3_filtered['Size'] == dim_filters['size']]
-            
-            if mat_filters.get('property_class') and mat_filters['property_class'] != "All" and 'Product Grade' in asme_b18_3_filtered.columns:
-                asme_b18_3_filtered = asme_b18_3_filtered[asme_b18_3_filtered['Product Grade'] == mat_filters['property_class']]
-            
-            # Combine with main results
-            if not asme_b18_3_filtered.empty:
-                filtered_df = pd.concat([filtered_df, asme_b18_3_filtered], ignore_index=True)
-    
-    return filtered_df
+    # Combine all filtered dataframes
+    if filtered_dfs:
+        final_df = pd.concat(filtered_dfs, ignore_index=True)
+        return final_df
+    else:
+        return pd.DataFrame()
 
 def export_filtered_data(filtered_df, format_type, include_analysis=True):
     """Export filtered data with professional formatting"""
@@ -2391,11 +2469,11 @@ def show_enhanced_home():
     </div>
     """, unsafe_allow_html=True)
     
-    # Professional Key Metrics
+    # Professional Key Metrics - UPDATED: Now shows 4 dimensional standards
     col1, col2, col3, col4 = st.columns(4)
     
     total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0) + (len(df_din7991) if st.session_state.din7991_loaded else 0) + (len(df_asme_b18_3) if st.session_state.asme_b18_3_loaded else 0)
-    total_standards = len(df['Standards'].unique()) + 1 if not df.empty else 1
+    total_dimensional_standards = st.session_state.dimensional_standards_count
     total_threads = len(thread_files)
     total_mecert = len(df_mechem) if not df_mechem.empty else 0
     
@@ -2411,9 +2489,9 @@ def show_enhanced_home():
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">🌍 Standards</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_standards}</h2>
-            <p style="color: #7f8c8d; margin:0;">Supported</p>
+            <h3 style="color: #3498db; margin:0;">🌍 Dimensional Standards</h3>
+            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -2466,7 +2544,7 @@ def show_enhanced_home():
         
         # Check data status with professional badges
         status_items = [
-            ("Main Product Data", not df.empty, "engineering-badge"),
+            ("ASME B18.2.1 Data", not df.empty, "engineering-badge"),
             ("ISO 4014 Data", not df_iso4014.empty, "technical-badge"),
             ("DIN-7991 Data", st.session_state.din7991_loaded, "material-badge"),
             ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "grade-badge"),
@@ -2537,16 +2615,13 @@ def show_enhanced_calculations():
         with col1:
             series = st.selectbox("Measurement System", ["Inch", "Metric"], key="calc_series")
             
-            # Enhanced product options including threaded rod and stud - UPDATED: Added Hexagon Socket Head Cap Screws
+            # Enhanced product options including threaded rod and stud - UPDATED: All four standards
             if series == "Inch":
-                product_options_from_df = [p for p in df['Product'].dropna().unique() if any(x in p.lower() for x in ['hex', 'bolt', 'screw', 'nut'])] if not df.empty else []
-                unique_products = list(set(product_options_from_df))
-                product_options = sorted(unique_products) + ["Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Washer"]
-                standard_options = ["ASME B1.1", "ASME B18.3"]  # UPDATED: Added ASME B18.3
+                product_options = ["Hex Bolt", "Heavy Hex Bolt", "Hex Screw", "Heavy Hex Screw", "Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Washer"]
+                standard_options = ["ASME B1.1", "ASME B18.2.1", "ASME B18.3"]
             else:
-                # UPDATED: Added Hexagon Socket Head Cap Screws to metric products
                 product_options = ["Hex Bolt", "Hexagon Socket Countersunk Head Cap Screw", "Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Nut", "Washer"]
-                standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014", "DIN-7991", "ASME B18.3"]  # UPDATED: Added ASME B18.3
+                standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014", "DIN-7991"]
             
             selected_product = st.selectbox("Product Type", product_options)
             selected_standard = st.selectbox("Applicable Standard", standard_options)
@@ -2564,12 +2639,15 @@ def show_enhanced_calculations():
             elif selected_standard == "DIN-7991":
                 df_source = df_din7991
                 size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.din7991_loaded else []
-            elif selected_standard == "ASME B18.3":  # NEW: Handle ASME B18.3 sizes
+            elif selected_standard == "ASME B18.3":
                 df_source = df_asme_b18_3
                 size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.asme_b18_3_loaded else []
             elif selected_standard in thread_files:
                 df_thread = get_thread_data(selected_standard)
                 size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
+            elif selected_standard == "ASME B18.2.1":
+                df_source = df
+                size_options = sorted(df_source['Size'].dropna().unique()) if not df.empty else []
             
             selected_size = st.selectbox("Size Specification", size_options) if size_options else st.selectbox("Size Specification", ["No sizes available"])
             
