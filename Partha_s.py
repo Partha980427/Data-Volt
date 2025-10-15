@@ -184,18 +184,32 @@ def initialize_session_state():
     load_config()
     save_user_preferences()
 
-def get_thread_data(standard, thread_size=None, thread_class=None):
-    """Centralized thread data retrieval"""
-    if standard not in thread_files:
+@st.cache_data(ttl=3600)
+def load_thread_data(standard_name):
+    """Load thread data with proper error handling and caching"""
+    if standard_name not in thread_files:
         return pd.DataFrame()
     
-    df_thread = load_thread_data(thread_files[standard])
+    file_path = thread_files[standard_name]
+    try:
+        df_thread = safe_load_excel_file_enhanced(file_path)
+        if df_thread.empty:
+            st.warning(f"Thread data for {standard_name} is empty")
+        return df_thread
+    except Exception as e:
+        st.error(f"Error loading thread data for {standard_name}: {str(e)}")
+        return pd.DataFrame()
+
+def get_thread_data(standard, thread_size=None, thread_class=None):
+    """Centralized thread data retrieval - FIXED VERSION"""
+    df_thread = load_thread_data(standard)
     if df_thread.empty:
         return pd.DataFrame()
     
-    if thread_size and "Thread" in df_thread.columns:
+    # Apply filters if provided
+    if thread_size and thread_size != "All" and "Thread" in df_thread.columns:
         df_thread = df_thread[df_thread["Thread"] == thread_size]
-    if thread_class and "Class" in df_thread.columns:
+    if thread_class and thread_class != "All" and "Class" in df_thread.columns:
         df_thread = df_thread[df_thread["Class"] == thread_class]
     
     return df_thread
@@ -806,16 +820,6 @@ if not df_iso4014.empty:
     
     if grade_col and grade_col != 'Product Grade':
         df_iso4014['Product Grade'] = df_iso4014[grade_col]
-
-@st.cache_data
-def load_thread_data(file_path):
-    """Load thread data with proper error handling"""
-    try:
-        df_thread = pd.read_excel(file_path)
-        return df_thread
-    except Exception as e:
-        st.sidebar.error(f"❌ Error loading thread data: {str(e)}")
-        return pd.DataFrame()
 
 # ======================================================
 # 🔹 ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING
@@ -1528,7 +1532,7 @@ def show_data_quality_indicators():
         
         thread_status = []
         for standard, url in thread_files.items():
-            df_thread = load_thread_data(url)
+            df_thread = load_thread_data(standard)
             if not df_thread.empty:
                 thread_status.append(f"{standard}: ✅")
             else:
@@ -2281,26 +2285,8 @@ def show_enhanced_product_database():
             
             if dimensional_standard != "All":
                 # Get sizes based on selected standard and product
-                if dimensional_standard == "ASME B18.2.1" and not df.empty:
-                    temp_df = df.copy()
-                    if dimensional_product != "All" and 'Product' in temp_df.columns:
-                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
-                    size_options = get_safe_size_options(temp_df)
-                elif dimensional_standard == "ISO 4014" and not df_iso4014.empty:
-                    temp_df = df_iso4014.copy()
-                    if dimensional_product != "All" and 'Product' in temp_df.columns:
-                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
-                    size_options = get_safe_size_options(temp_df)
-                elif dimensional_standard == "DIN-7991" and st.session_state.din7991_loaded:
-                    temp_df = df_din7991.copy()
-                    if dimensional_product != "All" and 'Product' in temp_df.columns:
-                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
-                    size_options = get_safe_size_options(temp_df)
-                elif dimensional_standard == "ASME B18.3" and st.session_state.asme_b18_3_loaded:
-                    temp_df = df_asme_b18_3.copy()
-                    if dimensional_product != "All" and 'Product' in temp_df.columns:
-                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
-                    size_options = get_safe_size_options(temp_df)
+                temp_df = get_filtered_dataframe(dimensional_product, dimensional_standard)
+                size_options = get_safe_size_options(temp_df)
             
             dimensional_size = st.selectbox("Size", size_options, key="dimensional_size")
         
