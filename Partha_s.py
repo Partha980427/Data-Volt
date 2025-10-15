@@ -2221,10 +2221,10 @@ def show_enhanced_product_database():
             <h3 class="filter-header">📐 Section A - Dimensional Specifications</h3>
         """, unsafe_allow_html=True)
         
-        # 1. Product List (Filter)
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
+            # 1. Product List (Filter)
             # Get all unique products from all standards
             all_products = set()
             for standard_products_list in st.session_state.available_products.values():
@@ -2234,29 +2234,45 @@ def show_enhanced_product_database():
             dimensional_product = st.selectbox("Product List", all_products, key="dimensional_product")
         
         with col2:
-            # 2. Series (Inch/Metric)
-            series_options = ["All", "Inch", "Metric"]
+            # 2. Series (Inch/Metric) - Auto-determined based on product
+            series_options = ["All"]
+            
+            # Determine available series based on selected product
+            if dimensional_product != "All":
+                # Check which standards have this product
+                available_series_for_product = set()
+                for standard, products in st.session_state.available_products.items():
+                    if dimensional_product in products:
+                        series = st.session_state.available_series.get(standard, "")
+                        if series:
+                            available_series_for_product.add(series)
+                
+                if available_series_for_product:
+                    series_options.extend(sorted(available_series_for_product))
+                else:
+                    series_options.extend(["Inch", "Metric"])
+            else:
+                series_options.extend(["Inch", "Metric"])
+            
             dimensional_series = st.selectbox("Series System", series_options, key="dimensional_series")
         
         with col3:
-            # 3. Standards (According to the Product and Series)
-            available_standards = []
+            # 3. Standards (Filtered based on Product and Series)
+            available_standards = ["All"]
             
-            # Filter standards based on selected series
-            if dimensional_series == "Inch":
-                if "ASME B18.2.1" in st.session_state.available_series and st.session_state.available_series["ASME B18.2.1"] == "Inch":
-                    available_standards.append("ASME B18.2.1")
-                if "ASME B18.3" in st.session_state.available_series and st.session_state.available_series["ASME B18.3"] == "Inch":
-                    available_standards.append("ASME B18.3")
-            elif dimensional_series == "Metric":
-                if "ISO 4014" in st.session_state.available_series and st.session_state.available_series["ISO 4014"] == "Metric":
-                    available_standards.append("ISO 4014")
-                if "DIN-7991" in st.session_state.available_series and st.session_state.available_series["DIN-7991"] == "Metric":
-                    available_standards.append("DIN-7991")
-            else:  # "All"
-                available_standards = list(st.session_state.available_series.keys())
+            if dimensional_product != "All":
+                # Filter standards that have the selected product
+                for standard, products in st.session_state.available_products.items():
+                    if dimensional_product in products:
+                        # Further filter by series if specified
+                        if dimensional_series == "All" or st.session_state.available_series.get(standard, "") == dimensional_series:
+                            available_standards.append(standard)
+            else:
+                # If "All" products, filter by series only
+                for standard, series in st.session_state.available_series.items():
+                    if dimensional_series == "All" or series == dimensional_series:
+                        available_standards.append(standard)
             
-            available_standards = ["All"] + available_standards
             dimensional_standard = st.selectbox("Standards", available_standards, key="dimensional_standard")
         
         with col4:
