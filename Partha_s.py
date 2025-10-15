@@ -171,7 +171,10 @@ def initialize_session_state():
         "dimensional_standards_count": 0,
         "available_products": {},
         "available_series": {},
-        "debug_mode": False
+        "debug_mode": False,
+        "section_a_view": True,
+        "section_b_view": True,
+        "section_c_view": True
     }
     
     for key, value in defaults.items():
@@ -606,6 +609,26 @@ st.markdown("""
         border-radius: 8px;
         margin: 0.3rem 0;
         border-left: 3px solid #3498db;
+    }
+    
+    .section-toggle {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .section-toggle:hover {
+        background: #e9ecef;
+    }
+    
+    .section-toggle.active {
+        background: #3498db;
+        color: white;
+        border-color: #3498db;
     }
     
     @media (max-width: 768px) {
@@ -2146,154 +2169,202 @@ def show_enhanced_product_database():
     with st.sidebar:
         st.session_state.debug_mode = st.checkbox("🔧 Debug Mode", value=st.session_state.debug_mode)
     
-    st.markdown("### 🔍 Single-Standard Search System")
-    st.info("💡 Select ONE standard and filter data within that standard only")
-    
-    st.markdown("""
-    <div class="filter-section">
-        <h3 class="filter-header">📐 Section A - Dimensional Specifications</h3>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        dimensional_standards = ["All"]
-        if not df.empty:
-            dimensional_standards.append("ASME B18.2.1")
-        if not df_iso4014.empty:
-            dimensional_standards.append("ISO 4014")
-        if st.session_state.din7991_loaded:
-            dimensional_standards.append("DIN-7991")
-        if st.session_state.asme_b18_3_loaded:
-            dimensional_standards.append("ASME B18.3")
-        
-        dimensional_standard = st.selectbox("Dimensional Standard", dimensional_standards, key="dimensional_standard")
-    
-    with col2:
-        if dimensional_standard == "All":
-            product_types = ["All"]
-        else:
-            product_types = get_products_for_standard(dimensional_standard)
-        
-        dimensional_product = st.selectbox("Product Type", product_types, key="dimensional_product")
-    
-    with col3:
-        if dimensional_standard == "All":
-            series_display = "Select Standard"
-        else:
-            series_display = get_series_for_standard(dimensional_standard)
-        
-        st.selectbox("Series System", [series_display], key="dimensional_series", disabled=True)
-    
-    with col4:
-        if dimensional_standard == "All":
-            size_options = ["All"]
-        else:
-            temp_df = get_filtered_dataframe(dimensional_product, dimensional_standard)
-            size_options = get_safe_size_options(temp_df)
-        
-        dimensional_size = st.selectbox("Size", size_options, key="dimensional_size")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="filter-section">
-        <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
-    """, unsafe_allow_html=True)
-    
+    # Section Toggles
+    st.markdown("### 🔧 Section Controls")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        thread_standards = ["All"]
-        if dimensional_standard == "All":
-            thread_standards += ["ASME B1.1", "ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-        elif dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
-            thread_standards += ["ASME B1.1"]
-        else:
-            thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-        
-        thread_standard = st.selectbox("Thread Standard", thread_standards, key="thread_standard")
+        section_a_active = st.checkbox("📐 Section A - Dimensional Specifications", value=st.session_state.section_a_view, key="section_a_toggle")
+        st.session_state.section_a_view = section_a_active
     
     with col2:
-        thread_size_options = ["All"]
-        if thread_standard != "All":
-            df_thread = get_thread_data(thread_standard)
-            if not df_thread.empty and "Thread" in df_thread.columns:
-                thread_size_options += sorted(df_thread['Thread'].dropna().unique())
-        thread_size = st.selectbox("Thread Size", thread_size_options, key="thread_size")
+        section_b_active = st.checkbox("🔩 Section B - Thread Specifications", value=st.session_state.section_b_view, key="section_b_toggle")
+        st.session_state.section_b_view = section_b_active
     
     with col3:
-        if dimensional_standard == "ISO 4014":
-            grade_options = ["All", "A", "B"]
-            tolerance_class = st.selectbox("Product Grade (A/B)", grade_options, key="tolerance_class")
-            st.info("ℹ️ Product Grade filter resolves duplicate entries")
-        else:
-            tolerance_options = ["All"]
-            if dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
-                tolerance_options += ["1A", "2A", "3A"]
-            elif dimensional_standard in ["ISO 4014", "DIN-7991"]:
-                tolerance_options += ["6g", "6H", "4g", "4H", "8g", "8H"]
+        section_c_active = st.checkbox("🧪 Section C - Material Properties", value=st.session_state.section_c_view, key="section_c_toggle")
+        st.session_state.section_c_view = section_c_active
+    
+    st.markdown("---")
+    
+    # SECTION A - DIMENSIONAL SPECIFICATIONS
+    if st.session_state.section_a_view:
+        st.markdown("""
+        <div class="filter-section">
+            <h3 class="filter-header">📐 Section A - Dimensional Specifications</h3>
+        """, unsafe_allow_html=True)
+        
+        # 1. Product List (Filter)
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            # Get all unique products from all standards
+            all_products = set()
+            for standard_products_list in st.session_state.available_products.values():
+                all_products.update(standard_products_list)
+            all_products = ["All"] + sorted([p for p in all_products if p != "All"])
             
-            tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="tolerance_class")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="filter-section">
-        <h3 class="filter-header">🧪 Section C - Material Properties</h3>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        property_classes = ["All"]
+            dimensional_product = st.selectbox("Product List", all_products, key="dimensional_product")
         
-        if st.session_state.property_classes:
-            property_classes.extend(sorted(st.session_state.property_classes))
-        else:
-            if not df.empty and 'Product Grade' in df.columns:
-                grades = df['Product Grade'].dropna().unique()
-                property_classes.extend(sorted(grades))
-            if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-                iso_grades = df_iso4014['Product Grade'].dropna().unique()
-                for grade in iso_grades:
-                    if grade not in property_classes:
-                        property_classes.append(grade)
+        with col2:
+            # 2. Series (Inch/Metric)
+            series_options = ["All", "Inch", "Metric"]
+            dimensional_series = st.selectbox("Series System", series_options, key="dimensional_series")
         
-        property_class = st.selectbox("Property Class (Grade)", property_classes, key="property_class")
+        with col3:
+            # 3. Standards (According to the Product and Series)
+            available_standards = []
+            
+            # Filter standards based on selected series
+            if dimensional_series == "Inch":
+                if "ASME B18.2.1" in st.session_state.available_series and st.session_state.available_series["ASME B18.2.1"] == "Inch":
+                    available_standards.append("ASME B18.2.1")
+                if "ASME B18.3" in st.session_state.available_series and st.session_state.available_series["ASME B18.3"] == "Inch":
+                    available_standards.append("ASME B18.3")
+            elif dimensional_series == "Metric":
+                if "ISO 4014" in st.session_state.available_series and st.session_state.available_series["ISO 4014"] == "Metric":
+                    available_standards.append("ISO 4014")
+                if "DIN-7991" in st.session_state.available_series and st.session_state.available_series["DIN-7991"] == "Metric":
+                    available_standards.append("DIN-7991")
+            else:  # "All"
+                available_standards = list(st.session_state.available_series.keys())
+            
+            available_standards = ["All"] + available_standards
+            dimensional_standard = st.selectbox("Standards", available_standards, key="dimensional_standard")
         
-        if property_class != "All":
-            with st.expander(f"🔬 View Mechanical & Chemical Details for {property_class}", expanded=False):
-                show_mechanical_chemical_details(property_class)
+        with col4:
+            # 4. Size (Filter)
+            size_options = ["All"]
+            
+            if dimensional_standard != "All":
+                # Get sizes based on selected standard and product
+                if dimensional_standard == "ASME B18.2.1" and not df.empty:
+                    temp_df = df.copy()
+                    if dimensional_product != "All" and 'Product' in temp_df.columns:
+                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
+                    size_options = get_safe_size_options(temp_df)
+                elif dimensional_standard == "ISO 4014" and not df_iso4014.empty:
+                    temp_df = df_iso4014.copy()
+                    if dimensional_product != "All" and 'Product' in temp_df.columns:
+                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
+                    size_options = get_safe_size_options(temp_df)
+                elif dimensional_standard == "DIN-7991" and st.session_state.din7991_loaded:
+                    temp_df = df_din7991.copy()
+                    if dimensional_product != "All" and 'Product' in temp_df.columns:
+                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
+                    size_options = get_safe_size_options(temp_df)
+                elif dimensional_standard == "ASME B18.3" and st.session_state.asme_b18_3_loaded:
+                    temp_df = df_asme_b18_3.copy()
+                    if dimensional_product != "All" and 'Product' in temp_df.columns:
+                        temp_df = temp_df[temp_df['Product'] == dimensional_product]
+                    size_options = get_safe_size_options(temp_df)
+            
+            dimensional_size = st.selectbox("Size", size_options, key="dimensional_size")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     
-    with col2:
-        material_standards = ["All"]
+    # SECTION B - THREAD SPECIFICATIONS
+    if st.session_state.section_b_view:
+        st.markdown("""
+        <div class="filter-section">
+            <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
+        """, unsafe_allow_html=True)
         
-        if property_class != "All":
-            mechem_standards = get_standards_for_property_class(property_class)
-            if mechem_standards:
-                material_standards.extend(sorted(mechem_standards))
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            thread_standards = ["All"]
+            if dimensional_standard == "All":
+                thread_standards += ["ASME B1.1", "ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+            elif dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
+                thread_standards += ["ASME B1.1"]
             else:
-                grade_standards = []
-                if not df.empty and 'Product Grade' in df.columns:
-                    grade_df = df[df['Product Grade'] == property_class]
-                    grade_standards.extend(grade_df['Standards'].dropna().unique().tolist())
-                if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-                    iso_grade_df = df_iso4014[df_iso4014['Product Grade'] == property_class]
-                    if not iso_grade_df.empty:
-                        grade_standards.append("ISO 4014")
+                thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+            
+            thread_standard = st.selectbox("Thread Standard", thread_standards, key="thread_standard")
+        
+        with col2:
+            thread_size_options = ["All"]
+            if thread_standard != "All":
+                df_thread = get_thread_data(thread_standard)
+                if not df_thread.empty and "Thread" in df_thread.columns:
+                    thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+            thread_size = st.selectbox("Thread Size", thread_size_options, key="thread_size")
+        
+        with col3:
+            if dimensional_standard == "ISO 4014":
+                grade_options = ["All", "A", "B"]
+                tolerance_class = st.selectbox("Product Grade (A/B)", grade_options, key="tolerance_class")
+                st.info("ℹ️ Product Grade filter resolves duplicate entries")
+            else:
+                tolerance_options = ["All"]
+                if dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
+                    tolerance_options += ["1A", "2A", "3A"]
+                elif dimensional_standard in ["ISO 4014", "DIN-7991"]:
+                    tolerance_options += ["6g", "6H", "4g", "4H", "8g", "8H"]
                 
-                material_standards.extend(sorted(set(grade_standards)))
+                tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="tolerance_class")
         
-        material_standard = st.selectbox("Material Standard", material_standards, key="material_standard")
-        
-        if property_class != "All":
-            if mechem_standards:
-                st.success("✅ Data from Mechanical & Chemical Properties")
-            else:
-                st.info("ℹ️ Data from main product database")
+        st.markdown("</div>", unsafe_allow_html=True)
     
-    st.markdown("</div>", unsafe_allow_html=True)
+    # SECTION C - MATERIAL PROPERTIES
+    if st.session_state.section_c_view:
+        st.markdown("""
+        <div class="filter-section">
+            <h3 class="filter-header">🧪 Section C - Material Properties</h3>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            property_classes = ["All"]
+            
+            if st.session_state.property_classes:
+                property_classes.extend(sorted(st.session_state.property_classes))
+            else:
+                if not df.empty and 'Product Grade' in df.columns:
+                    grades = df['Product Grade'].dropna().unique()
+                    property_classes.extend(sorted(grades))
+                if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
+                    iso_grades = df_iso4014['Product Grade'].dropna().unique()
+                    for grade in iso_grades:
+                        if grade not in property_classes:
+                            property_classes.append(grade)
+            
+            property_class = st.selectbox("Property Class (Grade)", property_classes, key="property_class")
+            
+            if property_class != "All":
+                with st.expander(f"🔬 View Mechanical & Chemical Details for {property_class}", expanded=False):
+                    show_mechanical_chemical_details(property_class)
+        
+        with col2:
+            material_standards = ["All"]
+            
+            if property_class != "All":
+                mechem_standards = get_standards_for_property_class(property_class)
+                if mechem_standards:
+                    material_standards.extend(sorted(mechem_standards))
+                else:
+                    grade_standards = []
+                    if not df.empty and 'Product Grade' in df.columns:
+                        grade_df = df[df['Product Grade'] == property_class]
+                        grade_standards.extend(grade_df['Standards'].dropna().unique().tolist())
+                    if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
+                        iso_grade_df = df_iso4014[df_iso4014['Product Grade'] == property_class]
+                        if not iso_grade_df.empty:
+                            grade_standards.append("ISO 4014")
+                    
+                    material_standards.extend(sorted(set(grade_standards)))
+            
+            material_standard = st.selectbox("Material Standard", material_standards, key="material_standard")
+            
+            if property_class != "All":
+                if mechem_standards:
+                    st.success("✅ Data from Mechanical & Chemical Properties")
+                else:
+                    st.info("ℹ️ Data from main product database")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -2301,7 +2372,7 @@ def show_enhanced_product_database():
         if st.button("🚀 APPLY FILTERS & SEARCH", use_container_width=True, type="primary"):
             st.session_state.current_filters_dimensional = {
                 'product': dimensional_product,
-                'series': get_series_for_standard(dimensional_standard) if dimensional_standard != "All" else "All",
+                'series': dimensional_series,
                 'standard': dimensional_standard,
                 'size': dimensional_size
             }
