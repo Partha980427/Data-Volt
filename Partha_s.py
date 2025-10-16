@@ -302,12 +302,17 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     result_df = df_thread.copy()
     
     if thread_size and thread_size != "All" and "Thread" in result_df.columns:
-        # Convert both to string for comparison
-        result_df = result_df[result_df["Thread"].astype(str) == str(thread_size)]
+        # Normalize both sides to trimmed string for safe comparison
+        selected_thread = str(thread_size).strip()
+        result_df = result_df[
+            result_df["Thread"].astype(str).str.strip() == selected_thread
+        ]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
-        # Convert both to string for comparison
-        result_df = result_df[result_df["Class"].astype(str) == str(thread_class)]
+        # Normalize whitespace/case to handle variants like "1A ", "1a", etc.
+        selected_class = str(thread_class).strip().casefold()
+        mask_class = result_df["Class"].astype(str).str.strip().str.casefold() == selected_class
+        result_df = result_df[mask_class]
     
     return result_df
 
@@ -1999,25 +2004,29 @@ def get_filtered_dataframe(product_type, standard):
     if standard == "ASME B18.2.1":
         temp_df = df.copy()
         if product_type != "All" and 'Product' in temp_df.columns:
-            temp_df = temp_df[temp_df['Product'] == product_type]
+            _target = str(product_type).strip().casefold()
+            temp_df = temp_df[temp_df['Product'].astype(str).str.strip().str.casefold() == _target]
         return temp_df
     
     elif standard == "ISO 4014":
         temp_df = df_iso4014.copy()
         if product_type != "All" and 'Product' in temp_df.columns:
-            temp_df = temp_df[temp_df['Product'] == product_type]
+            _target = str(product_type).strip().casefold()
+            temp_df = temp_df[temp_df['Product'].astype(str).str.strip().str.casefold() == _target]
         return temp_df
     
     elif standard == "DIN-7991":
         temp_df = df_din7991.copy()
         if product_type != "All" and 'Product' in temp_df.columns:
-            temp_df = temp_df[temp_df['Product'] == product_type]
+            _target = str(product_type).strip().casefold()
+            temp_df = temp_df[temp_df['Product'].astype(str).str.strip().str.casefold() == _target]
         return temp_df
     
     elif standard == "ASME B18.3":
         temp_df = df_asme_b18_3.copy()
         if product_type != "All" and 'Product' in temp_df.columns:
-            temp_df = temp_df[temp_df['Product'] == product_type]
+            _target = str(product_type).strip().casefold()
+            temp_df = temp_df[temp_df['Product'].astype(str).str.strip().str.casefold() == _target]
         return temp_df
     
     return pd.DataFrame()
@@ -2052,13 +2061,28 @@ def apply_section_a_filters():
     
     # Apply product filter
     if filters.get('product') and filters['product'] != "All" and 'Product' in result_df.columns:
-        result_df = result_df[result_df['Product'] == filters['product']]
+        try:
+            _prod_target = str(filters['product']).strip().casefold()
+            result_df = result_df[
+                result_df['Product'].astype(str).str.strip().str.casefold() == _prod_target
+            ]
+        except Exception:
+            pass
     
     # Apply size filter
     if filters.get('size') and filters['size'] != "All" and 'Size' in result_df.columns:
         try:
-            result_df = result_df[result_df['Size'].astype(str) == str(filters['size'])]
-        except:
+            # Normalize numeric-like values such as 0,1,2 or 1.0 -> "1"
+            def _normalize_size_val(v):
+                s = str(v).strip()
+                if re.match(r'^\d+\.0+$', s):
+                    s = s.split('.', 1)[0]
+                return s
+            _selected_size = _normalize_size_val(filters['size'])
+            result_df = result_df[
+                result_df['Size'].apply(_normalize_size_val) == _selected_size
+            ]
+        except Exception:
             pass
     
     return result_df
