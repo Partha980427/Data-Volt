@@ -302,12 +302,15 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     result_df = df_thread.copy()
     
     if thread_size and thread_size != "All" and "Thread" in result_df.columns:
-        # Convert both to string for comparison
-        result_df = result_df[result_df["Thread"].astype(str) == str(thread_size)]
+        # FIXED: Convert both to string for proper comparison
+        result_df = result_df[result_df["Thread"].astype(str).str.strip() == str(thread_size).strip()]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
-        # Convert both to string for comparison
-        result_df = result_df[result_df["Class"].astype(str) == str(thread_class)]
+        # FIXED: Normalize both strings for class comparison (strip whitespace, handle case)
+        result_df = result_df[
+            result_df["Class"].astype(str).str.strip().str.upper() == 
+            str(thread_class).strip().upper()
+        ]
     
     return result_df
 
@@ -2054,11 +2057,15 @@ def apply_section_a_filters():
     if filters.get('product') and filters['product'] != "All" and 'Product' in result_df.columns:
         result_df = result_df[result_df['Product'] == filters['product']]
     
-    # Apply size filter
+    # Apply size filter - FIXED: Normalize both values to string for comparison
     if filters.get('size') and filters['size'] != "All" and 'Size' in result_df.columns:
         try:
-            result_df = result_df[result_df['Size'].astype(str) == str(filters['size'])]
-        except:
+            # Convert both to string and strip whitespace for proper comparison
+            result_df = result_df[
+                result_df['Size'].astype(str).str.strip() == str(filters['size']).strip()
+            ]
+        except Exception as e:
+            st.warning(f"Size filtering issue: {str(e)}")
             pass
     
     return result_df
