@@ -175,7 +175,16 @@ def initialize_session_state():
         "section_a_view": True,
         "section_b_view": True,
         "section_c_view": True,
-        "thread_independent_mode": False  # NEW: Thread section independence
+        "thread_independent_mode": True,  # Default to independent mode
+        # NEW: Independent section results
+        "section_a_results": pd.DataFrame(),
+        "section_b_results": pd.DataFrame(),
+        "section_c_results": pd.DataFrame(),
+        "combined_results": pd.DataFrame(),
+        # NEW: Independent section filters
+        "section_a_filters": {},
+        "section_b_filters": {},
+        "section_c_filters": {}
     }
     
     for key, value in defaults.items():
@@ -644,6 +653,30 @@ st.markdown("""
         background: #3498db;
         color: white;
         border-color: #3498db;
+    }
+    
+    .independent-section {
+        border: 2px solid #3498db;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    }
+    
+    .section-results {
+        border: 2px solid #28a745;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
+    }
+    
+    .combined-results {
+        border: 2px solid #8e44ad;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f8f0f8 0%, #ffffff 100%);
     }
     
     @media (max-width: 768px) {
@@ -1813,7 +1846,7 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 FIXED FILTERING LOGIC - SINGLE STANDARD ONLY
+# 🔹 INDEPENDENT SECTION FILTERING - COMPLETELY SEPARATE
 # ======================================================
 
 def get_products_for_standard(standard):
@@ -1827,23 +1860,6 @@ def get_series_for_standard(standard):
     if standard in st.session_state.available_series:
         return st.session_state.available_series[standard]
     return "All"
-
-def clean_dataframe_columns(df):
-    """Remove only completely empty columns - LESS AGGRESSIVE VERSION"""
-    if df.empty:
-        return df
-    
-    # Remove only columns with ALL NaN values (completely empty)
-    df = df.dropna(axis=1, how='all')
-    
-    # Remove columns that are completely empty strings or whitespace only
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            # Check if all values are empty strings or whitespace
-            if df[col].str.strip().replace('', pd.NA).isna().all():
-                df = df.drop(col, axis=1)
-    
-    return df
 
 def get_filtered_dataframe(product_type, standard):
     """Get filtered dataframe based on product type and standard"""
@@ -1874,282 +1890,301 @@ def get_filtered_dataframe(product_type, standard):
     return pd.DataFrame()
 
 # ======================================================
-# 🔹 FIXED: SINGLE-STANDARD FILTERING ONLY
+# 🔹 INDEPENDENT SECTION A - DIMENSIONAL SPECIFICATIONS
 # ======================================================
-def apply_all_filters():
-    """FIXED VERSION: Apply filters to SINGLE selected standard only"""
+def apply_section_a_filters():
+    """Apply filters for Section A only - completely independent"""
+    filters = st.session_state.section_a_filters
     
-    dim_filters = st.session_state.current_filters_dimensional
+    if not filters:
+        return pd.DataFrame()
     
-    if st.session_state.debug_mode:
-        st.sidebar.write("🔧 Applying SINGLE-STANDARD filters:", dim_filters)
-    
-    selected_standard = dim_filters.get('standard', 'All')
+    selected_standard = filters.get('standard', 'All')
     
     if selected_standard == "All":
-        if st.session_state.debug_mode:
-            st.sidebar.write("❌ 'All' standards selected - cannot filter across standards")
         return pd.DataFrame()
     
     result_df = pd.DataFrame()
     
     if selected_standard == "ASME B18.2.1" and not df.empty:
         result_df = df.copy()
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Selected ASME B18.2.1 - {len(result_df)} records")
-        
     elif selected_standard == "ISO 4014" and not df_iso4014.empty:
         result_df = df_iso4014.copy()
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Selected ISO 4014 - {len(result_df)} records")
-        
     elif selected_standard == "DIN-7991" and st.session_state.din7991_loaded:
         result_df = df_din7991.copy()
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Selected DIN-7991 - {len(result_df)} records")
-        
     elif selected_standard == "ASME B18.3" and st.session_state.asme_b18_3_loaded:
         result_df = df_asme_b18_3.copy()
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Selected ASME B18.3 - {len(result_df)} records")
     else:
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"❌ No data found for standard: {selected_standard}")
         return pd.DataFrame()
     
-    # Apply product filter to the SINGLE standard
-    if dim_filters.get('product') and dim_filters['product'] != "All" and 'Product' in result_df.columns:
-        result_df = result_df[result_df['Product'] == dim_filters['product']]
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Applied product filter: {dim_filters['product']} - {len(result_df)} records remaining")
+    # Apply product filter
+    if filters.get('product') and filters['product'] != "All" and 'Product' in result_df.columns:
+        result_df = result_df[result_df['Product'] == filters['product']]
     
-    # Apply size filter to the SINGLE standard - FIXED VERSION
-    if dim_filters.get('size') and dim_filters['size'] != "All" and 'Size' in result_df.columns:
+    # Apply size filter
+    if filters.get('size') and filters['size'] != "All" and 'Size' in result_df.columns:
         try:
-            # Convert both to string for comparison to handle numeric sizes properly
-            result_df = result_df[result_df['Size'].astype(str) == str(dim_filters['size'])]
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"✅ Applied size filter: {dim_filters['size']} - {len(result_df)} records remaining")
-        except Exception as e:
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"❌ Size filter error: {str(e)}")
-    
-    # Apply material filters if any
-    mat_filters = st.session_state.current_filters_material
-    if mat_filters and mat_filters.get('property_class') and mat_filters['property_class'] != "All":
-        grade_col = None
-        for col in result_df.columns:
-            if 'grade' in col.lower():
-                grade_col = col
-                break
-        
-        if grade_col:
-            result_df = result_df[result_df[grade_col] == mat_filters['property_class']]
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"✅ Applied grade filter: {mat_filters['property_class']} - {len(result_df)} records remaining")
-    
-    # For ISO 4014 - apply Product Grade filter if available to handle duplicates
-    if selected_standard == "ISO 4014" and 'Product Grade' in result_df.columns:
-        thread_filters = st.session_state.current_filters_thread
-        if thread_filters and thread_filters.get('class') and thread_filters['class'] != "All":
-            result_df = result_df[result_df['Product Grade'] == thread_filters['class']]
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"✅ Applied Product Grade filter: {thread_filters['class']} - {len(result_df)} records remaining")
-    
-    if st.session_state.debug_mode:
-        st.sidebar.write(f"🎯 Final result: {len(result_df)} records")
+            result_df = result_df[result_df['Size'].astype(str) == str(filters['size'])]
+        except:
+            pass
     
     return result_df
 
-def show_filtered_results():
-    """Display filtered results in professional format"""
-    
-    filtered_df = apply_all_filters()
-    
-    if st.session_state.debug_mode:
-        st.markdown("### 🐛 Debug Information")
-        st.write("Current Filters:", {
-            'dimensional': st.session_state.current_filters_dimensional,
-            'thread': st.session_state.current_filters_thread,
-            'material': st.session_state.current_filters_material
-        })
-        st.write("DataFrame Info:")
-        st.write(f"Shape: {filtered_df.shape}")
-        st.write("Columns:", filtered_df.columns.tolist() if not filtered_df.empty else "No columns")
-    
-    if filtered_df.empty:
-        st.warning("🚫 No products match the current filters. Try adjusting your search criteria.")
+def show_section_a_results():
+    """Display results for Section A"""
+    if st.session_state.section_a_results.empty:
         return
     
-    filtered_df = clean_dataframe_columns(filtered_df)
+    st.markdown('<div class="section-results">', unsafe_allow_html=True)
+    st.markdown("### 📐 Section A Results - Dimensional Specifications")
     
-    st.markdown(f"""
-    <div class="engineering-header" style="padding: 1.5rem; margin-bottom: 1rem;">
-        <h3 style="margin:0;">🎯 Filtered Results: {len(filtered_df)} Products Found</h3>
-        <p style="margin:0; opacity: 0.9;">Professional Technical Data Display</p>
-    </div>
-    """, unsafe_allow_html=True)
+    result_df = st.session_state.section_a_results
+    result_df = clean_dataframe_columns(result_df)
     
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        unique_products = filtered_df['Product'].nunique() if 'Product' in filtered_df.columns else 0
-        st.metric("Unique Products", unique_products)
-    
-    with col2:
-        unique_sizes = filtered_df['Size'].nunique() if 'Size' in filtered_df.columns else 0
-        st.metric("Unique Sizes", unique_sizes)
-    
-    with col3:
-        unique_standards = filtered_df['Standards'].nunique() if 'Standards' in filtered_df.columns else 0
-        st.metric("Standards", unique_standards)
-    
-    with col4:
-        data_completeness = (filtered_df.count().sum() / (filtered_df.shape[0] * filtered_df.shape[1])) * 100
-        st.metric("Data Quality", f"{data_completeness:.1f}%")
-    
-    st.markdown("### 📊 Professional Data Display")
+    st.markdown(f"**🎯 Found {len(result_df)} matching products**")
     
     st.dataframe(
-        filtered_df,
+        result_df,
         use_container_width=True,
-        height=600,
-        column_config={
-            "Product": st.column_config.TextColumn("Product", width="medium"),
-            "Size": st.column_config.TextColumn("Size", width="small"),
-            "Standards": st.column_config.TextColumn("Standard", width="medium"),
-            "Product Grade": st.column_config.TextColumn("Grade", width="small"),
-        }
+        height=400
     )
     
-    st.markdown("---")
-    st.markdown("### 📤 Professional Export Options")
+    # Export options for Section A
+    col1, col2 = st.columns(2)
+    with col1:
+        export_format_a = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_a")
+    with col2:
+        if st.button("📥 Export Section A Results", use_container_width=True):
+            enhanced_export_data(result_df, export_format_a)
     
-    export_col1, export_col2, export_col3 = st.columns([2, 1, 1])
-    
-    with export_col1:
-        export_format = st.selectbox("Export Format", ["Excel", "CSV"], key="export_format")
-    
-    with export_col2:
-        include_analysis = st.checkbox("Include Analysis", value=True)
-    
-    with export_col3:
-        if st.button("🚀 Generate Export", use_container_width=True):
-            export_filtered_data(filtered_df, export_format, include_analysis)
-    
-    if len(filtered_df) > 1:
-        st.markdown("---")
-        st.markdown("### 📈 Visual Analysis")
-        
-        viz_col1, viz_col2 = st.columns(2)
-        
-        with viz_col1:
-            if 'Product' in filtered_df.columns:
-                product_counts = filtered_df['Product'].value_counts().head(8)
-                if len(product_counts) > 0:
-                    fig_products = px.bar(
-                        x=product_counts.index,
-                        y=product_counts.values,
-                        title="Product Distribution",
-                        labels={'x': 'Product', 'y': 'Count'},
-                        color=product_counts.values,
-                        color_continuous_scale='blues'
-                    )
-                    st.plotly_chart(fig_products, use_container_width=True)
-        
-        with viz_col2:
-            if 'Size' in filtered_df.columns:
-                size_counts = filtered_df['Size'].value_counts().head(8)
-                if len(size_counts) > 0:
-                    fig_sizes = px.pie(
-                        values=size_counts.values,
-                        names=size_counts.index,
-                        title="Size Distribution"
-                    )
-                    st.plotly_chart(fig_sizes, use_container_width=True)
-
-def export_filtered_data(filtered_df, format_type, include_analysis=True):
-    """Export filtered data with professional formatting"""
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    try:
-        if format_type == "Excel":
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-                    filtered_df.to_excel(writer, sheet_name='Filtered_Data', index=False)
-                    
-                    if include_analysis:
-                        analysis_data = {
-                            'Metric': ['Total Records', 'Unique Products', 'Unique Sizes', 'Unique Standards', 'Data Completeness'],
-                            'Value': [
-                                len(filtered_df),
-                                filtered_df['Product'].nunique() if 'Product' in filtered_df.columns else 0,
-                                filtered_df['Size'].nunique() if 'Size' in filtered_df.columns else 0,
-                                filtered_df['Standards'].nunique() if 'Standards' in filtered_df.columns else 0,
-                                f"{(filtered_df.count().sum() / (filtered_df.shape[0] * filtered_df.shape[1])) * 100:.1f}%"
-                            ]
-                        }
-                        pd.DataFrame(analysis_data).to_excel(writer, sheet_name='Analysis', index=False)
-                    
-                    workbook = writer.book
-                    worksheet = writer.sheets['Filtered_Data']
-                    
-                    for column in worksheet.columns:
-                        max_length = 0
-                        column_letter = column[0].column_letter
-                        for cell in column:
-                            try:
-                                if len(str(cell.value)) > max_length:
-                                    max_length = len(str(cell.value))
-                            except:
-                                pass
-                        adjusted_width = min(max_length + 2, 50)
-                        worksheet.column_dimensions[column_letter].width = adjusted_width
-                
-                with open(tmp.name, 'rb') as f:
-                    st.download_button(
-                        label="📥 Download Excel File",
-                        data=f,
-                        file_name=f"JSC_Product_Data_{timestamp}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key=f"excel_export_{timestamp}"
-                    )
-        
-        else:
-            csv_data = filtered_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CSV File",
-                data=csv_data,
-                file_name=f"JSC_Product_Data_{timestamp}.csv",
-                mime="text/csv",
-                use_container_width=True,
-                key=f"csv_export_{timestamp}"
-            )
-            
-        st.success("✅ Export generated successfully!")
-        
-    except Exception as e:
-        st.error(f"❌ Export failed: {str(e)}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 ENHANCED PRODUCT INTELLIGENCE CENTER - FIXED VERSION
+# 🔹 INDEPENDENT SECTION B - THREAD SPECIFICATIONS
+# ======================================================
+def apply_section_b_filters():
+    """Apply filters for Section B only - completely independent"""
+    filters = st.session_state.section_b_filters
+    
+    if not filters:
+        return pd.DataFrame()
+    
+    selected_standard = filters.get('standard', 'All')
+    
+    if selected_standard == "All":
+        return pd.DataFrame()
+    
+    # Get thread data
+    df_thread = get_thread_data(selected_standard)
+    if df_thread.empty:
+        return pd.DataFrame()
+    
+    result_df = df_thread.copy()
+    
+    # Apply thread size filter
+    if filters.get('size') and filters['size'] != "All" and "Thread" in result_df.columns:
+        result_df = result_df[result_df["Thread"] == filters['size']]
+    
+    # Apply tolerance class filter
+    if filters.get('class') and filters['class'] != "All" and "Class" in result_df.columns:
+        result_df = result_df[result_df["Class"] == filters['class']]
+    
+    return result_df
+
+def show_section_b_results():
+    """Display results for Section B"""
+    if st.session_state.section_b_results.empty:
+        return
+    
+    st.markdown('<div class="section-results">', unsafe_allow_html=True)
+    st.markdown("### 🔩 Section B Results - Thread Specifications")
+    
+    result_df = st.session_state.section_b_results
+    result_df = clean_dataframe_columns(result_df)
+    
+    st.markdown(f"**🎯 Found {len(result_df)} matching thread specifications**")
+    
+    st.dataframe(
+        result_df,
+        use_container_width=True,
+        height=400
+    )
+    
+    # Export options for Section B
+    col1, col2 = st.columns(2)
+    with col1:
+        export_format_b = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_b")
+    with col2:
+        if st.button("📥 Export Section B Results", use_container_width=True):
+            enhanced_export_data(result_df, export_format_b)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# 🔹 INDEPENDENT SECTION C - MATERIAL PROPERTIES
+# ======================================================
+def apply_section_c_filters():
+    """Apply filters for Section C only - completely independent"""
+    filters = st.session_state.section_c_filters
+    
+    if not filters:
+        return pd.DataFrame()
+    
+    property_class = filters.get('property_class', 'All')
+    
+    if property_class == "All":
+        return pd.DataFrame()
+    
+    if df_mechem.empty:
+        return pd.DataFrame()
+    
+    result_df = df_mechem.copy()
+    
+    # Find property class column
+    property_class_col = None
+    for col in st.session_state.me_chem_columns:
+        col_lower = col.lower()
+        if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
+            property_class_col = col
+            break
+    
+    if not property_class_col:
+        return pd.DataFrame()
+    
+    # Apply property class filter
+    if property_class_col in result_df.columns:
+        result_df = result_df[result_df[property_class_col] == property_class]
+    
+    return result_df
+
+def show_section_c_results():
+    """Display results for Section C"""
+    if st.session_state.section_c_results.empty:
+        return
+    
+    st.markdown('<div class="section-results">', unsafe_allow_html=True)
+    st.markdown("### 🧪 Section C Results - Material Properties")
+    
+    result_df = st.session_state.section_c_results
+    result_df = clean_dataframe_columns(result_df)
+    
+    st.markdown(f"**🎯 Found {len(result_df)} matching material properties**")
+    
+    st.dataframe(
+        result_df,
+        use_container_width=True,
+        height=400
+    )
+    
+    # Show detailed properties
+    filters = st.session_state.section_c_filters
+    if filters and filters.get('property_class') and filters['property_class'] != "All":
+        show_mechanical_chemical_details(filters['property_class'])
+    
+    # Export options for Section C
+    col1, col2 = st.columns(2)
+    with col1:
+        export_format_c = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_c")
+    with col2:
+        if st.button("📥 Export Section C Results", use_container_width=True):
+            enhanced_export_data(result_df, export_format_c)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# 🔹 COMBINE ALL SECTIONS RESULTS
+# ======================================================
+def combine_all_results():
+    """Combine results from all sections for final display"""
+    all_results = []
+    
+    # Add Section A results with source identifier
+    if not st.session_state.section_a_results.empty:
+        section_a_df = st.session_state.section_a_results.copy()
+        section_a_df['Data_Source'] = 'Section_A_Dimensional'
+        all_results.append(section_a_df)
+    
+    # Add Section B results with source identifier
+    if not st.session_state.section_b_results.empty:
+        section_b_df = st.session_state.section_b_results.copy()
+        section_b_df['Data_Source'] = 'Section_B_Thread'
+        all_results.append(section_b_df)
+    
+    # Add Section C results with source identifier
+    if not st.session_state.section_c_results.empty:
+        section_c_df = st.session_state.section_c_results.copy()
+        section_c_df['Data_Source'] = 'Section_C_Material'
+        all_results.append(section_c_df)
+    
+    if not all_results:
+        return pd.DataFrame()
+    
+    # Combine all dataframes
+    combined_df = pd.concat(all_results, ignore_index=True)
+    return combined_df
+
+def show_combined_results():
+    """Display combined results from all sections"""
+    if st.session_state.combined_results.empty:
+        return
+    
+    st.markdown('<div class="combined-results">', unsafe_allow_html=True)
+    st.markdown("### 🎯 Combined Results - All Sections")
+    
+    combined_df = st.session_state.combined_results
+    combined_df = clean_dataframe_columns(combined_df)
+    
+    # Summary statistics
+    section_a_count = len(combined_df[combined_df['Data_Source'] == 'Section_A_Dimensional'])
+    section_b_count = len(combined_df[combined_df['Data_Source'] == 'Section_B_Thread'])
+    section_c_count = len(combined_df[combined_df['Data_Source'] == 'Section_C_Material'])
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Records", len(combined_df))
+    with col2:
+        st.metric("Section A", section_a_count)
+    with col3:
+        st.metric("Section B", section_b_count)
+    with col4:
+        st.metric("Section C", section_c_count)
+    
+    st.markdown(f"**📊 Combined data from all sections: {len(combined_df)} total records**")
+    
+    st.dataframe(
+        combined_df,
+        use_container_width=True,
+        height=600
+    )
+    
+    # Export combined results
+    st.markdown("### 📤 Export Combined Results")
+    col1, col2 = st.columns(2)
+    with col1:
+        export_format_combined = st.selectbox("Export Format", ["Excel", "CSV"], key="export_combined")
+    with col2:
+        if st.button("📥 Export All Results", use_container_width=True, type="primary"):
+            enhanced_export_data(combined_df, export_format_combined)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# 🔹 ENHANCED PRODUCT INTELLIGENCE CENTER - INDEPENDENT SECTIONS
 # ======================================================
 def show_enhanced_product_database():
-    """Enhanced Product Intelligence Center with FIXED filtering"""
+    """Enhanced Product Intelligence Center with COMPLETELY INDEPENDENT sections"""
     
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            🎯 Product Intelligence Center
+            🎯 Product Intelligence Center - Independent Sections
         </h1>
-        <p style="margin:0; opacity: 0.9;">Advanced Single-Standard Search & Technical Specifications</p>
+        <p style="margin:0; opacity: 0.9;">Each section works completely independently - No dependencies</p>
         <div style="margin-top: 1rem;">
-            <span class="engineering-badge">Single-Standard Search</span>
-            <span class="material-badge">Technical Filters</span>
-            <span class="grade-badge">Professional Export</span>
-            <span class="technical-badge">Real-time Analytics</span>
+            <span class="engineering-badge">Independent Sections</span>
+            <span class="material-badge">Separate Filters</span>
+            <span class="grade-badge">Individual Results</span>
+            <span class="technical-badge">Combined View</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2158,58 +2193,7 @@ def show_enhanced_product_database():
         st.error("🚫 No data sources available. Please check your data connections.")
         return
     
-    col1, col2, col3, col4 = st.columns(4)
-    
-    total_products = len(df) + (len(df_iso4014) if not df_iso4014.empty else 0) + (len(df_din7991) if st.session_state.din7991_loaded else 0) + (len(df_asme_b18_3) if st.session_state.asme_b18_3_loaded else 0)
-    total_dimensional_standards = st.session_state.dimensional_standards_count
-    total_threads = len(thread_files)
-    total_mecert = len(df_mechem) if not df_mechem.empty else 0
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">📊 Total Products</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_products:,}</h2>
-            <p style="color: #7f8c8d; margin:0;">Database Records</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">🌍 Dimensional Standards</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_dimensional_standards}</h2>
-            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">⚡ Thread Types</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_threads}</h2>
-            <p style="color: #7f8c8d; margin:0;">Available</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">🔬 ME&CERT</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_mecert}</h2>
-            <p style="color: #7f8c8d; margin:0;">Properties</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    with st.sidebar:
-        st.session_state.debug_mode = st.checkbox("🔧 Debug Mode", value=st.session_state.debug_mode)
-        st.session_state.thread_independent_mode = st.checkbox("🔩 Independent Thread Search", 
-                                                             value=st.session_state.thread_independent_mode,
-                                                             help="Enable independent thread searching without dimensional filters")
-    
-    # Section Toggles
+    # Section toggles
     st.markdown("### 🔧 Section Controls")
     col1, col2, col3 = st.columns(3)
     
@@ -2227,256 +2211,224 @@ def show_enhanced_product_database():
     
     st.markdown("---")
     
-    # Initialize all variables with default values
-    dimensional_product = "All"
-    dimensional_series = "All"
-    dimensional_standard = "All"
-    dimensional_size = "All"
-    thread_standard = "All"
-    thread_size = "All"
-    tolerance_class = "All"
-    property_class = "All"
-    material_standard = "All"
-    
-    # SECTION A - DIMENSIONAL SPECIFICATIONS
+    # SECTION A - DIMENSIONAL SPECIFICATIONS (COMPLETELY INDEPENDENT)
     if st.session_state.section_a_view:
         st.markdown("""
-        <div class="filter-section">
+        <div class="independent-section">
             <h3 class="filter-header">📐 Section A - Dimensional Specifications</h3>
         """, unsafe_allow_html=True)
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            # 1. Product List (Filter)
-            # Get all unique products from all standards
+            # Product List
             all_products = set()
             for standard_products_list in st.session_state.available_products.values():
                 all_products.update(standard_products_list)
             all_products = ["All"] + sorted([p for p in all_products if p != "All"])
             
-            dimensional_product = st.selectbox("Product List", all_products, key="dimensional_product")
+            dimensional_product = st.selectbox("Product List", all_products, key="section_a_product")
         
         with col2:
-            # 2. Series (Inch/Metric) - Auto-determined based on product
-            series_options = ["All"]
-            
-            # Determine available series based on selected product
-            if dimensional_product != "All":
-                # Check which standards have this product
-                available_series_for_product = set()
-                for standard, products in st.session_state.available_products.items():
-                    if dimensional_product in products:
-                        series = st.session_state.available_series.get(standard, "")
-                        if series:
-                            available_series_for_product.add(series)
-                
-                if available_series_for_product:
-                    series_options.extend(sorted(available_series_for_product))
-                else:
-                    series_options.extend(["Inch", "Metric"])
-            else:
-                series_options.extend(["Inch", "Metric"])
-            
-            dimensional_series = st.selectbox("Series System", series_options, key="dimensional_series")
+            # Series System
+            series_options = ["All", "Inch", "Metric"]
+            dimensional_series = st.selectbox("Series System", series_options, key="section_a_series")
         
         with col3:
-            # 3. Standards (Filtered based on Product and Series)
+            # Standards
             available_standards = ["All"]
+            for standard in st.session_state.available_products.keys():
+                available_standards.append(standard)
             
-            if dimensional_product != "All":
-                # Filter standards that have the selected product
-                for standard, products in st.session_state.available_products.items():
-                    if dimensional_product in products:
-                        # Further filter by series if specified
-                        if dimensional_series == "All" or st.session_state.available_series.get(standard, "") == dimensional_series:
-                            available_standards.append(standard)
-            else:
-                # If "All" products, filter by series only
-                for standard, series in st.session_state.available_series.items():
-                    if dimensional_series == "All" or series == dimensional_series:
-                        available_standards.append(standard)
-            
-            dimensional_standard = st.selectbox("Standards", available_standards, key="dimensional_standard")
+            dimensional_standard = st.selectbox("Standards", available_standards, key="section_a_standard")
         
         with col4:
-            # 4. Size (Filter) - FIXED VERSION
+            # Size
             size_options = ["All"]
-            
             if dimensional_standard != "All":
-                # Get sizes based on selected standard and product
                 temp_df = get_filtered_dataframe(dimensional_product, dimensional_standard)
                 size_options = get_safe_size_options(temp_df)
             
-            dimensional_size = st.selectbox("Size", size_options, key="dimensional_size")
+            dimensional_size = st.selectbox("Size", size_options, key="section_a_size")
+        
+        # Apply Section A Filters Button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 APPLY SECTION A FILTERS", use_container_width=True, type="primary", key="apply_section_a"):
+                st.session_state.section_a_filters = {
+                    'product': dimensional_product,
+                    'series': dimensional_series,
+                    'standard': dimensional_standard,
+                    'size': dimensional_size
+                }
+                # Apply filters and store results
+                st.session_state.section_a_results = apply_section_a_filters()
+                st.rerun()
         
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Show Section A Results
+        show_section_a_results()
     
-    # SECTION B - THREAD SPECIFICATIONS - COMPLETELY INDEPENDENT
+    # SECTION B - THREAD SPECIFICATIONS (COMPLETELY INDEPENDENT)
     if st.session_state.section_b_view:
         st.markdown("""
-        <div class="filter-section">
+        <div class="independent-section">
             <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
         """, unsafe_allow_html=True)
-        
-        if st.session_state.thread_independent_mode:
-            st.info("🔩 **Independent Thread Search Mode**: Thread specifications are completely independent of dimensional filters")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # Thread standards - completely independent
+            # Thread standards
             thread_standards = ["All", "ASME B1.1", "ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-            thread_standard = st.selectbox("Thread Standard", thread_standards, key="thread_standard")
+            thread_standard = st.selectbox("Thread Standard", thread_standards, key="section_b_standard")
         
         with col2:
-            # Thread sizes - independent
+            # Thread sizes
             thread_size_options = ["All"]
             if thread_standard != "All":
                 df_thread = get_thread_data(thread_standard)
                 if not df_thread.empty and "Thread" in df_thread.columns:
                     thread_sizes = df_thread['Thread'].dropna().unique()
-                    # Convert to string and filter empty
                     thread_sizes = [str(size) for size in thread_sizes if str(size).strip() != '']
                     thread_size_options.extend(sorted(thread_sizes))
-            thread_size = st.selectbox("Thread Size", thread_size_options, key="thread_size")
+            thread_size = st.selectbox("Thread Size", thread_size_options, key="section_b_size")
         
         with col3:
-            # Tolerance classes - FIXED: Only show inch tolerance classes, remove metric ones
+            # Tolerance classes
             if thread_standard == "ASME B1.1":
                 tolerance_options = ["All", "1A", "2A", "3A", "1B", "2B", "3B"]
-                tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="tolerance_class")
-                st.info("ℹ️ Inch series tolerance classes")
+                tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="section_b_class")
             else:
-                # For metric threads, no tolerance classes (as requested)
                 tolerance_class = "All"
                 st.info("ℹ️ Metric threads - No tolerance class filter")
         
+        # Apply Section B Filters Button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 APPLY SECTION B FILTERS", use_container_width=True, type="primary", key="apply_section_b"):
+                st.session_state.section_b_filters = {
+                    'standard': thread_standard,
+                    'size': thread_size,
+                    'class': tolerance_class
+                }
+                # Apply filters and store results
+                st.session_state.section_b_results = apply_section_b_filters()
+                st.rerun()
+        
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Show Section B Results
+        show_section_b_results()
     
-    # SECTION C - MATERIAL PROPERTIES
+    # SECTION C - MATERIAL PROPERTIES (COMPLETELY INDEPENDENT)
     if st.session_state.section_c_view:
         st.markdown("""
-        <div class="filter-section">
+        <div class="independent-section">
             <h3 class="filter-header">🧪 Section C - Material Properties</h3>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
         with col1:
+            # Property classes
             property_classes = ["All"]
-            
             if st.session_state.property_classes:
                 property_classes.extend(sorted(st.session_state.property_classes))
             else:
+                # Fallback to product grades from main databases
+                all_grades = set()
                 if not df.empty and 'Product Grade' in df.columns:
                     grades = df['Product Grade'].dropna().unique()
-                    property_classes.extend(sorted([str(g) for g in grades if str(g).strip() != '']))
+                    all_grades.update([str(g) for g in grades if str(g).strip() != ''])
                 if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
                     iso_grades = df_iso4014['Product Grade'].dropna().unique()
-                    for grade in iso_grades:
-                        grade_str = str(grade)
-                        if grade_str not in property_classes and grade_str.strip() != '':
-                            property_classes.append(grade_str)
+                    all_grades.update([str(g) for g in iso_grades if str(g).strip() != ''])
+                property_classes.extend(sorted(all_grades))
             
-            property_class = st.selectbox("Property Class (Grade)", property_classes, key="property_class")
-            
-            if property_class != "All":
-                with st.expander(f"🔬 View Mechanical & Chemical Details for {property_class}", expanded=False):
-                    show_mechanical_chemical_details(property_class)
+            property_class = st.selectbox("Property Class (Grade)", property_classes, key="section_c_class")
         
         with col2:
+            # Material standards
             material_standards = ["All"]
-            
             if property_class != "All":
                 mechem_standards = get_standards_for_property_class(property_class)
                 if mechem_standards:
                     material_standards.extend(sorted(mechem_standards))
-                else:
-                    grade_standards = []
-                    if not df.empty and 'Product Grade' in df.columns:
-                        grade_df = df[df['Product Grade'] == property_class]
-                        grade_standards.extend(grade_df['Standards'].dropna().unique().tolist())
-                    if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-                        iso_grade_df = df_iso4014[df_iso4014['Product Grade'] == property_class]
-                        if not iso_grade_df.empty:
-                            grade_standards.append("ISO 4014")
-                    
-                    material_standards.extend(sorted(set(grade_standards)))
             
-            material_standard = st.selectbox("Material Standard", material_standards, key="material_standard")
-            
-            if property_class != "All":
-                if mechem_standards:
-                    st.success("✅ Data from Mechanical & Chemical Properties")
-                else:
-                    st.info("ℹ️ Data from main product database")
+            material_standard = st.selectbox("Material Standard", material_standards, key="section_c_standard")
         
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("🚀 APPLY FILTERS & SEARCH", use_container_width=True, type="primary"):
-            # Only save filters from visible sections
-            if st.session_state.section_a_view:
-                st.session_state.current_filters_dimensional = {
-                    'product': dimensional_product,
-                    'series': dimensional_series,
-                    'standard': dimensional_standard,
-                    'size': dimensional_size
-                }
-            else:
-                st.session_state.current_filters_dimensional = {}
-            
-            if st.session_state.section_b_view:
-                st.session_state.current_filters_thread = {
-                    'standard': thread_standard,
-                    'size': thread_size,
-                    'class': tolerance_class
-                }
-            else:
-                st.session_state.current_filters_thread = {}
-            
-            if st.session_state.section_c_view:
-                st.session_state.current_filters_material = {
+        # Apply Section C Filters Button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 APPLY SECTION C FILTERS", use_container_width=True, type="primary", key="apply_section_c"):
+                st.session_state.section_c_filters = {
                     'property_class': property_class,
                     'standard': material_standard
                 }
-            else:
-                st.session_state.current_filters_material = {}
-                
+                # Apply filters and store results
+                st.session_state.section_c_results = apply_section_c_filters()
+                st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Show Section C Results
+        show_section_c_results()
+    
+    # COMBINE ALL RESULTS SECTION
+    st.markdown("---")
+    st.markdown("### 🔗 Combine All Sections")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🔄 COMBINE ALL SECTION RESULTS", use_container_width=True, type="secondary"):
+            st.session_state.combined_results = combine_all_results()
             st.rerun()
     
-    if (st.session_state.current_filters_dimensional or 
-        st.session_state.current_filters_thread or 
-        st.session_state.current_filters_material):
-        
-        show_filtered_results()
+    # Show Combined Results
+    show_combined_results()
     
+    # Quick actions
     st.markdown("---")
-    st.markdown("### ⚡ Quick Standard Search")
+    st.markdown("### ⚡ Quick Actions")
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     
     with quick_col1:
-        if st.button("🔧 ASME B18.2.1", use_container_width=True):
-            st.session_state.current_filters_dimensional = {'standard': 'ASME B18.2.1'}
+        if st.button("🔄 Clear All Filters", use_container_width=True):
+            st.session_state.section_a_filters = {}
+            st.session_state.section_b_filters = {}
+            st.session_state.section_c_filters = {}
+            st.session_state.section_a_results = pd.DataFrame()
+            st.session_state.section_b_results = pd.DataFrame()
+            st.session_state.section_c_results = pd.DataFrame()
+            st.session_state.combined_results = pd.DataFrame()
             st.rerun()
     
     with quick_col2:
-        if st.button("🌍 ISO 4014", use_container_width=True):
-            st.session_state.current_filters_dimensional = {'standard': 'ISO 4014'}
+        if st.button("📊 View All Data", use_container_width=True):
+            # Show all available data
+            st.session_state.section_a_results = df.copy()
+            st.session_state.section_b_results = get_thread_data("ASME B1.1")
+            if not df_mechem.empty:
+                st.session_state.section_c_results = df_mechem.copy()
             st.rerun()
     
     with quick_col3:
-        if st.button("⚡ DIN-7991", use_container_width=True) and st.session_state.din7991_loaded:
-            st.session_state.current_filters_dimensional = {'standard': 'DIN-7991'}
-            st.rerun()
+        if st.button("💾 Export Everything", use_container_width=True):
+            # Combine current results and export
+            combined = combine_all_results()
+            if not combined.empty:
+                enhanced_export_data(combined, "Excel")
+            else:
+                st.warning("No data to export")
     
     with quick_col4:
-        if st.button("🔩 ASME B18.3", use_container_width=True) and st.session_state.asme_b18_3_loaded:
-            st.session_state.current_filters_dimensional = {'standard': 'ASME B18.3'}
+        if st.button("📋 Reset Sections", use_container_width=True):
+            st.session_state.section_a_view = True
+            st.session_state.section_b_view = True
+            st.session_state.section_c_view = True
             st.rerun()
 
 # ======================================================
@@ -2810,28 +2762,29 @@ def show_help_system():
     """Show contextual help system"""
     with st.sidebar:
         st.markdown("---")
-        with st.expander("ℹ️ Filtering Guide"):
+        with st.expander("ℹ️ Independent Sections Guide"):
             st.markdown("""
-            **Single-Standard Search:**
+            **🎯 INDEPENDENT SECTIONS ARCHITECTURE:**
             
-            🔧 **How it works:**
-            - Select ONE standard (ASME, ISO, DIN)
-            - Filter products/sizes WITHIN that standard
-            - "All" means all data FROM THAT STANDARD
+            📐 **Section A - Dimensional:**
+            - Completely independent filters
+            - Searches dimensional databases only
+            - No dependency on other sections
             
-            🎯 **ISO 4014 Special:**
-            - Use "Product Grade (A/B)" filter for duplicates
-            - This resolves duplicate size entries
+            🔩 **Section B - Thread:**
+            - Independent thread specifications
+            - Searches thread databases only
+            - No connection to dimensional data
             
-            ⚡ **Quick Search:**
-            - Use standard buttons for instant access
-            - No cross-standard filtering
+            🧪 **Section C - Material:**
+            - Independent material properties
+            - Searches mechanical/chemical data
+            - Standalone operation
             
-            🔩 **Thread Section:**
-            - Now completely independent from dimensional filters
-            - Use checkbox to enable independent thread search
-            - Metric threads don't show tolerance classes
-            - Inch threads show proper tolerance classes (1A, 2A, 3A, etc.)
+            🔗 **Combine Results:**
+            - Optional combination of all sections
+            - Each section maintains its identity
+            - Data_Source column identifies origin
             """)
 
 # ======================================================
@@ -2862,6 +2815,25 @@ def main():
     
     show_data_quality_indicators()
     
+    # Sidebar navigation
+    with st.sidebar:
+        st.markdown("## 🧭 Navigation")
+        
+        sections = [
+            "🏠 Home Dashboard",
+            "📦 Product Database", 
+            "🧮 Calculations",
+            "🤖 PiU (AI Assistant)"
+        ]
+        
+        for section in sections:
+            if st.button(section, use_container_width=True, key=f"nav_{section}"):
+                if section == "🏠 Home Dashboard":
+                    st.session_state.selected_section = None
+                else:
+                    st.session_state.selected_section = section
+                st.rerun()
+    
     if st.session_state.selected_section is None:
         show_enhanced_home()
     else:
@@ -2871,13 +2843,13 @@ def main():
         <hr>
         <div style='text-align: center; color: gray; padding: 2rem;'>
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="engineering-badge">Professional</span>
-                <span class="technical-badge">Precise</span>
-                <span class="material-badge">Reliable</span>
+                <span class="engineering-badge">Independent Sections</span>
+                <span class="technical-badge">Professional</span>
+                <span class="material-badge">Precise</span>
                 <span class="grade-badge">Engineering Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 | Single-Standard Filtering Enabled</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 | Independent Section Architecture</p>
         </div>
     """, unsafe_allow_html=True)
 
