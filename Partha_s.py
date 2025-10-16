@@ -1224,23 +1224,10 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
-# 🔹 FIXED DATA CLEANING - LESS AGGRESSIVE
+# 🔹 MINIMAL DATA CLEANING - OPTION 2
 # ======================================================
 def clean_dataframe_columns(df):
-    """Remove only completely empty columns - LESS AGGRESSIVE VERSION"""
-    if df.empty:
-        return df
-    
-    # Remove only columns with ALL NaN values (completely empty)
-    df = df.dropna(axis=1, how='all')
-    
-    # Remove columns that are completely empty strings or whitespace only
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            # Check if all values are empty strings or whitespace
-            if df[col].str.strip().replace('', pd.NA).isna().all():
-                df = df.drop(col, axis=1)
-    
+    """No cleaning at all - just return the dataframe as-is"""
     return df
 
 # ======================================================
@@ -2079,7 +2066,6 @@ def show_section_a_results():
     st.markdown("### 📐 Section A Results - Dimensional Specifications")
     
     result_df = st.session_state.section_a_results
-    result_df = clean_dataframe_columns(result_df)
     
     st.markdown(f"**🎯 Found {len(result_df)} matching products**")
     
@@ -2132,7 +2118,6 @@ def show_section_b_results():
     st.markdown("### 🔩 Section B Results - Thread Specifications")
     
     result_df = st.session_state.section_b_results
-    result_df = clean_dataframe_columns(result_df)
     
     st.markdown(f"**🎯 Found {len(result_df)} matching thread specifications**")
     
@@ -2204,7 +2189,6 @@ def show_section_c_results():
     st.markdown("### 🧪 Section C Results - Material Properties")
     
     result_df = st.session_state.section_c_results
-    result_df = clean_dataframe_columns(result_df)
     
     st.markdown(f"**🎯 Found {len(result_df)} matching material properties**")
     
@@ -2270,7 +2254,6 @@ def show_combined_results():
     st.markdown("### 🎯 Combined Results - All Sections")
     
     combined_df = st.session_state.combined_results
-    combined_df = clean_dataframe_columns(combined_df)
     
     # Summary statistics
     section_a_count = len(combined_df[combined_df['Data_Source'] == 'Section_A_Dimensional'])
