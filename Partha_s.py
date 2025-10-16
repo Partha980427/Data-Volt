@@ -196,7 +196,10 @@ def initialize_session_state():
         "section_c_current_class": "All",
         "section_c_current_standard": "All",
         # NEW: Thread data cache
-        "thread_data_cache": {}
+        "thread_data_cache": {},
+        # NEW: Professional card view
+        "show_professional_card": False,
+        "selected_product_details": None
     }
     
     for key, value in defaults.items():
@@ -815,6 +818,185 @@ st.markdown("""
         background: linear-gradient(135deg, #f8f0f8 0%, #ffffff 100%);
     }
     
+    /* NEW: Professional Product Card Styles */
+    .professional-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #3498db;
+        border-radius: 15px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 10px 30px rgba(52, 152, 219, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .professional-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--engineering-blue);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .card-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin: 0;
+    }
+    
+    .card-subtitle {
+        font-size: 1.2rem;
+        color: #7f8c8d;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .card-company {
+        background: var(--engineering-blue);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .specification-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .spec-group {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .spec-group-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .spec-row {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.8rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .spec-row:last-child {
+        border-bottom: none;
+    }
+    
+    .spec-label-min {
+        text-align: right;
+        font-weight: 600;
+        color: #e74c3c;
+        font-size: 0.9rem;
+    }
+    
+    .spec-label-max {
+        text-align: left;
+        font-weight: 600;
+        color: #27ae60;
+        font-size: 0.9rem;
+    }
+    
+    .spec-dimension {
+        text-align: center;
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.95rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .spec-value {
+        padding: 0.5rem;
+        text-align: center;
+        font-weight: 500;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 2px solid #e9ecef;
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    .card-badge {
+        background: var(--technical-teal);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 15px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    
+    .card-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+    
+    .action-button {
+        background: var(--engineering-blue);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    }
+    
+    .action-button.secondary {
+        background: #6c757d;
+    }
+    
+    .action-button.secondary:hover {
+        background: #5a6268;
+    }
+    
     @media (max-width: 768px) {
         .engineering-header {
             padding: 1.5rem !important;
@@ -827,6 +1009,22 @@ st.markdown("""
         }
         .message {
             max-width: 85%;
+        }
+        .specification-grid {
+            grid-template-columns: 1fr;
+        }
+        .card-header {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+        .card-footer {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+        .card-actions {
+            justify-content: center;
         }
     }
 </style>
@@ -2052,6 +2250,208 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
+# 🔹 NEW: PROFESSIONAL PRODUCT CARD DISPLAY
+# ======================================================
+def show_professional_product_card(product_details):
+    """Display a beautiful professional product specification card"""
+    
+    # Extract product details
+    product_name = product_details.get('Product', 'Hex Bolt')
+    size = product_details.get('Size', '1/4 x 10')
+    standard = product_details.get('Standards', 'ASME B18.2.1')
+    thread = product_details.get('Thread', '1/4-20-UNC-2A')
+    
+    # Get current date and user info
+    current_date = datetime.now().strftime('%d/%m/%Y')
+    generated_by = "Partha Sharma"  # This could be dynamic based on user login
+    
+    # Create the professional card HTML
+    card_html = f"""
+    <div class="professional-card">
+        <div class="card-header">
+            <div>
+                <h1 class="card-title">{product_name}</h1>
+                <p class="card-subtitle">Size: {size} | Standard: {standard}</p>
+            </div>
+            <div class="card-company">JSC India</div>
+        </div>
+        
+        <div class="specification-grid">
+            <!-- Dimensional Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">📐 Dimensional Specifications</div>
+                
+                <!-- Body Diameter -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Body Dia (Min)</div>
+                    <div class="spec-dimension">Body Diameter</div>
+                    <div class="spec-label-max">Body Dia (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Body_Dia_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Body_Dia_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Width Across Flats -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Flats (Min)</div>
+                    <div class="spec-dimension">Width Across Flats</div>
+                    <div class="spec-label-max">Width Across Flats (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Width Across Corners -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Corners (Min)</div>
+                    <div class="spec-dimension">Width Across Corners</div>
+                    <div class="spec-label-max">Width Across Corners (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Max', 'N/A')}</div>
+                </div>
+            </div>
+            
+            <!-- Head Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">🔩 Head Specifications</div>
+                
+                <!-- Head Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Head Height (Min)</div>
+                    <div class="spec-dimension">Head Height</div>
+                    <div class="spec-label-max">Head Height (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Radius of Fillet -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Radius of Fillet (Min)</div>
+                    <div class="spec-dimension">Radius of Fillet</div>
+                    <div class="spec-label-max">Radius of Fillet (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Washer Face Thickness -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Washer Face Thickness (Min)</div>
+                    <div class="spec-dimension">Washer Face Thickness</div>
+                    <div class="spec-label-max">Washer Face Thickness (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
+                </div>
+            </div>
+            
+            <!-- Additional Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">⚙️ Additional Specifications</div>
+                
+                <!-- Wrenching Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Wrenching Height (Min)</div>
+                    <div class="spec-dimension">Wrenching Height</div>
+                    <div class="spec-label-max">Total Runout (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Thread Information -->
+                <div class="spec-row">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--engineering-blue); color: white; padding: 0.8rem;">
+                        <strong>Thread: {thread}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer">
+            <div>
+                <strong>Generation Date:</strong> {current_date}<br>
+                <strong>Generated By:</strong> {generated_by}
+            </div>
+            <div class="card-badge">
+                Professional Specification
+            </div>
+        </div>
+        
+        <div class="card-actions">
+            <button class="action-button" onclick="window.print()">🖨️ Print Specification</button>
+            <button class="action-button secondary">📧 Email Specification</button>
+            <button class="action-button secondary">💾 Save as PDF</button>
+        </div>
+    </div>
+    """
+    
+    # Display the card
+    st.markdown(card_html, unsafe_allow_html=True)
+    
+    # Add some action buttons below the card
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔄 View Raw Data", use_container_width=True):
+            st.dataframe(pd.DataFrame([product_details]))
+    with col2:
+        if st.button("📊 Compare Products", use_container_width=True):
+            st.info("Product comparison feature coming soon!")
+    with col3:
+        if st.button("❌ Close Card", use_container_width=True):
+            st.session_state.show_professional_card = False
+            st.rerun()
+
+def extract_product_details(row):
+    """Extract product details from dataframe row and map to card format"""
+    details = {
+        'Product': row.get('Product', 'Hex Bolt'),
+        'Size': row.get('Size', 'N/A'),
+        'Standards': row.get('Standards', 'ASME B18.2.1'),
+        'Thread': row.get('Thread', '1/4-20-UNC-2A'),
+        
+        # Map dimensional specifications - these would come from your actual data columns
+        'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
+        'Body_Dia_Max': row.get('Body_Diameter_Max', row.get('Basic_Major_Diameter_Max', 'N/A')),
+        
+        'Width_Across_Flats_Min': row.get('Width_Across_Flats_Min', row.get('W_Across_Flats_Min', 'N/A')),
+        'Width_Across_Flats_Max': row.get('Width_Across_Flats_Max', row.get('W_Across_Flats_Max', 'N/A')),
+        
+        'Width_Across_Corners_Min': row.get('Width_Across_Corners_Min', row.get('W_Across_Corners_Min', 'N/A')),
+        'Width_Across_Corners_Max': row.get('Width_Across_Corners_Max', row.get('W_Across_Corners_Max', 'N/A')),
+        
+        'Head_Height_Min': row.get('Head_Height_Min', 'N/A'),
+        'Head_Height_Max': row.get('Head_Height_Max', 'N/A'),
+        
+        'Radius_Fillet_Min': row.get('Radius_Fillet_Min', row.get('Fillet_Radius_Min', 'N/A')),
+        'Radius_Fillet_Max': row.get('Radius_Fillet_Max', row.get('Fillet_Radius_Max', 'N/A')),
+        
+        'Washer_Face_Thickness_Min': row.get('Washer_Face_Thickness_Min', 'N/A'),
+        'Washer_Face_Thickness_Max': row.get('Washer_Face_Thickness_Max', 'N/A'),
+        
+        'Wrenching_Height_Min': row.get('Wrenching_Height_Min', 'N/A'),
+        'Total_Runout_Max': row.get('Total_Runout_Max', 'N/A')
+    }
+    
+    return details
+
+# ======================================================
 # 🔹 FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
 # ======================================================
 
@@ -2152,6 +2552,23 @@ def show_section_a_results():
     
     st.markdown(f"**🎯 Found {len(result_df)} matching products**")
     
+    # NEW: Professional Card View Toggle
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        show_card_view = st.checkbox("🎨 Show Professional Card View", value=st.session_state.show_professional_card, key="card_view_toggle")
+        st.session_state.show_professional_card = show_card_view
+    
+    # Show professional card if enabled and we have results
+    if st.session_state.show_professional_card and not result_df.empty:
+        # Use the first result for the card display
+        first_product = result_df.iloc[0]
+        product_details = extract_product_details(first_product)
+        st.session_state.selected_product_details = product_details
+        
+        # Show the professional card
+        show_professional_product_card(product_details)
+    
+    # Always show the data table
     st.dataframe(
         result_df,
         use_container_width=True,
@@ -2863,6 +3280,7 @@ def show_enhanced_product_database():
             st.session_state.section_b_results = pd.DataFrame()
             st.session_state.section_c_results = pd.DataFrame()
             st.session_state.combined_results = pd.DataFrame()
+            st.session_state.show_professional_card = False
             # Reset current selections
             st.session_state.section_a_current_product = "All"
             st.session_state.section_a_current_series = "All"
