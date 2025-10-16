@@ -174,7 +174,8 @@ def initialize_session_state():
         "debug_mode": False,
         "section_a_view": True,
         "section_b_view": True,
-        "section_c_view": True
+        "section_c_view": True,
+        "thread_independent_mode": False  # NEW: Thread section independence
     }
     
     for key, value in defaults.items():
@@ -979,6 +980,10 @@ def size_to_float(size_str):
         if not size_str or size_str == "":
             return 0.0
         
+        # Handle numeric sizes (0,1,2,3 etc)
+        if size_str.isdigit():
+            return float(size_str)
+        
         if size_str.startswith('M'):
             match = re.match(r'M\s*([\d.]+)', size_str)
             if match:
@@ -1019,7 +1024,7 @@ def safe_sort_sizes(size_list):
             return list(size_list)
 
 def get_safe_size_options(temp_df):
-    """Completely safe way to get size options"""
+    """Completely safe way to get size options - FIXED VERSION"""
     size_options = ["All"]
     
     if temp_df is None or temp_df.empty:
@@ -1029,13 +1034,20 @@ def get_safe_size_options(temp_df):
         return size_options
     
     try:
+        # Get unique sizes and handle NaN values properly
         unique_sizes = temp_df['Size'].dropna().unique()
+        
+        # Convert all sizes to string and filter out empty strings
+        unique_sizes = [str(size) for size in unique_sizes if str(size).strip() != '']
+        
         if len(unique_sizes) > 0:
             sorted_sizes = safe_sort_sizes(unique_sizes)
             size_options.extend(sorted_sizes)
     except Exception as e:
+        st.warning(f"Size processing warning: {str(e)}")
         try:
             unique_sizes = temp_df['Size'].dropna().unique()
+            unique_sizes = [str(size) for size in unique_sizes if str(size).strip() != '']
             size_options.extend(list(unique_sizes))
         except:
             pass
@@ -1911,11 +1923,16 @@ def apply_all_filters():
         if st.session_state.debug_mode:
             st.sidebar.write(f"✅ Applied product filter: {dim_filters['product']} - {len(result_df)} records remaining")
     
-    # Apply size filter to the SINGLE standard  
+    # Apply size filter to the SINGLE standard - FIXED VERSION
     if dim_filters.get('size') and dim_filters['size'] != "All" and 'Size' in result_df.columns:
-        result_df = result_df[result_df['Size'] == dim_filters['size']]
-        if st.session_state.debug_mode:
-            st.sidebar.write(f"✅ Applied size filter: {dim_filters['size']} - {len(result_df)} records remaining")
+        try:
+            # Convert both to string for comparison to handle numeric sizes properly
+            result_df = result_df[result_df['Size'].astype(str) == str(dim_filters['size'])]
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"✅ Applied size filter: {dim_filters['size']} - {len(result_df)} records remaining")
+        except Exception as e:
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"❌ Size filter error: {str(e)}")
     
     # Apply material filters if any
     mat_filters = st.session_state.current_filters_material
@@ -2188,6 +2205,9 @@ def show_enhanced_product_database():
     
     with st.sidebar:
         st.session_state.debug_mode = st.checkbox("🔧 Debug Mode", value=st.session_state.debug_mode)
+        st.session_state.thread_independent_mode = st.checkbox("🔩 Independent Thread Search", 
+                                                             value=st.session_state.thread_independent_mode,
+                                                             help="Enable independent thread searching without dimensional filters")
     
     # Section Toggles
     st.markdown("### 🔧 Section Controls")
@@ -2280,7 +2300,7 @@ def show_enhanced_product_database():
             dimensional_standard = st.selectbox("Standards", available_standards, key="dimensional_standard")
         
         with col4:
-            # 4. Size (Filter)
+            # 4. Size (Filter) - FIXED VERSION
             size_options = ["All"]
             
             if dimensional_standard != "All":
@@ -2292,47 +2312,45 @@ def show_enhanced_product_database():
         
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # SECTION B - THREAD SPECIFICATIONS
+    # SECTION B - THREAD SPECIFICATIONS - COMPLETELY INDEPENDENT
     if st.session_state.section_b_view:
         st.markdown("""
         <div class="filter-section">
             <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
         """, unsafe_allow_html=True)
         
+        if st.session_state.thread_independent_mode:
+            st.info("🔩 **Independent Thread Search Mode**: Thread specifications are completely independent of dimensional filters")
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            thread_standards = ["All"]
-            if dimensional_standard == "All":
-                thread_standards += ["ASME B1.1", "ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-            elif dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
-                thread_standards += ["ASME B1.1"]
-            else:
-                thread_standards += ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-            
+            # Thread standards - completely independent
+            thread_standards = ["All", "ASME B1.1", "ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
             thread_standard = st.selectbox("Thread Standard", thread_standards, key="thread_standard")
         
         with col2:
+            # Thread sizes - independent
             thread_size_options = ["All"]
             if thread_standard != "All":
                 df_thread = get_thread_data(thread_standard)
                 if not df_thread.empty and "Thread" in df_thread.columns:
-                    thread_size_options += sorted(df_thread['Thread'].dropna().unique())
+                    thread_sizes = df_thread['Thread'].dropna().unique()
+                    # Convert to string and filter empty
+                    thread_sizes = [str(size) for size in thread_sizes if str(size).strip() != '']
+                    thread_size_options.extend(sorted(thread_sizes))
             thread_size = st.selectbox("Thread Size", thread_size_options, key="thread_size")
         
         with col3:
-            if dimensional_standard == "ISO 4014":
-                grade_options = ["All", "A", "B"]
-                tolerance_class = st.selectbox("Product Grade (A/B)", grade_options, key="tolerance_class")
-                st.info("ℹ️ Product Grade filter resolves duplicate entries")
-            else:
-                tolerance_options = ["All"]
-                if dimensional_standard in ["ASME B18.2.1", "ASME B18.3"]:
-                    tolerance_options += ["1A", "2A", "3A"]
-                elif dimensional_standard in ["ISO 4014", "DIN-7991"]:
-                    tolerance_options += ["6g", "6H", "4g", "4H", "8g", "8H"]
-                
+            # Tolerance classes - FIXED: Only show inch tolerance classes, remove metric ones
+            if thread_standard == "ASME B1.1":
+                tolerance_options = ["All", "1A", "2A", "3A", "1B", "2B", "3B"]
                 tolerance_class = st.selectbox("Tolerance Class", tolerance_options, key="tolerance_class")
+                st.info("ℹ️ Inch series tolerance classes")
+            else:
+                # For metric threads, no tolerance classes (as requested)
+                tolerance_class = "All"
+                st.info("ℹ️ Metric threads - No tolerance class filter")
         
         st.markdown("</div>", unsafe_allow_html=True)
     
@@ -2353,12 +2371,13 @@ def show_enhanced_product_database():
             else:
                 if not df.empty and 'Product Grade' in df.columns:
                     grades = df['Product Grade'].dropna().unique()
-                    property_classes.extend(sorted(grades))
+                    property_classes.extend(sorted([str(g) for g in grades if str(g).strip() != '']))
                 if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
                     iso_grades = df_iso4014['Product Grade'].dropna().unique()
                     for grade in iso_grades:
-                        if grade not in property_classes:
-                            property_classes.append(grade)
+                        grade_str = str(grade)
+                        if grade_str not in property_classes and grade_str.strip() != '':
+                            property_classes.append(grade_str)
             
             property_class = st.selectbox("Property Class (Grade)", property_classes, key="property_class")
             
@@ -2807,6 +2826,12 @@ def show_help_system():
             ⚡ **Quick Search:**
             - Use standard buttons for instant access
             - No cross-standard filtering
+            
+            🔩 **Thread Section:**
+            - Now completely independent from dimensional filters
+            - Use checkbox to enable independent thread search
+            - Metric threads don't show tolerance classes
+            - Inch threads show proper tolerance classes (1A, 2A, 3A, etc.)
             """)
 
 # ======================================================
