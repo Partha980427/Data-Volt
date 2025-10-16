@@ -992,21 +992,22 @@ if not df_iso4014.empty:
         df_iso4014['Product Grade'] = df_iso4014[grade_col]
 
 # ======================================================
-# 🔹 ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING
+# 🔹 ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING - FIXED
 # ======================================================
 def process_mechanical_chemical_data():
-    """Process and extract property classes from Mechanical & Chemical data"""
+    """Process and extract property classes from Mechanical & Chemical data - FIXED VERSION"""
     if df_mechem.empty:
         return [], []
     
     try:
         me_chem_columns = df_mechem.columns.tolist()
         
+        # Find the property class column (Grade/Class column)
         property_class_col = None
         possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation']
         
         for col in me_chem_columns:
-            col_lower = col.lower()
+            col_lower = str(col).lower()
             for possible in possible_class_cols:
                 if possible.lower() in col_lower:
                     property_class_col = col
@@ -1014,13 +1015,15 @@ def process_mechanical_chemical_data():
             if property_class_col:
                 break
         
+        # If no specific class column found, use the first column
         if not property_class_col and len(me_chem_columns) > 0:
             property_class_col = me_chem_columns[0]
         
         property_classes = []
         if property_class_col and property_class_col in df_mechem.columns:
+            # Get unique property classes and clean them
             property_classes = df_mechem[property_class_col].dropna().unique().tolist()
-            property_classes = [str(pc) for pc in property_classes if str(pc).strip() != '']
+            property_classes = [str(pc).strip() for pc in property_classes if str(pc).strip() != '']
         
         st.session_state.me_chem_columns = me_chem_columns
         st.session_state.property_classes = property_classes
@@ -1032,35 +1035,53 @@ def process_mechanical_chemical_data():
         return [], []
 
 def get_standards_for_property_class(property_class):
-    """Get available standards for a specific property class"""
-    if df_mechem.empty or not property_class:
+    """Get available standards for a specific property class - FIXED VERSION"""
+    if df_mechem.empty or not property_class or property_class == "All":
         return []
     
     try:
+        # Find the standard column
+        standard_col = None
+        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type', 'Designation']
+        
+        for col in df_mechem.columns:
+            col_lower = str(col).lower()
+            for possible in possible_standard_cols:
+                if possible.lower() in col_lower:
+                    standard_col = col
+                    break
+            if standard_col:
+                break
+        
+        if not standard_col:
+            return []
+        
+        # Find the property class column
         property_class_col = None
-        for col in st.session_state.me_chem_columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
-                property_class_col = col
+        possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation']
+        
+        for col in df_mechem.columns:
+            col_lower = str(col).lower()
+            for possible in possible_class_cols:
+                if possible.lower() in col_lower:
+                    property_class_col = col
+                    break
+            if property_class_col:
                 break
         
         if not property_class_col:
             return []
         
+        # Filter data by property class and get unique standards
         filtered_data = df_mechem[df_mechem[property_class_col] == property_class]
         
-        standards = []
-        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type']
+        if filtered_data.empty:
+            return []
         
-        for col in filtered_data.columns:
-            col_lower = col.lower()
-            for possible in possible_standard_cols:
-                if possible.lower() in col_lower:
-                    col_standards = filtered_data[col].dropna().unique()
-                    standards.extend([str(std) for std in col_standards if str(std).strip() != ''])
-                    break
+        standards = filtered_data[standard_col].dropna().unique().tolist()
+        standards = [str(std).strip() for std in standards if str(std).strip() != '']
         
-        return list(set(standards))
+        return sorted(standards)
         
     except Exception as e:
         st.error(f"Error getting standards for {property_class}: {str(e)}")
@@ -1072,14 +1093,21 @@ def show_mechanical_chemical_details(property_class):
         return
     
     try:
+        # Find the property class column
         property_class_col = None
-        for col in st.session_state.me_chem_columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
-                property_class_col = col
+        possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation']
+        
+        for col in df_mechem.columns:
+            col_lower = str(col).lower()
+            for possible in possible_class_cols:
+                if possible.lower() in col_lower:
+                    property_class_col = col
+                    break
+            if property_class_col:
                 break
         
         if not property_class_col:
+            st.info("No property class column found in the data")
             return
         
         filtered_data = df_mechem[df_mechem[property_class_col] == property_class]
@@ -1090,12 +1118,14 @@ def show_mechanical_chemical_details(property_class):
         
         st.markdown(f"### 🧪 Detailed Properties for {property_class}")
         
+        # Display the filtered data
         st.dataframe(
             filtered_data,
             use_container_width=True,
             height=400
         )
         
+        # Show key properties in a structured way
         st.markdown("#### 📊 Key Properties")
         
         mechanical_props = []
@@ -1103,7 +1133,7 @@ def show_mechanical_chemical_details(property_class):
         other_props = []
         
         for col in filtered_data.columns:
-            col_lower = col.lower()
+            col_lower = str(col).lower()
             if col == property_class_col:
                 continue
             
@@ -2144,16 +2174,17 @@ def show_section_b_results():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 SECTION C - MATERIAL PROPERTIES
+# 🔹 SECTION C - MATERIAL PROPERTIES - FIXED VERSION
 # ======================================================
 def apply_section_c_filters():
-    """Apply filters for Section C only - completely independent"""
+    """Apply filters for Section C only - completely independent - FIXED VERSION"""
     filters = st.session_state.section_c_filters
     
     if not filters:
         return pd.DataFrame()
     
     property_class = filters.get('property_class', 'All')
+    standard = filters.get('standard', 'All')
     
     if property_class == "All":
         return pd.DataFrame()
@@ -2163,12 +2194,17 @@ def apply_section_c_filters():
     
     result_df = df_mechem.copy()
     
-    # Find property class column
+    # Find the property class column
     property_class_col = None
-    for col in st.session_state.me_chem_columns:
-        col_lower = col.lower()
-        if any(keyword in col_lower for keyword in ['grade', 'class', 'property']):
-            property_class_col = col
+    possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation']
+    
+    for col in df_mechem.columns:
+        col_lower = str(col).lower()
+        for possible in possible_class_cols:
+            if possible.lower() in col_lower:
+                property_class_col = col
+                break
+        if property_class_col:
             break
     
     if not property_class_col:
@@ -2178,10 +2214,28 @@ def apply_section_c_filters():
     if property_class_col in result_df.columns:
         result_df = result_df[result_df[property_class_col] == property_class]
     
+    # Apply standard filter if specified
+    if standard != "All":
+        # Find the standard column
+        standard_col = None
+        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type', 'Designation']
+        
+        for col in result_df.columns:
+            col_lower = str(col).lower()
+            for possible in possible_standard_cols:
+                if possible.lower() in col_lower:
+                    standard_col = col
+                    break
+            if standard_col:
+                break
+        
+        if standard_col and standard_col in result_df.columns:
+            result_df = result_df[result_df[standard_col] == standard]
+    
     return result_df
 
 def show_section_c_results():
-    """Display results for Section C"""
+    """Display results for Section C - FIXED VERSION"""
     if st.session_state.section_c_results.empty:
         return
     
@@ -2191,6 +2245,10 @@ def show_section_c_results():
     result_df = st.session_state.section_c_results
     
     st.markdown(f"**🎯 Found {len(result_df)} matching material properties**")
+    
+    # Show debug info if enabled
+    if st.session_state.debug_mode:
+        st.info(f"**Debug Info Section C:** Columns: {result_df.columns.tolist()}, Shape: {result_df.shape}")
     
     st.dataframe(
         result_df,
@@ -2336,7 +2394,7 @@ def get_available_sizes_for_standard_product(standard, product):
 # 🔹 FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA HANDLING
 # ======================================================
 def show_enhanced_product_database():
-    """Enhanced Product Intelligence Center with FIXED Section B thread data"""
+    """Enhanced Product Intelligence Center with FIXED Section C material properties"""
     
     st.markdown("""
     <div class="engineering-header">
@@ -2584,30 +2642,25 @@ def show_enhanced_product_database():
         # Show Section B Results
         show_section_b_results()
     
-    # SECTION C - MATERIAL PROPERTIES (COMPLETELY INDEPENDENT)
+    # SECTION C - MATERIAL PROPERTIES (COMPLETELY INDEPENDENT) - FIXED VERSION
     if st.session_state.section_c_view:
         st.markdown("""
         <div class="independent-section">
             <h3 class="filter-header">🧪 Section C - Material Properties</h3>
+            <p><strong>FIXED:</strong> Direct data filtering from Mechanical & Chemical Excel file</p>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Property classes
+            # Property classes - FIXED: Get directly from Mechanical & Chemical data
             property_classes = ["All"]
             if st.session_state.property_classes:
                 property_classes.extend(sorted(st.session_state.property_classes))
             else:
-                # Fallback to product grades from main databases
-                all_grades = set()
-                if not df.empty and 'Product Grade' in df.columns:
-                    grades = df['Product Grade'].dropna().unique()
-                    all_grades.update([str(g) for g in grades if str(g).strip() != ''])
-                if not df_iso4014.empty and 'Product Grade' in df_iso4014.columns:
-                    iso_grades = df_iso4014['Product Grade'].dropna().unique()
-                    all_grades.update([str(g) for g in iso_grades if str(g).strip() != ''])
-                property_classes.extend(sorted(all_grades))
+                # If no property classes found, show a message
+                st.info("No property classes found in Mechanical & Chemical data")
+                property_classes = ["All", "No data available"]
             
             property_class = st.selectbox(
                 "Property Class (Grade)", 
@@ -2616,14 +2669,20 @@ def show_enhanced_product_database():
                 index=property_classes.index(st.session_state.section_c_current_class) if st.session_state.section_c_current_class in property_classes else 0
             )
             st.session_state.section_c_current_class = property_class
+            
+            # Show info about selected property class
+            if property_class != "All" and property_class != "No data available":
+                st.caption(f"Selected: {property_class}")
         
         with col2:
-            # Material standards
+            # Material standards - FIXED: Get standards based on selected property class
             material_standards = ["All"]
-            if property_class != "All":
+            if property_class != "All" and property_class != "No data available":
                 mechem_standards = get_standards_for_property_class(property_class)
                 if mechem_standards:
                     material_standards.extend(sorted(mechem_standards))
+                else:
+                    st.caption("No specific standards found for this property class")
             
             material_standard = st.selectbox(
                 "Material Standard", 
@@ -2632,18 +2691,36 @@ def show_enhanced_product_database():
                 index=material_standards.index(st.session_state.section_c_current_standard) if st.session_state.section_c_current_standard in material_standards else 0
             )
             st.session_state.section_c_current_standard = material_standard
+            
+            # Show info about available standards
+            if material_standard != "All":
+                st.caption(f"Standard: {material_standard}")
+        
+        # Debug information for Section C
+        if st.session_state.debug_mode:
+            st.info(f"""
+            **Debug Info - Section C:**
+            - Property Classes Available: {len(property_classes)-1}
+            - Selected Property Class: {property_class}
+            - Standards Available: {len(material_standards)-1}
+            - Selected Standard: {material_standard}
+            - Mechanical & Chemical Data: {len(df_mechem)} records
+            """)
         
         # Apply Section C Filters Button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("🚀 APPLY SECTION C FILTERS", use_container_width=True, type="primary", key="apply_section_c"):
-                st.session_state.section_c_filters = {
-                    'property_class': property_class,
-                    'standard': material_standard
-                }
-                # Apply filters and store results
-                st.session_state.section_c_results = apply_section_c_filters()
-                st.rerun()
+                if property_class == "All" or property_class == "No data available":
+                    st.warning("Please select a valid property class")
+                else:
+                    st.session_state.section_c_filters = {
+                        'property_class': property_class,
+                        'standard': material_standard
+                    }
+                    # Apply filters and store results
+                    st.session_state.section_c_results = apply_section_c_filters()
+                    st.rerun()
         
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -3063,9 +3140,10 @@ def show_help_system():
             - Independent thread specifications
             
             🧪 **Section C - Material:**
+            - **FIXED:** Direct Mechanical & Chemical data filtering
+            - **FIXED:** Property class dropdown from actual Excel data
+            - **FIXED:** Standards dropdown based on selected property class
             - Independent material properties
-            - Searches mechanical/chemical data
-            - Standalone operation
             
             🔗 **Combine Results:**
             - Optional combination of all sections
