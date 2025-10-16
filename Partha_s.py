@@ -194,7 +194,9 @@ def initialize_session_state():
         "section_b_current_size": "All",
         "section_b_current_class": "All",
         "section_c_current_class": "All",
-        "section_c_current_standard": "All"
+        "section_c_current_standard": "All",
+        # NEW: Thread data cache
+        "thread_data_cache": {}
     }
     
     for key, value in defaults.items():
@@ -204,9 +206,12 @@ def initialize_session_state():
     load_config()
     save_user_preferences()
 
+# ======================================================
+# 🔹 FIXED THREAD DATA LOADING - PROPER DATA TYPES
+# ======================================================
 @st.cache_data(ttl=3600)
-def load_thread_data(standard_name):
-    """Load thread data with proper error handling and caching"""
+def load_thread_data_enhanced(standard_name):
+    """Enhanced thread data loading with proper data type handling"""
     if standard_name not in thread_files:
         return pd.DataFrame()
     
@@ -215,24 +220,142 @@ def load_thread_data(standard_name):
         df_thread = safe_load_excel_file_enhanced(file_path)
         if df_thread.empty:
             st.warning(f"Thread data for {standard_name} is empty")
+            return pd.DataFrame()
+        
+        # Clean column names
+        df_thread.columns = [str(col).strip() for col in df_thread.columns]
+        
+        # Debug: Show column info
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"📊 {standard_name} Columns:", df_thread.columns.tolist())
+            st.sidebar.write(f"📊 {standard_name} Shape:", df_thread.shape)
+            st.sidebar.write(f"📊 {standard_name} Sample:", df_thread.head(2) if not df_thread.empty else "Empty")
+        
+        # Handle different column naming patterns
+        thread_col = None
+        class_col = None
+        
+        # Find thread size column
+        possible_thread_cols = ['Thread', 'Size', 'Thread Size', 'Nominal Size', 'Basic Major Diameter']
+        for col in df_thread.columns:
+            col_lower = str(col).lower()
+            for possible in possible_thread_cols:
+                if possible.lower() in col_lower:
+                    thread_col = col
+                    break
+            if thread_col:
+                break
+        
+        # Find class/tolerance column
+        possible_class_cols = ['Class', 'Tolerance', 'Tolerance Class', 'Thread Class']
+        for col in df_thread.columns:
+            col_lower = str(col).lower()
+            for possible in possible_class_cols:
+                if possible.lower() in col_lower:
+                    class_col = col
+                    break
+            if class_col:
+                break
+        
+        # If no specific class column found, check for columns containing tolerance info
+        if not class_col:
+            for col in df_thread.columns:
+                if 'tolerance' in str(col).lower() or 'class' in str(col).lower():
+                    class_col = col
+                    break
+        
+        # Standardize column names for consistent processing
+        if thread_col:
+            df_thread = df_thread.rename(columns={thread_col: 'Thread'})
+        
+        if class_col:
+            df_thread = df_thread.rename(columns={class_col: 'Class'})
+        
+        # Clean data - convert all to string and handle NaN
+        if 'Thread' in df_thread.columns:
+            df_thread['Thread'] = df_thread['Thread'].astype(str).str.strip()
+            df_thread = df_thread[df_thread['Thread'] != 'nan']
+            df_thread = df_thread[df_thread['Thread'] != '']
+        
+        if 'Class' in df_thread.columns:
+            df_thread['Class'] = df_thread['Class'].astype(str).str.strip()
+            df_thread = df_thread[df_thread['Class'] != 'nan']
+            df_thread = df_thread[df_thread['Class'] != '']
+        
+        # Add standard identifier
+        df_thread['Standard'] = standard_name
+        
         return df_thread
+        
     except Exception as e:
         st.error(f"Error loading thread data for {standard_name}: {str(e)}")
         return pd.DataFrame()
 
-def get_thread_data(standard, thread_size=None, thread_class=None):
-    """Centralized thread data retrieval - FIXED VERSION"""
-    df_thread = load_thread_data(standard)
+def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
+    """Enhanced thread data retrieval with proper filtering"""
+    df_thread = load_thread_data_enhanced(standard)
+    
     if df_thread.empty:
         return pd.DataFrame()
     
     # Apply filters if provided
-    if thread_size and thread_size != "All" and "Thread" in df_thread.columns:
-        df_thread = df_thread[df_thread["Thread"] == thread_size]
-    if thread_class and thread_class != "All" and "Class" in df_thread.columns:
-        df_thread = df_thread[df_thread["Class"] == thread_class]
+    result_df = df_thread.copy()
     
-    return df_thread
+    if thread_size and thread_size != "All" and "Thread" in result_df.columns:
+        # Convert both to string for comparison
+        result_df = result_df[result_df["Thread"].astype(str) == str(thread_size)]
+    
+    if thread_class and thread_class != "All" and "Class" in result_df.columns:
+        # Convert both to string for comparison
+        result_df = result_df[result_df["Class"].astype(str) == str(thread_class)]
+    
+    return result_df
+
+def get_thread_sizes_enhanced(standard):
+    """Get available thread sizes with proper data handling"""
+    df_thread = load_thread_data_enhanced(standard)
+    
+    if df_thread.empty or "Thread" not in df_thread.columns:
+        return ["All"]
+    
+    try:
+        # Get unique sizes and handle NaN values properly
+        unique_sizes = df_thread['Thread'].dropna().unique()
+        
+        # Convert all sizes to string and filter out empty strings
+        unique_sizes = [str(size).strip() for size in unique_sizes if str(size).strip() != '']
+        
+        if len(unique_sizes) > 0:
+            sorted_sizes = safe_sort_sizes(unique_sizes)
+            return ["All"] + sorted_sizes
+        else:
+            return ["All"]
+    except Exception as e:
+        st.warning(f"Thread size processing warning for {standard}: {str(e)}")
+        return ["All"]
+
+def get_thread_classes_enhanced(standard):
+    """Get available thread classes with proper data handling"""
+    df_thread = load_thread_data_enhanced(standard)
+    
+    if df_thread.empty or "Class" not in df_thread.columns:
+        return ["All"]
+    
+    try:
+        # Get unique classes and handle NaN values properly
+        unique_classes = df_thread['Class'].dropna().unique()
+        
+        # Convert all classes to string and filter out empty strings
+        unique_classes = [str(cls).strip() for cls in unique_classes if str(cls).strip() != '']
+        
+        if len(unique_classes) > 0:
+            sorted_classes = sorted(unique_classes)
+            return ["All"] + sorted_classes
+        else:
+            return ["All"]
+    except Exception as e:
+        st.warning(f"Thread class processing warning for {standard}: {str(e)}")
+        return ["All"]
 
 # ======================================================
 # 🔹 Page Setup with Professional Engineering Styling
@@ -1587,7 +1710,7 @@ def show_data_quality_indicators():
         
         thread_status = []
         for standard, url in thread_files.items():
-            df_thread = load_thread_data(standard)
+            df_thread = load_thread_data_enhanced(standard)
             if not df_thread.empty:
                 thread_status.append(f"{standard}: ✅")
             else:
@@ -1970,7 +2093,7 @@ def show_section_a_results():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 SECTION B - THREAD SPECIFICATIONS
+# 🔹 FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA TYPES
 # ======================================================
 def apply_section_b_filters():
     """Apply filters for Section B only - completely independent"""
@@ -1984,20 +2107,12 @@ def apply_section_b_filters():
     if selected_standard == "All":
         return pd.DataFrame()
     
-    # Get thread data
-    df_thread = get_thread_data(selected_standard)
-    if df_thread.empty:
-        return pd.DataFrame()
-    
-    result_df = df_thread.copy()
-    
-    # Apply thread size filter
-    if filters.get('size') and filters['size'] != "All" and "Thread" in result_df.columns:
-        result_df = result_df[result_df["Thread"] == filters['size']]
-    
-    # Apply tolerance class filter
-    if filters.get('class') and filters['class'] != "All" and "Class" in result_df.columns:
-        result_df = result_df[result_df["Class"] == filters['class']]
+    # Get thread data using enhanced function
+    result_df = get_thread_data_enhanced(
+        selected_standard,
+        filters.get('size'),
+        filters.get('class')
+    )
     
     return result_df
 
@@ -2013,6 +2128,12 @@ def show_section_b_results():
     result_df = clean_dataframe_columns(result_df)
     
     st.markdown(f"**🎯 Found {len(result_df)} matching thread specifications**")
+    
+    # Show data info for debugging
+    if st.session_state.debug_mode:
+        st.info(f"**Debug Info:** Columns: {result_df.columns.tolist()}, Shape: {result_df.shape}")
+        if not result_df.empty:
+            st.info(f"Sample data types: {result_df.dtypes.to_dict()}")
     
     st.dataframe(
         result_df,
@@ -2221,8 +2342,11 @@ def get_available_sizes_for_standard_product(standard, product):
     
     return size_options
 
+# ======================================================
+# 🔹 FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA HANDLING
+# ======================================================
 def show_enhanced_product_database():
-    """Enhanced Product Intelligence Center with FIXED Section A relationships"""
+    """Enhanced Product Intelligence Center with FIXED Section B thread data"""
     
     st.markdown("""
     <div class="engineering-header">
@@ -2361,11 +2485,12 @@ def show_enhanced_product_database():
         # Show Section A Results
         show_section_a_results()
     
-    # SECTION B - THREAD SPECIFICATIONS (COMPLETELY INDEPENDENT)
+    # SECTION B - THREAD SPECIFICATIONS (FIXED DATA TYPES)
     if st.session_state.section_b_view:
         st.markdown("""
         <div class="independent-section">
             <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
+            <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
         """, unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
@@ -2380,16 +2505,19 @@ def show_enhanced_product_database():
                 index=thread_standards.index(st.session_state.section_b_current_standard) if st.session_state.section_b_current_standard in thread_standards else 0
             )
             st.session_state.section_b_current_standard = thread_standard
+            
+            # Show thread data info
+            if thread_standard != "All":
+                df_thread = load_thread_data_enhanced(thread_standard)
+                if not df_thread.empty:
+                    st.caption(f"Threads available: {len(df_thread)}")
+                    if st.session_state.debug_mode:
+                        st.caption(f"Columns: {df_thread.columns.tolist()}")
         
         with col2:
-            # Thread sizes
-            thread_size_options = ["All"]
-            if thread_standard != "All":
-                df_thread = get_thread_data(thread_standard)
-                if not df_thread.empty and "Thread" in df_thread.columns:
-                    thread_sizes = df_thread['Thread'].dropna().unique()
-                    thread_sizes = [str(size) for size in thread_sizes if str(size).strip() != '']
-                    thread_size_options.extend(sorted(thread_sizes))
+            # Thread sizes - FIXED: Get from actual Excel data
+            thread_size_options = get_thread_sizes_enhanced(thread_standard)
+            
             thread_size = st.selectbox(
                 "Thread Size", 
                 thread_size_options, 
@@ -2397,11 +2525,20 @@ def show_enhanced_product_database():
                 index=thread_size_options.index(st.session_state.section_b_current_size) if st.session_state.section_b_current_size in thread_size_options else 0
             )
             st.session_state.section_b_current_size = thread_size
+            
+            if thread_size != "All":
+                st.caption(f"Sizes available: {len(thread_size_options)-1}")
         
         with col3:
-            # Tolerance classes
+            # Tolerance classes - FIXED: Get ACTUAL classes from Excel data
             if thread_standard == "ASME B1.1":
-                tolerance_options = ["All", "1A", "2A", "3A", "1B", "2B", "3B"]
+                # Get actual tolerance classes from Excel data
+                tolerance_options = get_thread_classes_enhanced(thread_standard)
+                
+                # If no specific classes found, use default
+                if len(tolerance_options) == 1:  # Only "All"
+                    tolerance_options = ["All", "1A", "2A", "3A"]
+                
                 tolerance_class = st.selectbox(
                     "Tolerance Class", 
                     tolerance_options, 
@@ -2409,10 +2546,35 @@ def show_enhanced_product_database():
                     index=tolerance_options.index(st.session_state.section_b_current_class) if st.session_state.section_b_current_class in tolerance_options else 0
                 )
                 st.session_state.section_b_current_class = tolerance_class
+                
+                if tolerance_class != "All":
+                    st.caption(f"Classes available: {len(tolerance_options)-1}")
             else:
-                tolerance_class = "All"
-                st.session_state.section_b_current_class = "All"
-                st.info("ℹ️ Metric threads - No tolerance class filter")
+                # For metric threads, show available classes from data
+                tolerance_options = get_thread_classes_enhanced(thread_standard)
+                tolerance_class = st.selectbox(
+                    "Tolerance Class", 
+                    tolerance_options, 
+                    key="section_b_class",
+                    index=tolerance_options.index(st.session_state.section_b_current_class) if st.session_state.section_b_current_class in tolerance_options else 0
+                )
+                st.session_state.section_b_current_class = tolerance_class
+                
+                if tolerance_class != "All":
+                    st.caption(f"Classes available: {len(tolerance_options)-1}")
+        
+        # Debug information for Section B
+        if st.session_state.debug_mode and thread_standard != "All":
+            df_thread_sample = load_thread_data_enhanced(thread_standard)
+            if not df_thread_sample.empty:
+                st.info(f"""
+                **Debug Info - Section B ({thread_standard}):**
+                - Total Records: {len(df_thread_sample)}
+                - Columns: {df_thread_sample.columns.tolist()}
+                - Unique Sizes: {len(get_thread_sizes_enhanced(thread_standard))-1}
+                - Unique Classes: {len(get_thread_classes_enhanced(thread_standard))-1}
+                - Sample Data: {df_thread_sample[['Thread', 'Class']].head(3).to_dict() if 'Thread' in df_thread_sample.columns and 'Class' in df_thread_sample.columns else 'No Thread/Class columns'}
+                """)
         
         # Apply Section B Filters Button
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -2542,7 +2704,8 @@ def show_enhanced_product_database():
         if st.button("📊 View All Data", use_container_width=True, key="view_all"):
             # Show all available data
             st.session_state.section_a_results = df.copy()
-            st.session_state.section_b_results = get_thread_data("ASME B1.1")
+            # Load thread data for ASME B1.1
+            st.session_state.section_b_results = get_thread_data_enhanced("ASME B1.1")
             if not df_mechem.empty:
                 st.session_state.section_c_results = df_mechem.copy()
             st.rerun()
@@ -2611,8 +2774,8 @@ def show_enhanced_calculations():
                 df_source = df_asme_b18_3
                 size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.asme_b18_3_loaded else []
             elif selected_standard in thread_files:
-                df_thread = get_thread_data(selected_standard)
-                size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty else []
+                df_thread = get_thread_data_enhanced(selected_standard)
+                size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty and 'Thread' in df_thread.columns else []
             elif selected_standard == "ASME B18.2.1":
                 df_source = df
                 size_options = sorted(df_source['Size'].dropna().unique()) if not df.empty else []
@@ -2646,8 +2809,8 @@ def show_enhanced_calculations():
                     
             else:
                 if selected_standard in thread_files and selected_size != "No sizes available":
-                    df_thread = get_thread_data(selected_standard)
-                    if not df_thread.empty:
+                    df_thread = get_thread_data_enhanced(selected_standard)
+                    if not df_thread.empty and 'Thread' in df_thread.columns:
                         thread_row = df_thread[df_thread["Thread"] == selected_size]
                         if not thread_row.empty and "Pitch Diameter (Min)" in thread_row.columns:
                             pitch_val = thread_row["Pitch Diameter (Min)"].values[0]
@@ -2861,7 +3024,7 @@ def show_enhanced_home():
             ("DIN-7991 Data", st.session_state.din7991_loaded, "material-badge"),
             ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "grade-badge"),
             ("ME&CERT Data", not df_mechem.empty, "engineering-badge"),
-            ("Thread Data", any(not load_thread_data(url).empty for url in thread_files.values()), "technical-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "technical-badge"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -2904,9 +3067,10 @@ def show_help_system():
             - Searches dimensional databases only
             
             🔩 **Section B - Thread:**
+            - **FIXED:** Proper data loading from Excel files
+            - **FIXED:** Correct tolerance classes from actual data
+            - **FIXED:** Proper data type handling
             - Independent thread specifications
-            - Searches thread databases only
-            - No connection to dimensional data
             
             🧪 **Section C - Material:**
             - Independent material properties
