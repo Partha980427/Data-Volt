@@ -22,12 +22,12 @@ import math
 warnings.filterwarnings('ignore')
 
 # ======================================================
-# 🔹 Paths & Files - UPDATED WITH GOOGLE SHEETS LINKS
+# PATHS & FILES - UPDATED WITH GOOGLE SHEETS LINKS
 # ======================================================
 url = "https://docs.google.com/spreadsheets/d/11Icre8F3X8WA5BVwkJx75NOH3VzF6G7b/export?format=xlsx"
 local_excel_path = r"G:\My Drive\Streamlite\ASME B18.2.1 Hex Bolt and Heavy Hex Bolt.xlsx"
 
-# UPDATED: Mechanical and Chemical Properties paths
+# Mechanical and Chemical Properties paths
 me_chem_google_url = "https://docs.google.com/spreadsheets/d/12lBzI67Wb0yZyJKYxpDCLzHF9zvS2Fha/export?format=xlsx"
 me_chem_path = r"G:\My Drive\Streamlite\Mechanical and Chemical.xlsx"
 
@@ -39,7 +39,7 @@ iso4014_file_url = "https://docs.google.com/spreadsheets/d/1d2hANwoMhuzwyKJ72c12
 din7991_local_path = r"G:\My Drive\Streamlite\DIN-7991.xlsx"
 din7991_file_url = "https://docs.google.com/spreadsheets/d/1PjptIbFfebdF1h_Aj124fNgw5jNBWlvn/export?format=xlsx"
 
-# NEW: ASME B18.3 paths - local and Google Sheets
+# ASME B18.3 paths - local and Google Sheets
 asme_b18_3_local_path = r"G:\My Drive\Streamlite\ASME B18.3.xlsx"
 asme_b18_3_file_url = "https://docs.google.com/spreadsheets/d/1dPNGwf7bv5A77rMSPpl11dhcJTXQfob1/export?format=xlsx"
 
@@ -51,7 +51,7 @@ thread_files = {
 }
 
 # ======================================================
-# 🔹 Enhanced Configuration & Error Handling
+# ENHANCED CONFIGURATION & ERROR HANDLING
 # ======================================================
 @st.cache_data(ttl=3600, show_spinner=False)
 def safe_load_excel_file_enhanced(path_or_url, max_retries=3, timeout=30):
@@ -125,7 +125,7 @@ def load_config():
             },
             'ui': {
                 'theme': 'light',
-                'page_title': 'JSC Industries – Fastener Intelligence'
+                'page_title': 'JSC Industries - Fastener Intelligence'
             },
             'features': {
                 'ai_assistant': True,
@@ -177,16 +177,13 @@ def initialize_session_state():
         "section_b_view": True,
         "section_c_view": True,
         "thread_independent_mode": True,
-        # NEW: Independent section results
         "section_a_results": pd.DataFrame(),
         "section_b_results": pd.DataFrame(),
         "section_c_results": pd.DataFrame(),
         "combined_results": pd.DataFrame(),
-        # NEW: Independent section filters
         "section_a_filters": {},
         "section_b_filters": {},
         "section_c_filters": {},
-        # NEW: Current section selections
         "section_a_current_product": "All",
         "section_a_current_series": "All",
         "section_a_current_standard": "All",
@@ -196,12 +193,9 @@ def initialize_session_state():
         "section_b_current_class": "All",
         "section_c_current_class": "All",
         "section_c_current_standard": "All",
-        # NEW: Thread data cache
         "thread_data_cache": {},
-        # NEW: Professional card view
         "show_professional_card": False,
         "selected_product_details": None,
-        # NEW: Batch calculation results
         "batch_calculation_results": pd.DataFrame()
     }
     
@@ -213,7 +207,7 @@ def initialize_session_state():
     save_user_preferences()
 
 # ======================================================
-# 🔹 FIXED THREAD DATA LOADING - PROPER DATA TYPES
+# FIXED THREAD DATA LOADING - PROPER DATA TYPES
 # ======================================================
 @st.cache_data(ttl=3600)
 def load_thread_data_enhanced(standard_name):
@@ -233,9 +227,8 @@ def load_thread_data_enhanced(standard_name):
         
         # Debug: Show column info
         if st.session_state.debug_mode:
-            st.sidebar.write(f"📊 {standard_name} Columns:", df_thread.columns.tolist())
-            st.sidebar.write(f"📊 {standard_name} Shape:", df_thread.shape)
-            st.sidebar.write(f"📊 {standard_name} Sample:", df_thread.head(2) if not df_thread.empty else "Empty")
+            st.sidebar.write(f"Columns {standard_name}:", df_thread.columns.tolist())
+            st.sidebar.write(f"Shape {standard_name}:", df_thread.shape)
         
         # Handle different column naming patterns
         thread_col = None
@@ -308,11 +301,9 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     result_df = df_thread.copy()
     
     if thread_size and thread_size != "All" and "Thread" in result_df.columns:
-        # FIXED: Convert both to string for proper comparison
         result_df = result_df[result_df["Thread"].astype(str).str.strip() == str(thread_size).strip()]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
-        # FIXED: Normalize both strings for class comparison (strip whitespace, handle case)
         result_df = result_df[
             result_df["Class"].astype(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
@@ -367,10 +358,10 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# 🔹 Page Setup with Professional Engineering Styling
+# PAGE SETUP WITH PROFESSIONAL ENGINEERING STYLING
 # ======================================================
 st.set_page_config(
-    page_title="JSC Industries – Fastener Intelligence", 
+    page_title="JSC Industries - Fastener Intelligence", 
     layout="wide",
     page_icon="🔧",
     initial_sidebar_state="expanded"
@@ -821,7 +812,6 @@ st.markdown("""
         background: linear-gradient(135deg, #f8f0f8 0%, #ffffff 100%);
     }
     
-    /* NEW: Professional Product Card Styles */
     .professional-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 2px solid #3498db;
@@ -1037,7 +1027,7 @@ st.markdown("""
 initialize_session_state()
 
 # ======================================================
-# 🔹 ENHANCED DATA LOADING WITH PRODUCT MAPPING
+# ENHANCED DATA LOADING WITH PRODUCT MAPPING
 # ======================================================
 
 # Load main data
@@ -1046,29 +1036,29 @@ df = safe_load_excel_file_enhanced(url) if url else safe_load_excel_file_enhance
 # Load Mechanical and Chemical data
 df_mechem = safe_load_excel_file_enhanced(me_chem_google_url)
 if df_mechem.empty:
-    st.info("🔄 Online Mechanical & Chemical file not accessible, trying local version...")
+    st.info("Online Mechanical & Chemical file not accessible, trying local version...")
     df_mechem = safe_load_excel_file_enhanced(me_chem_path)
 
 # Load ISO 4014 data
 df_iso4014 = safe_load_excel_file_enhanced(iso4014_file_url)
 if df_iso4014.empty:
-    st.info("🔄 Online ISO 4014 file not accessible, trying local version...")
+    st.info("Online ISO 4014 file not accessible, trying local version...")
     df_iso4014 = safe_load_excel_file_enhanced(iso4014_local_path)
 
 # Load DIN-7991 data
 df_din7991 = safe_load_excel_file_enhanced(din7991_file_url)
 if df_din7991.empty:
-    st.info("🔄 Online DIN-7991 file not accessible, trying local version...")
+    st.info("Online DIN-7991 file not accessible, trying local version...")
     df_din7991 = safe_load_excel_file_enhanced(din7991_local_path)
 
 # Load ASME B18.3 data
 df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_file_url)
 if df_asme_b18_3.empty:
-    st.info("🔄 Online ASME B18.3 file not accessible, trying local version...")
+    st.info("Online ASME B18.3 file not accessible, trying local version...")
     df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_local_path)
 
 # ======================================================
-# 🔹 FIXED DATA PROCESSING - CORRECT PRODUCT NAMES
+# FIXED DATA PROCESSING - CORRECT PRODUCT NAMES
 # ======================================================
 
 def process_standard_data():
@@ -1193,7 +1183,7 @@ if not df_iso4014.empty:
         df_iso4014['Product Grade'] = df_iso4014[grade_col]
 
 # ======================================================
-# 🔹 ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING - COMPLETELY FIXED
+# ENHANCED MECHANICAL & CHEMICAL DATA PROCESSING - COMPLETELY FIXED
 # ======================================================
 def process_mechanical_chemical_data():
     """Process and extract ALL property classes from Mechanical & Chemical data - COMPLETELY FIXED"""
@@ -1240,9 +1230,8 @@ def process_mechanical_chemical_data():
         
         # Debug info
         if st.session_state.debug_mode:
-            st.sidebar.write(f"🔧 Found {len(property_classes)} property classes")
-            st.sidebar.write(f"🔧 Property class columns: {property_class_cols}")
-            st.sidebar.write(f"🔧 Sample classes: {property_classes[:10]}")
+            st.sidebar.write(f"Found {len(property_classes)} property classes")
+            st.sidebar.write(f"Property class columns: {property_class_cols}")
         
         return me_chem_columns, property_classes
         
@@ -1370,7 +1359,7 @@ def show_mechanical_chemical_details(property_class):
             st.info(f"No detailed data found for {property_class}")
             return
         
-        st.markdown(f"### 🧪 Detailed Properties for {property_class}")
+        st.markdown(f"### Detailed Properties for {property_class}")
         
         # Display the filtered data
         st.dataframe(
@@ -1380,7 +1369,7 @@ def show_mechanical_chemical_details(property_class):
         )
         
         # Show key properties in a structured way
-        st.markdown("#### 📊 Key Properties")
+        st.markdown("#### Key Properties")
         
         mechanical_props = []
         chemical_props = []
@@ -1421,7 +1410,7 @@ def show_mechanical_chemical_details(property_class):
 me_chem_columns, property_classes = process_mechanical_chemical_data()
 
 # ======================================================
-# 🔹 COMPLETELY BULLETPROOF SIZE HANDLING - FIXED VERSION
+# COMPLETELY BULLETPROOF SIZE HANDLING - FIXED VERSION
 # ======================================================
 def size_to_float(size_str):
     """Convert size string to float for sorting - ULTRA ROBUST VERSION"""
@@ -1508,7 +1497,7 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
-# 🔹 RECTIFIED WEIGHT CALCULATION FUNCTIONS
+# RECTIFIED WEIGHT CALCULATION FUNCTIONS
 # ======================================================
 
 def get_pitch_diameter_from_database(standard, thread_size, thread_class=None):
@@ -1706,7 +1695,7 @@ def convert_length_to_mm(length_val, unit):
         return 0
 
 # ======================================================
-# 🔹 ENHANCED BATCH PROCESSING WITH DATABASE CONNECTIONS
+# ENHANCED BATCH PROCESSING WITH DATABASE CONNECTIONS
 # ======================================================
 def process_batch_calculation_enhanced(batch_df):
     """Enhanced batch processing with database connections for weight calculation"""
@@ -1768,7 +1757,7 @@ def process_batch_calculation_enhanced(batch_df):
                 'Calculated_Weight_kg': weight_kg,
                 'Thread_Standard': thread_standard,
                 'Thread_Class': thread_class,
-                'Status': '✅ Success' if weight_kg > 0 else '❌ Failed'
+                'Status': 'Success' if weight_kg > 0 else 'Failed'
             }
             results.append(result_row)
             
@@ -1782,7 +1771,7 @@ def process_batch_calculation_enhanced(batch_df):
         return None
 
 # ======================================================
-# 🔹 ADVANCED AI ASSISTANT WITH SELF-LEARNING CAPABILITIES
+# ADVANCED AI ASSISTANT WITH SELF-LEARNING CAPABILITIES
 # ======================================================
 class AdvancedFastenerAI:
     def __init__(self, df, df_iso4014, df_mechem, thread_files, df_din7991=None, df_asme_b18_3=None):
@@ -2125,12 +2114,12 @@ class AdvancedFastenerAI:
         self.learning_memory[interaction_key]['last_used'] = datetime.now().isoformat()
 
 # ======================================================
-# 🔹 Enhanced Data Quality Indicators
+# Enhanced Data Quality Indicators
 # ======================================================
 def show_data_quality_indicators():
     """Show data quality and validation indicators"""
     st.sidebar.markdown("---")
-    with st.sidebar.expander("📊 Data Quality Status"):
+    with st.sidebar.expander("Data Quality Status"):
         if not df.empty:
             total_rows = len(df)
             missing_data = df.isnull().sum().sum()
@@ -2164,9 +2153,9 @@ def show_data_quality_indicators():
         for standard, url in thread_files.items():
             df_thread = load_thread_data_enhanced(standard)
             if not df_thread.empty:
-                thread_status.append(f"{standard}: ✅")
+                thread_status.append(f"{standard}: OK")
             else:
-                thread_status.append(f"{standard}: ❌")
+                thread_status.append(f"{standard}: Limited")
         
         st.markdown(f'<div class="data-quality-indicator quality-good">Thread Data: Available</div>', unsafe_allow_html=True)
         for status in thread_status:
@@ -2178,7 +2167,7 @@ def show_data_quality_indicators():
             st.markdown('<div class="data-quality-indicator quality-warning">AI Assistant: Basic Mode</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 MESSENGER-STYLE CHAT INTERFACE WITH ADVANCED AI
+# MESSENGER-STYLE CHAT INTERFACE WITH ADVANCED AI
 # ======================================================
 def add_message(role, content):
     """Add message to chat history"""
@@ -2207,7 +2196,7 @@ def show_chat_interface():
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            🤖 PiU - Advanced Fastener Intelligence
+            PiU - Advanced Fastener Intelligence
         </h1>
         <p style="margin:0;">Ask complex technical questions about materials, properties, and specifications</p>
         <div style="margin-top: 0.5rem;">
@@ -2220,11 +2209,11 @@ def show_chat_interface():
     """, unsafe_allow_html=True)
     
     if st.session_state.ai_model_loaded:
-        st.success("✅ Advanced AI Mode: Semantic search and technical reasoning enabled")
+        st.success("Advanced AI Mode: Semantic search and technical reasoning enabled")
     else:
-        st.warning("⚠️ Basic AI Mode: Install transformers, sentence-transformers, chromadb for full capabilities")
+        st.warning("Basic AI Mode: Install transformers, sentence-transformers, chromadb for full capabilities")
     
-    st.markdown("### 🔬 Technical Questions")
+    st.markdown("### Technical Questions")
     technical_questions = [
         "What is C% in Grade 5?",
         "Compare Grade 5 vs Grade 8 mechanical properties",
@@ -2241,7 +2230,7 @@ def show_chat_interface():
                 st.session_state.ai_thinking = True
                 st.rerun()
     
-    st.markdown("### 💬 Advanced AI Chat")
+    st.markdown("### Advanced AI Chat")
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
     for msg in st.session_state.chat_messages:
@@ -2259,7 +2248,7 @@ def show_chat_interface():
                 <div>{formatted_content}</div>
                 <div class="message-time">{msg['time']}</div>
             </div>
-            ""', unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
     
     if st.session_state.ai_thinking:
         show_typing_indicator()
@@ -2301,12 +2290,12 @@ def show_chat_interface():
             st.session_state.chat_messages = []
             st.rerun()
     with col2:
-        if st.button("🔄 Reload AI Models", use_container_width=True):
+        if st.button("Reload AI Models", use_container_width=True):
             st.session_state.ai_model_loaded = False
             st.rerun()
 
 # ======================================================
-# 🔹 Enhanced Export Functionality
+# Enhanced Export Functionality
 # ======================================================
 def export_to_excel(df, filename_prefix):
     """Export dataframe to Excel with formatting"""
@@ -2344,7 +2333,7 @@ def enhanced_export_data(filtered_df, export_format):
         if excel_file:
             with open(excel_file, 'rb') as f:
                 st.download_button(
-                    label="📥 Download Excel File",
+                    label="Download Excel File",
                     data=f,
                     file_name=f"fastener_data_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2354,7 +2343,7 @@ def enhanced_export_data(filtered_df, export_format):
     else:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            label="📥 Download CSV File",
+            label="Download CSV File",
             data=csv_data,
             file_name=f"fastener_data_{timestamp}.csv",
             mime="text/csv",
@@ -2363,7 +2352,7 @@ def enhanced_export_data(filtered_df, export_format):
         )
 
 # ======================================================
-# 🔹 Enhanced Calculation History
+# Enhanced Calculation History
 # ======================================================
 def save_calculation_history(calculation_data):
     """Save calculation to history"""
@@ -2379,7 +2368,7 @@ def save_calculation_history(calculation_data):
 def show_calculation_history():
     """Display calculation history"""
     if 'calculation_history' in st.session_state and st.session_state.calculation_history:
-        st.markdown("### 📝 Recent Calculations")
+        st.markdown("### Recent Calculations")
         for calc in reversed(st.session_state.calculation_history[-5:]):
             with st.container():
                 st.markdown(f"""
@@ -2392,7 +2381,7 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 NEW: PROFESSIONAL PRODUCT CARD DISPLAY
+# NEW: PROFESSIONAL PRODUCT CARD DISPLAY
 # ======================================================
 def show_professional_product_card(product_details):
     """Display a beautiful professional product specification card"""
@@ -2421,7 +2410,7 @@ def show_professional_product_card(product_details):
         <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
             <div class="spec-group">
-                <div class="spec-group-title">📐 Dimensional Specifications</div>
+                <div class="spec-group-title">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
                 <div class="spec-row">
@@ -2462,7 +2451,7 @@ def show_professional_product_card(product_details):
             
             <!-- Head Specifications Group -->
             <div class="spec-group">
-                <div class="spec-group-title">🔩 Head Specifications</div>
+                <div class="spec-group-title">Head Specifications</div>
                 
                 <!-- Head Height -->
                 <div class="spec-row">
@@ -2503,7 +2492,7 @@ def show_professional_product_card(product_details):
             
             <!-- Additional Specifications Group -->
             <div class="spec-group">
-                <div class="spec-group-title">⚙️ Additional Specifications</div>
+                <div class="spec-group-title">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
                 <div class="spec-row">
@@ -2537,9 +2526,9 @@ def show_professional_product_card(product_details):
         </div>
         
         <div class="card-actions">
-            <button class="action-button" onclick="window.print()">🖨️ Print Specification</button>
-            <button class="action-button secondary">📧 Email Specification</button>
-            <button class="action-button secondary">💾 Save as PDF</button>
+            <button class="action-button" onclick="window.print()">Print Specification</button>
+            <button class="action-button secondary">Email Specification</button>
+            <button class="action-button secondary">Save as PDF</button>
         </div>
     </div>
     """
@@ -2550,13 +2539,13 @@ def show_professional_product_card(product_details):
     # Add some action buttons below the card
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("🔄 View Raw Data", use_container_width=True):
+        if st.button("View Raw Data", use_container_width=True):
             st.dataframe(pd.DataFrame([product_details]))
     with col2:
-        if st.button("📊 Compare Products", use_container_width=True):
+        if st.button("Compare Products", use_container_width=True):
             st.info("Product comparison feature coming soon!")
     with col3:
-        if st.button("❌ Close Card", use_container_width=True):
+        if st.button("Close Card", use_container_width=True):
             st.session_state.show_professional_card = False
             st.rerun()
 
@@ -2594,7 +2583,7 @@ def extract_product_details(row):
     return details
 
 # ======================================================
-# 🔹 FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
+# FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
 # ======================================================
 
 def get_products_for_standard(standard):
@@ -2638,7 +2627,7 @@ def get_filtered_dataframe(product_type, standard):
     return pd.DataFrame()
 
 # ======================================================
-# 🔹 FIXED SECTION A FILTERING LOGIC
+# FIXED SECTION A FILTERING LOGIC
 # ======================================================
 def apply_section_a_filters():
     """Apply filters for Section A only - completely independent"""
@@ -2688,16 +2677,16 @@ def show_section_a_results():
         return
     
     st.markdown('<div class="section-results">', unsafe_allow_html=True)
-    st.markdown("### 📐 Section A Results - Dimensional Specifications")
+    st.markdown("### Section A Results - Dimensional Specifications")
     
     result_df = st.session_state.section_a_results
     
-    st.markdown(f"**🎯 Found {len(result_df)} matching products**")
+    st.markdown(f"**Found {len(result_df)} matching products**")
     
     # NEW: Professional Card View Toggle
     col1, col2 = st.columns([3, 1])
     with col2:
-        show_card_view = st.checkbox("🎨 Show Professional Card View", value=st.session_state.show_professional_card, key="card_view_toggle")
+        show_card_view = st.checkbox("Show Professional Card View", value=st.session_state.show_professional_card, key="card_view_toggle")
         st.session_state.show_professional_card = show_card_view
     
     # Show professional card if enabled and we have results
@@ -2722,13 +2711,13 @@ def show_section_a_results():
     with col1:
         export_format_a = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_a")
     with col2:
-        if st.button("📥 Export Section A Results", use_container_width=True, key="export_btn_a"):
+        if st.button("Export Section A Results", use_container_width=True, key="export_btn_a"):
             enhanced_export_data(result_df, export_format_a)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA TYPES
+# FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA TYPES
 # ======================================================
 def apply_section_b_filters():
     """Apply filters for Section B only - completely independent"""
@@ -2757,11 +2746,11 @@ def show_section_b_results():
         return
     
     st.markdown('<div class="section-results">', unsafe_allow_html=True)
-    st.markdown("### 🔩 Section B Results - Thread Specifications")
+    st.markdown("### Section B Results - Thread Specifications")
     
     result_df = st.session_state.section_b_results
     
-    st.markdown(f"**🎯 Found {len(result_df)} matching thread specifications**")
+    st.markdown(f"**Found {len(result_df)} matching thread specifications**")
     
     # Show data info for debugging
     if st.session_state.debug_mode:
@@ -2780,13 +2769,13 @@ def show_section_b_results():
     with col1:
         export_format_b = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_b")
     with col2:
-        if st.button("📥 Export Section B Results", use_container_width=True, key="export_btn_b"):
+        if st.button("Export Section B Results", use_container_width=True, key="export_btn_b"):
             enhanced_export_data(result_df, export_format_b)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 SECTION C - MATERIAL PROPERTIES - COMPLETELY FIXED VERSION
+# SECTION C - MATERIAL PROPERTIES - COMPLETELY FIXED VERSION
 # ======================================================
 def apply_section_c_filters():
     """Apply filters for Section C only - completely independent - COMPLETELY FIXED"""
@@ -2893,11 +2882,11 @@ def show_section_c_results():
         return
     
     st.markdown('<div class="section-results">', unsafe_allow_html=True)
-    st.markdown("### 🧪 Section C Results - Material Properties")
+    st.markdown("### Section C Results - Material Properties")
     
     result_df = st.session_state.section_c_results
     
-    st.markdown(f"**🎯 Found {len(result_df)} matching material properties**")
+    st.markdown(f"**Found {len(result_df)} matching material properties**")
     
     # Show debug info if enabled
     if st.session_state.debug_mode:
@@ -2919,13 +2908,13 @@ def show_section_c_results():
     with col1:
         export_format_c = st.selectbox("Export Format", ["Excel", "CSV"], key="export_section_c")
     with col2:
-        if st.button("📥 Export Section C Results", use_container_width=True, key="export_btn_c"):
+        if st.button("Export Section C Results", use_container_width=True, key="export_btn_c"):
             enhanced_export_data(result_df, export_format_c)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 COMBINE ALL SECTIONS RESULTS
+# COMBINE ALL SECTIONS RESULTS
 # ======================================================
 def combine_all_results():
     """Combine results from all sections for final display"""
@@ -2962,7 +2951,7 @@ def show_combined_results():
         return
     
     st.markdown('<div class="combined-results">', unsafe_allow_html=True)
-    st.markdown("### 🎯 Combined Results - All Sections")
+    st.markdown("### Combined Results - All Sections")
     
     combined_df = st.session_state.combined_results
     
@@ -2981,7 +2970,7 @@ def show_combined_results():
     with col4:
         st.metric("Section C", section_c_count)
     
-    st.markdown(f"**📊 Combined data from all sections: {len(combined_df)} total records**")
+    st.markdown(f"**Combined data from all sections: {len(combined_df)} total records**")
     
     st.dataframe(
         combined_df,
@@ -2990,18 +2979,18 @@ def show_combined_results():
     )
     
     # Export combined results
-    st.markdown("### 📤 Export Combined Results")
+    st.markdown("### Export Combined Results")
     col1, col2 = st.columns(2)
     with col1:
         export_format_combined = st.selectbox("Export Format", ["Excel", "CSV"], key="export_combined")
     with col2:
-        if st.button("📥 Export All Results", use_container_width=True, type="primary", key="export_all_btn"):
+        if st.button("Export All Results", use_container_width=True, type="primary", key="export_all_btn"):
             enhanced_export_data(combined_df, export_format_combined)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# 🔹 FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
+# FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
 # ======================================================
 def get_available_standards_for_product_series(product, series):
     """Get available standards based on selected product and series"""
@@ -3044,7 +3033,7 @@ def get_available_sizes_for_standard_product(standard, product):
     return size_options
 
 # ======================================================
-# 🔹 FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA HANDLING
+# FIXED SECTION B - THREAD SPECIFICATIONS WITH PROPER DATA HANDLING
 # ======================================================
 def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
@@ -3052,7 +3041,7 @@ def show_enhanced_product_database():
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            🎯 Product Intelligence Center - Independent Sections
+            Product Intelligence Center - Independent Sections
         </h1>
         <p style="margin:0; opacity: 0.9;">Each section works completely independently - No dependencies</p>
         <div style="margin-top: 1rem;">
@@ -3065,23 +3054,23 @@ def show_enhanced_product_database():
     """, unsafe_allow_html=True)
     
     if df.empty and df_mechem.empty and df_iso4014.empty and not st.session_state.din7991_loaded and not st.session_state.asme_b18_3_loaded:
-        st.error("🚫 No data sources available. Please check your data connections.")
+        st.error("No data sources available. Please check your data connections.")
         return
     
     # Section toggles
-    st.markdown("### 🔧 Section Controls")
+    st.markdown("### Section Controls")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        section_a_active = st.checkbox("📐 Section A - Dimensional Specifications", value=st.session_state.section_a_view, key="section_a_toggle")
+        section_a_active = st.checkbox("Section A - Dimensional Specifications", value=st.session_state.section_a_view, key="section_a_toggle")
         st.session_state.section_a_view = section_a_active
     
     with col2:
-        section_b_active = st.checkbox("🔩 Section B - Thread Specifications", value=st.session_state.section_b_view, key="section_b_toggle")
+        section_b_active = st.checkbox("Section B - Thread Specifications", value=st.session_state.section_b_view, key="section_b_toggle")
         st.session_state.section_b_view = section_b_active
     
     with col3:
-        section_c_active = st.checkbox("🧪 Section C - Material Properties", value=st.session_state.section_c_view, key="section_c_toggle")
+        section_c_active = st.checkbox("Section C - Material Properties", value=st.session_state.section_c_view, key="section_c_toggle")
         st.session_state.section_c_view = section_c_active
     
     st.markdown("---")
@@ -3090,8 +3079,8 @@ def show_enhanced_product_database():
     if st.session_state.section_a_view:
         st.markdown("""
         <div class="independent-section">
-            <h3 class="filter-header">📐 Section A - Dimensional Specifications</h3>
-            <p><strong>Relationship:</strong> Product → Series → Standards → Size</p>
+            <h3 class="filter-header">Section A - Dimensional Specifications</h3>
+            <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size</p>
         """, unsafe_allow_html=True)
         
         col1, col2, col3, col4 = st.columns(4)
@@ -3170,7 +3159,7 @@ def show_enhanced_product_database():
         # Apply Section A Filters Button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 APPLY SECTION A FILTERS", use_container_width=True, type="primary", key="apply_section_a"):
+            if st.button("APPLY SECTION A FILTERS", use_container_width=True, type="primary", key="apply_section_a"):
                 st.session_state.section_a_filters = {
                     'product': dimensional_product,
                     'series': dimensional_series,
@@ -3190,7 +3179,7 @@ def show_enhanced_product_database():
     if st.session_state.section_b_view:
         st.markdown("""
         <div class="independent-section">
-            <h3 class="filter-header">🔩 Section B - Thread Specifications</h3>
+            <h3 class="filter-header">Section B - Thread Specifications</h3>
             <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
         """, unsafe_allow_html=True)
         
@@ -3280,7 +3269,7 @@ def show_enhanced_product_database():
         # Apply Section B Filters Button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 APPLY SECTION B FILTERS", use_container_width=True, type="primary", key="apply_section_b"):
+            if st.button("APPLY SECTION B FILTERS", use_container_width=True, type="primary", key="apply_section_b"):
                 st.session_state.section_b_filters = {
                     'standard': thread_standard,
                     'size': thread_size,
@@ -3299,7 +3288,7 @@ def show_enhanced_product_database():
     if st.session_state.section_c_view:
         st.markdown("""
         <div class="independent-section">
-            <h3 class="filter-header">🧪 Section C - Material Properties</h3>
+            <h3 class="filter-header">Section C - Material Properties</h3>
             <p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>
         """, unsafe_allow_html=True)
         
@@ -3370,7 +3359,7 @@ def show_enhanced_product_database():
         # Apply Section C Filters Button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 APPLY SECTION C FILTERS", use_container_width=True, type="primary", key="apply_section_c"):
+            if st.button("APPLY SECTION C FILTERS", use_container_width=True, type="primary", key="apply_section_c"):
                 if property_class == "All" or property_class == "No data available":
                     st.warning("Please select a valid property class")
                 else:
@@ -3396,11 +3385,11 @@ def show_enhanced_product_database():
     
     # COMBINE ALL RESULTS SECTION
     st.markdown("---")
-    st.markdown("### 🔗 Combine All Sections")
+    st.markdown("### Combine All Sections")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🔄 COMBINE ALL SECTION RESULTS", use_container_width=True, type="secondary", key="combine_all"):
+        if st.button("COMBINE ALL SECTION RESULTS", use_container_width=True, type="secondary", key="combine_all"):
             st.session_state.combined_results = combine_all_results()
             st.rerun()
     
@@ -3409,12 +3398,12 @@ def show_enhanced_product_database():
     
     # Quick actions
     st.markdown("---")
-    st.markdown("### ⚡ Quick Actions")
+    st.markdown("### Quick Actions")
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     
     with quick_col1:
-        if st.button("🔄 Clear All Filters", use_container_width=True, key="clear_all"):
+        if st.button("Clear All Filters", use_container_width=True, key="clear_all"):
             st.session_state.section_a_filters = {}
             st.session_state.section_b_filters = {}
             st.session_state.section_c_filters = {}
@@ -3436,7 +3425,7 @@ def show_enhanced_product_database():
             st.rerun()
     
     with quick_col2:
-        if st.button("📊 View All Data", use_container_width=True, key="view_all"):
+        if st.button("View All Data", use_container_width=True, key="view_all"):
             # Show all available data
             st.session_state.section_a_results = df.copy()
             # Load thread data for ASME B1.1
@@ -3446,7 +3435,7 @@ def show_enhanced_product_database():
             st.rerun()
     
     with quick_col3:
-        if st.button("💾 Export Everything", use_container_width=True, key="export_all"):
+        if st.button("Export Everything", use_container_width=True, key="export_all"):
             # Combine current results and export
             combined = combine_all_results()
             if not combined.empty:
@@ -3455,20 +3444,20 @@ def show_enhanced_product_database():
                 st.warning("No data to export")
     
     with quick_col4:
-        if st.button("📋 Reset Sections", use_container_width=True, key="reset_sections"):
+        if st.button("Reset Sections", use_container_width=True, key="reset_sections"):
             st.session_state.section_a_view = True
             st.session_state.section_b_view = True
             st.session_state.section_c_view = True
             st.rerun()
 
 # ======================================================
-# 🔹 ENHANCED CALCULATIONS SECTION WITH RECTIFIED WEIGHT CALCULATIONS
+# ENHANCED CALCULATIONS SECTION WITH RECTIFIED WEIGHT CALCULATIONS
 # ======================================================
 def show_enhanced_calculations():
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            🧮 Engineering Calculator Suite - RECTIFIED
+            Engineering Calculator Suite - RECTIFIED
         </h1>
         <p style="margin:0; opacity: 0.9;">Advanced weight calculations with proper database connections</p>
         <div style="margin-top: 0.5rem;">
@@ -3480,7 +3469,7 @@ def show_enhanced_calculations():
     </div>
     """, unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["🚀 Single Calculator", "📊 Batch Processor", "📈 Analytics"])
+    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
     with tab1:
         st.markdown("### Single Item Weight Calculator - RECTIFIED")
@@ -3537,7 +3526,7 @@ def show_enhanced_calculations():
         st.markdown("---")
         
         # Manual diameter input section
-        st.markdown("### 📏 Diameter Input")
+        st.markdown("### Diameter Input")
         col1, col2 = st.columns(2)
         
         with col1:
@@ -3552,18 +3541,18 @@ def show_enhanced_calculations():
         
         with col2:
             # Show database connection status
-            st.markdown("### 🔗 Database Connection")
+            st.markdown("### Database Connection")
             if diameter_type == "Pitch Diameter" and selected_standard in thread_files and selected_size != "No sizes available":
                 pitch_dia = get_pitch_diameter_from_database(selected_standard, selected_size, selected_class)
                 if pitch_dia:
-                    st.success(f"✅ Pitch Diameter (Min) from database: {pitch_dia:.3f} mm")
+                    st.success(f"Pitch Diameter (Min) from database: {pitch_dia:.3f} mm")
                     st.info(f"Source: {selected_standard} - {selected_size}" + (f" - Class {selected_class}" if selected_class else ""))
                 else:
-                    st.warning("⚠️ Pitch diameter not found in database. Using manual input.")
+                    st.warning("Pitch diameter not found in database. Using manual input.")
             else:
-                st.info("ℹ️ Body diameter mode selected or no database connection available")
+                st.info("Body diameter mode selected or no database connection available")
         
-        if st.button("🚀 Calculate Weight", use_container_width=True, key="calculate_weight"):
+        if st.button("Calculate Weight", use_container_width=True, key="calculate_weight"):
             diameter_mm = 0
             
             if diameter_type == "Body Diameter":
@@ -3602,7 +3591,7 @@ def show_enhanced_calculations():
                 )
                 
                 if weight_kg > 0:
-                    st.success(f"✅ **Calculation Result:**")
+                    st.success(f"**Calculation Result:**")
                     st.metric("Estimated Weight", f"{weight_kg} Kg", "Carbon Steel Density")
                     
                     st.info(f"""
@@ -3628,18 +3617,18 @@ def show_enhanced_calculations():
                     }
                     save_calculation_history(calculation_data)
                 else:
-                    st.error("❌ Failed to calculate weight. Please check inputs.")
+                    st.error("Failed to calculate weight. Please check inputs.")
             else:
-                st.error("❌ Please provide valid diameter information.")
+                st.error("Please provide valid diameter information.")
         
         show_calculation_history()
     
     with tab2:
         st.markdown("### Batch Weight Processor - ENHANCED")
-        st.info("📁 Upload a CSV/Excel file with columns: Product, Size, Length, Diameter_Type, Thread_Standard, Thread_Class")
+        st.info("Upload a CSV/Excel file with columns: Product, Size, Length, Diameter_Type, Thread_Standard, Thread_Class")
         
         # Download template
-        st.markdown("### 📋 Download Batch Template")
+        st.markdown("### Download Batch Template")
         template_data = {
             'Product': ['Hex Bolt', 'Threaded Rod', 'Hex Cap Screws'],
             'Size': ['1/4', 'M6', '3/8'],
@@ -3655,7 +3644,7 @@ def show_enhanced_calculations():
         template_df = pd.DataFrame(template_data)
         csv_template = template_df.to_csv(index=False)
         st.download_button(
-            label="📥 Download Batch Template (CSV)",
+            label="Download Batch Template (CSV)",
             data=csv_template,
             file_name="batch_weight_template.csv",
             mime="text/csv",
@@ -3685,12 +3674,12 @@ def show_enhanced_calculations():
                             results_df = process_batch_calculation_enhanced(batch_df)
                             if results_df is not None:
                                 st.session_state.batch_calculation_results = results_df
-                                st.success(f"✅ Processed {len(results_df)} records successfully!")
+                                st.success(f"Processed {len(results_df)} records successfully!")
                                 st.dataframe(results_df)
                                 
                                 # Show summary
-                                success_count = len(results_df[results_df['Status'] == '✅ Success'])
-                                failed_count = len(results_df[results_df['Status'] == '❌ Failed'])
+                                success_count = len(results_df[results_df['Status'] == 'Success'])
+                                failed_count = len(results_df[results_df['Status'] == 'Failed'])
                                 
                                 col1, col2 = st.columns(2)
                                 with col1:
@@ -3703,18 +3692,18 @@ def show_enhanced_calculations():
         
         # Show batch results if available
         if not st.session_state.batch_calculation_results.empty:
-            st.markdown("### 📤 Export Batch Results")
+            st.markdown("### Export Batch Results")
             export_col1, export_col2 = st.columns(2)
             with export_col1:
                 batch_export_format = st.selectbox("Export Format", ["CSV", "Excel"], key="batch_export")
             with export_col2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("📥 Download Batch Results", use_container_width=True, key="download_batch"):
+                if st.button("Download Batch Results", use_container_width=True, key="download_batch"):
                     enhanced_export_data(st.session_state.batch_calculation_results, batch_export_format)
     
     with tab3:
         st.markdown("### Calculation Analytics")
-        st.info("📈 Visual insights and calculation history")
+        st.info("Visual insights and calculation history")
         
         if 'calculation_history' in st.session_state and st.session_state.calculation_history:
             history_df = pd.DataFrame(st.session_state.calculation_history)
@@ -3741,20 +3730,20 @@ def show_enhanced_calculations():
                         st.plotly_chart(fig_products, use_container_width=True)
             
             # Show recent calculations table
-            st.markdown("### 📝 Recent Calculation Details")
+            st.markdown("### Recent Calculation Details")
             st.dataframe(history_df.tail(10), use_container_width=True)
         else:
             st.info("No calculation history available. Perform some calculations to see analytics here.")
 
 # ======================================================
-# 🔹 ENHANCED HOME DASHBOARD
+# ENHANCED HOME DASHBOARD
 # ======================================================
 def show_enhanced_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
     <div class="engineering-header">
-        <h1 style="margin:0; font-size: 2.5rem;">🔧 JSC Industries</h1>
+        <h1 style="margin:0; font-size: 2.5rem;">JSC Industries</h1>
         <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED</p>
         <div style="margin-top: 1rem;">
             <span class="engineering-badge">RECTIFIED Formulas</span>
@@ -3775,7 +3764,7 @@ def show_enhanced_home():
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">📊 Products</h3>
+            <h3 style="color: #3498db; margin:0;">Products</h3>
             <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_products}</h2>
             <p style="color: #7f8c8d; margin:0;">Total Records</p>
         </div>
@@ -3784,7 +3773,7 @@ def show_enhanced_home():
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">🌍 Dimensional Standards</h3>
+            <h3 style="color: #3498db; margin:0;">Dimensional Standards</h3>
             <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_dimensional_standards}</h2>
             <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
@@ -3793,7 +3782,7 @@ def show_enhanced_home():
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">⚡ Thread Types</h3>
+            <h3 style="color: #3498db; margin:0;">Thread Types</h3>
             <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_threads}</h2>
             <p style="color: #7f8c8d; margin:0;">Available</p>
         </div>
@@ -3802,39 +3791,39 @@ def show_enhanced_home():
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">🔬 ME&CERT</h3>
+            <h3 style="color: #3498db; margin:0;">ME&CERT</h3>
             <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_mecert}</h2>
             <p style="color: #7f8c8d; margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown('<h2 class="section-header">🚀 Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
     
     cols = st.columns(3)
     actions = [
-        ("📦 Product Database", "Professional product discovery with engineering filters", "database"),
-        ("🧮 Engineering Calculator", "RECTIFIED weight calculations with database connections", "calculator"),
-        ("📊 Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
-        ("🔧 Compare Products", "Side-by-side technical comparison", "compare"),
-        ("🤖 AI Assistant", "Technical queries and material analysis", "ai"),
-        ("📋 Export Reports", "Generate professional engineering reports", "export")
+        ("Product Database", "Professional product discovery with engineering filters", "database"),
+        ("Engineering Calculator", "RECTIFIED weight calculations with database connections", "calculator"),
+        ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
+        ("Compare Products", "Side-by-side technical comparison", "compare"),
+        ("AI Assistant", "Technical queries and material analysis", "ai"),
+        ("Export Reports", "Generate professional engineering reports", "export")
     ]
     
     for idx, (title, description, key) in enumerate(actions):
         with cols[idx % 3]:
             if st.button(f"**{title}**\n\n{description}", key=f"home_{key}"):
                 section_map = {
-                    "database": "📦 Product Database",
-                    "calculator": "🧮 Calculations", 
-                    "ai": "🤖 PiU (AI Assistant)"
+                    "database": "Product Database",
+                    "calculator": "Calculations", 
+                    "ai": "PiU (AI Assistant)"
                 }
-                st.session_state.selected_section = section_map.get(key, "📦 Product Database")
+                st.session_state.selected_section = section_map.get(key, "Product Database")
                 st.rerun()
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<h3 class="section-header">📈 System Status - RECTIFIED</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">System Status - RECTIFIED</h3>', unsafe_allow_html=True)
         
         status_items = [
             ("ASME B18.2.1 Data", not df.empty, "engineering-badge"),
@@ -3849,24 +3838,24 @@ def show_enhanced_home():
         
         for item_name, status, badge_class in status_items:
             if status:
-                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">✅ {item_name} - Active</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">⚠️ {item_name} - Limited</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<h3 class="section-header">🕒 RECTIFIED Features</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "🎯 Professional dimensional analysis",
-            "🧪 Material science and chemistry", 
-            "🔧 Grade specifications and standards",
-            "📊 Technical data visualization",
-            "🤖 AI-powered technical assistance",
-            "📋 Professional reporting",
-            "⚖️ RECTIFIED weight calculations",
-            "🔗 Database-connected pitch diameter",
-            "📐 Proper geometric formulas",
-            "⚙️ Carbon steel density (7.85 g/cm³)"
+            "Professional dimensional analysis",
+            "Material science and chemistry", 
+            "Grade specifications and standards",
+            "Technical data visualization",
+            "AI-powered technical assistance",
+            "Professional reporting",
+            "RECTIFIED weight calculations",
+            "Database-connected pitch diameter",
+            "Proper geometric formulas",
+            "Carbon steel density (7.85 g/cm³)"
         ]
         
         for feature in features:
@@ -3875,15 +3864,15 @@ def show_enhanced_home():
     show_calculation_history()
 
 # ======================================================
-# 🔹 HELP SYSTEM
+# HELP SYSTEM
 # ======================================================
 def show_help_system():
     """Show contextual help system"""
     with st.sidebar:
         st.markdown("---")
-        with st.expander("ℹ️ RECTIFIED Weight Calculation Guide"):
+        with st.expander("RECTIFIED Weight Calculation Guide"):
             st.markdown("""
-            **🎯 RECTIFIED WEIGHT CALCULATIONS:**
+            **RECTIFIED WEIGHT CALCULATIONS:**
             
             **Database Connections:**
             - Pitch Diameter automatically fetched from thread databases
@@ -3904,25 +3893,25 @@ def show_help_system():
             """)
 
 # ======================================================
-# 🔹 SECTION DISPATCHER
+# SECTION DISPATCHER
 # ======================================================
 def show_section(title):
-    if title == "📦 Product Database":
+    if title == "Product Database":
         show_enhanced_product_database()
-    elif title == "🧮 Calculations":
+    elif title == "Calculations":
         show_enhanced_calculations()
-    elif title == "🤖 PiU (AI Assistant)":
+    elif title == "PiU (AI Assistant)":
         show_chat_interface()
     else:
-        st.info(f"⚠️ Section {title} is coming soon!")
+        st.info(f"Section {title} is coming soon!")
     
     st.markdown("---")
-    if st.button("🏠 Back to Dashboard", use_container_width=True):
+    if st.button("Back to Dashboard", use_container_width=True):
         st.session_state.selected_section = None
         st.rerun()
 
 # ======================================================
-# 🔹 MAIN APPLICATION
+# MAIN APPLICATION
 # ======================================================
 def main():
     """Main application entry point"""
@@ -3933,18 +3922,18 @@ def main():
     
     # Sidebar navigation
     with st.sidebar:
-        st.markdown("## 🧭 Navigation")
+        st.markdown("## Navigation")
         
         sections = [
-            "🏠 Home Dashboard",
-            "📦 Product Database", 
-            "🧮 Calculations",
-            "🤖 PiU (AI Assistant)"
+            "Home Dashboard",
+            "Product Database", 
+            "Calculations",
+            "PiU (AI Assistant)"
         ]
         
         for section in sections:
             if st.button(section, use_container_width=True, key=f"nav_{section}"):
-                if section == "🏠 Home Dashboard":
+                if section == "Home Dashboard":
                     st.session_state.selected_section = None
                 else:
                     st.session_state.selected_section = section
@@ -3952,7 +3941,7 @@ def main():
         
         # Debug mode toggle
         st.markdown("---")
-        st.session_state.debug_mode = st.checkbox("🔧 Debug Mode", value=st.session_state.debug_mode)
+        st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
     
     if st.session_state.selected_section is None:
         show_enhanced_home()
