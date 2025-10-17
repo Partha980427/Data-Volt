@@ -3451,20 +3451,83 @@ def show_enhanced_product_database():
             st.rerun()
 
 # ======================================================
-# ENHANCED CALCULATIONS SECTION WITH RECTIFIED WEIGHT CALCULATIONS
+# UPDATED SINGLE ITEM WEIGHT CALCULATOR
 # ======================================================
+def get_dimensional_standards_for_product_series(product, series):
+    """Get dimensional standards based on product and series"""
+    if product.lower() in ["threaded rod", "stud"]:
+        return ["Not Required"]
+    
+    standards = ["All"]
+    
+    if series == "Inch":
+        if product.lower() in ["hex bolt", "heavy hex bolt", "hex cap screws", "heavy hex screws"]:
+            standards.extend(["ASME B18.2.1"])
+        elif "socket" in product.lower():
+            standards.extend(["ASME B18.3"])
+    elif series == "Metric":
+        if product.lower() in ["hex bolt"]:
+            standards.extend(["ISO 4014"])
+        elif "socket" in product.lower():
+            standards.extend(["DIN-7991"])
+    
+    return standards
+
+def get_thread_standards_for_series(series):
+    """Get thread standards based on series"""
+    if series == "Inch":
+        return ["ASME B1.1"]
+    elif series == "Metric":
+        return ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
+    return []
+
+def get_size_options_for_product_standard(product, standard, series):
+    """Get size options based on product, standard and series"""
+    if product.lower() in ["threaded rod", "stud"]:
+        # For threaded rod and stud, get sizes from thread standards
+        thread_standards = get_thread_standards_for_series(series)
+        all_sizes = set()
+        for thread_std in thread_standards:
+            sizes = get_thread_sizes_enhanced(thread_std)
+            all_sizes.update(sizes)
+        return ["All"] + sorted([s for s in all_sizes if s != "All"])
+    
+    # For other products, get from dimensional standards
+    if standard == "ASME B18.2.1" and not df.empty:
+        temp_df = df.copy()
+        if product != "All" and 'Product' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product'] == product]
+        return get_safe_size_options(temp_df)
+    elif standard == "ISO 4014" and not df_iso4014.empty:
+        temp_df = df_iso4014.copy()
+        if product != "All" and 'Product' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product'] == product]
+        return get_safe_size_options(temp_df)
+    elif standard == "DIN-7991" and st.session_state.din7991_loaded:
+        temp_df = df_din7991.copy()
+        if product != "All" and 'Product' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product'] == product]
+        return get_safe_size_options(temp_df)
+    elif standard == "ASME B18.3" and st.session_state.asme_b18_3_loaded:
+        temp_df = df_asme_b18_3.copy()
+        if product != "All" and 'Product' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product'] == product]
+        return get_safe_size_options(temp_df)
+    
+    return ["All"]
+
 def show_enhanced_calculations():
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            Engineering Calculator Suite - RECTIFIED
+            Engineering Calculator Suite - UPDATED
         </h1>
-        <p style="margin:0; opacity: 0.9;">Advanced weight calculations with proper database connections</p>
+        <p style="margin:0; opacity: 0.9;">Single Item Weight Calculator with enhanced workflow</p>
         <div style="margin-top: 0.5rem;">
-            <span class="engineering-badge">Database Connected</span>
-            <span class="technical-badge">Rectified Formulas</span>
-            <span class="material-badge">Carbon Steel Density</span>
-            <span class="grade-badge">Pitch Diameter Auto-fetch</span>
+            <span class="engineering-badge">Product-Based Workflow</span>
+            <span class="technical-badge">Dynamic Standards</span>
+            <span class="material-badge">Flexible Diameter Input</span>
+            <span class="grade-badge">Auto Size Selection</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3472,155 +3535,177 @@ def show_enhanced_calculations():
     tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
     with tab1:
-        st.markdown("### Single Item Weight Calculator - RECTIFIED")
+        st.markdown("### Single Item Weight Calculator - UPDATED")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            series = st.selectbox("Measurement System", ["Inch", "Metric"], key="calc_series")
+        # Main input form
+        with st.form("weight_calculator_form"):
+            col1, col2 = st.columns(2)
             
-            if series == "Inch":
-                product_options = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws", "Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Washer"]
-                standard_options = ["ASME B1.1", "ASME B18.2.1", "ASME B18.3"]
-                thread_class_options = ["1A", "2A", "3A"]
-            else:
-                product_options = ["Hex Bolt", "Hexagon Socket Countersunk Head Cap Screw", "Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Nut", "Washer"]
-                standard_options = ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine", "ISO 4014", "DIN-7991"]
-                thread_class_options = ["6g", "6H"]  # Removed tolerance class for metric as requested
-            
-            selected_product = st.selectbox("Product Type", product_options)
-            selected_standard = st.selectbox("Applicable Standard", standard_options)
-            
-            diameter_type = st.radio("Diameter Type", ["Body Diameter", "Pitch Diameter"], 
-                                   help="Select whether to use body diameter or pitch diameter for calculation")
-            
-            # Thread class selection - only for Inch series
-            if series == "Inch":
-                selected_class = st.selectbox("Thread Class", thread_class_options, key="thread_class_single")
-            else:
-                selected_class = None
-        
-        with col2:
-            size_options = []
-            if selected_standard == "ISO 4014":
-                df_source = df_iso4014
-                size_options = sorted(df_source['Size'].dropna().unique()) if not df_iso4014.empty else []
-            elif selected_standard == "DIN-7991":
-                df_source = df_din7991
-                size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.din7991_loaded else []
-            elif selected_standard == "ASME B18.3":
-                df_source = df_asme_b18_3
-                size_options = sorted(df_source['Size'].dropna().unique()) if st.session_state.asme_b18_3_loaded else []
-            elif selected_standard in thread_files:
-                df_thread = get_thread_data_enhanced(selected_standard)
-                size_options = sorted(df_thread['Thread'].dropna().unique()) if not df_thread.empty and 'Thread' in df_thread.columns else []
-            elif selected_standard == "ASME B18.2.1":
-                df_source = df
-                size_options = sorted(df_source['Size'].dropna().unique()) if not df.empty else []
-            
-            selected_size = st.selectbox("Size Specification", size_options) if size_options else st.selectbox("Size Specification", ["No sizes available"])
-            
-            length_val = st.number_input("Length Value", min_value=0.1, value=10.0, step=0.1)
-            length_unit = st.selectbox("Length Unit", ["mm", "inch", "meter", "ft"])
-
-        st.markdown("---")
-        
-        # Manual diameter input section
-        st.markdown("### Diameter Input")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if diameter_type == "Body Diameter":
-                body_dia = st.number_input("Enter Body Diameter", min_value=0.1, step=0.1, value=5.0, key="manual_dia")
-                body_dia_unit = st.selectbox("Body Diameter Unit", ["mm", "inch"], key="body_diameter_unit")
-            else:
-                # For pitch diameter, we'll try to fetch from database first
-                st.info("Pitch Diameter will be fetched from database automatically")
-                manual_pitch_dia = st.number_input("Manual Pitch Diameter (if not in database)", min_value=0.1, step=0.1, value=4.5, key="manual_pitch_dia")
-                pitch_dia_unit = st.selectbox("Pitch Diameter Unit", ["mm", "inch"], key="pitch_diameter_unit")
-        
-        with col2:
-            # Show database connection status
-            st.markdown("### Database Connection")
-            if diameter_type == "Pitch Diameter" and selected_standard in thread_files and selected_size != "No sizes available":
-                pitch_dia = get_pitch_diameter_from_database(selected_standard, selected_size, selected_class)
-                if pitch_dia:
-                    st.success(f"Pitch Diameter (Min) from database: {pitch_dia:.3f} mm")
-                    st.info(f"Source: {selected_standard} - {selected_size}" + (f" - Class {selected_class}" if selected_class else ""))
+            with col1:
+                # 1. Product Type
+                product_options = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws", 
+                                 "Hexagon Socket Head Cap Screws", "Threaded Rod", "Stud", "Washer", "Nut"]
+                selected_product = st.selectbox("Product Type", product_options, key="calc_product")
+                
+                # 2. Series
+                series_options = ["Inch", "Metric"]
+                selected_series = st.selectbox("Series", series_options, key="calc_series")
+                
+                # 3. Dimensional Standards (Not required for Threaded Rod and Stud)
+                dimensional_standards = get_dimensional_standards_for_product_series(selected_product, selected_series)
+                selected_dimensional_standard = st.selectbox(
+                    "Dimensional Standards", 
+                    dimensional_standards, 
+                    key="calc_dimensional_standard",
+                    help="Not required for Threaded Rod and Stud"
+                )
+                
+            with col2:
+                # 4. Size Specification
+                size_options = get_size_options_for_product_standard(selected_product, selected_dimensional_standard, selected_series)
+                selected_size = st.selectbox("Size Specification", size_options, key="calc_size")
+                
+                # 5. Diameter Type
+                diameter_type = st.radio("Diameter Type", ["Body Diameter", "Pitch Diameter"], key="calc_diameter_type")
+                
+                # 6. Thread Standards (only show if Pitch Diameter selected)
+                if diameter_type == "Pitch Diameter":
+                    thread_standards = get_thread_standards_for_series(selected_series)
+                    selected_thread_standard = st.selectbox("Thread Standard", thread_standards, key="calc_thread_standard")
                 else:
-                    st.warning("Pitch diameter not found in database. Using manual input.")
+                    selected_thread_standard = None
+                
+                # 7. Length Input
+                length_col1, length_col2 = st.columns([2, 1])
+                with length_col1:
+                    length_value = st.number_input("Length", min_value=0.1, value=10.0, step=0.1, key="calc_length")
+                with length_col2:
+                    length_unit = st.selectbox("Unit", ["mm", "inch", "meter", "ft"], key="calc_length_unit")
+            
+            # Diameter Input Section (conditional)
+            st.markdown("### Diameter Input")
+            if diameter_type == "Body Diameter":
+                dia_col1, dia_col2 = st.columns([2, 1])
+                with dia_col1:
+                    body_diameter = st.number_input("Body Diameter Value", min_value=0.1, value=5.0, step=0.1, key="calc_body_dia")
+                with dia_col2:
+                    body_dia_unit = st.selectbox("Body Diameter Unit", ["mm", "inch"], key="calc_body_dia_unit")
             else:
-                st.info("Body diameter mode selected or no database connection available")
+                # For Pitch Diameter, show database info
+                st.info("Pitch Diameter will be automatically fetched from the selected thread standard database")
+                # Optional manual override
+                with st.expander("Manual Pitch Diameter Input (Optional)"):
+                    manual_col1, manual_col2 = st.columns([2, 1])
+                    with manual_col1:
+                        manual_pitch_dia = st.number_input("Manual Pitch Diameter", min_value=0.1, value=4.5, step=0.1, key="calc_manual_pitch")
+                    with manual_col2:
+                        manual_pitch_unit = st.selectbox("Manual Pitch Unit", ["mm", "inch"], key="calc_manual_pitch_unit")
+            
+            # Calculate button
+            calculate_btn = st.form_submit_button("Calculate Weight", use_container_width=True)
         
-        if st.button("Calculate Weight", use_container_width=True, key="calculate_weight"):
+        # Calculation logic
+        if calculate_btn:
+            # Validate inputs
+            if selected_product.lower() not in ["threaded rod", "stud"] and selected_dimensional_standard == "Not Required":
+                st.error("Please select a dimensional standard for this product type")
+                return
+            
+            if selected_size == "All":
+                st.error("Please select a specific size")
+                return
+            
+            # Convert length to mm
+            length_mm = convert_length_to_mm(length_value, length_unit)
+            
+            # Determine diameter
             diameter_mm = 0
+            diameter_source = ""
             
             if diameter_type == "Body Diameter":
-                diameter_mm = body_dia * 25.4 if body_dia_unit == "inch" else body_dia
+                diameter_mm = body_diameter * 25.4 if body_dia_unit == "inch" else body_diameter
                 diameter_source = f"Manual Body Diameter: {diameter_mm:.2f} mm"
             else:
-                # Try to get pitch diameter from database first
-                pitch_dia = get_pitch_diameter_from_database(selected_standard, selected_size, selected_class)
-                if pitch_dia:
-                    diameter_mm = pitch_dia
-                    diameter_source = f"Pitch Diameter from {selected_standard}: {diameter_mm:.2f} mm"
-                else:
-                    # Fallback to manual input
-                    diameter_mm = manual_pitch_dia * 25.4 if pitch_dia_unit == "inch" else manual_pitch_dia
-                    diameter_source = f"Manual Pitch Diameter: {diameter_mm:.2f} mm"
+                # Try to get pitch diameter from database
+                if selected_thread_standard:
+                    pitch_dia = get_pitch_diameter_from_database(selected_thread_standard, selected_size, None)
+                    if pitch_dia:
+                        diameter_mm = pitch_dia
+                        diameter_source = f"Pitch Diameter from {selected_thread_standard}: {diameter_mm:.2f} mm"
+                    else:
+                        # Fallback to manual input
+                        if 'manual_pitch_dia' in locals():
+                            diameter_mm = manual_pitch_dia * 25.4 if manual_pitch_unit == "inch" else manual_pitch_dia
+                            diameter_source = f"Manual Pitch Diameter: {diameter_mm:.2f} mm"
+                        else:
+                            st.error("Could not fetch pitch diameter from database and no manual input provided")
+                            return
             
-            if diameter_mm > 0:
-                length_mm = convert_length_to_mm(length_val, length_unit)
-                
-                # Determine dimensional standard based on product type
-                dimensional_standard = "ASME B18.2.1" if series == "Inch" else "ISO 4014"
-                if "socket" in selected_product.lower():
-                    dimensional_standard = "ASME B18.3" if series == "Inch" else "DIN-7991"
-                
+            if diameter_mm > 0 and length_mm > 0:
+                # Calculate weight
                 weight_kg = calculate_weight_rectified(
                     product=selected_product,
                     diameter_mm=diameter_mm,
                     length_mm=length_mm,
                     diameter_type=diameter_type.lower().replace(" ", "_"),
-                    thread_standard=selected_standard,
+                    thread_standard=selected_thread_standard,
                     thread_size=selected_size,
-                    thread_class=selected_class,
-                    dimensional_standard=dimensional_standard,
+                    thread_class=None,
+                    dimensional_standard=selected_dimensional_standard if selected_dimensional_standard != "Not Required" else None,
                     dimensional_product=selected_product,
                     dimensional_size=selected_size
                 )
                 
                 if weight_kg > 0:
-                    st.success(f"**Calculation Result:**")
-                    st.metric("Estimated Weight", f"{weight_kg} Kg", "Carbon Steel Density")
+                    # Display results
+                    st.success("### Calculation Results")
                     
-                    st.info(f"""
-                    **Parameters Used:**
-                    - Product: {selected_product}
-                    - {diameter_source}
-                    - Length: {length_mm:.2f} mm ({length_val} {length_unit})
-                    - Standard: {selected_standard}
-                    - Diameter Type: {diameter_type}
-                    - Thread Class: {selected_class if selected_class else 'N/A'}
-                    - Material: Carbon Steel (7.85 g/cm³)
-                    """)
+                    result_col1, result_col2, result_col3 = st.columns(3)
                     
+                    with result_col1:
+                        st.metric("Estimated Weight", f"{weight_kg:.4f} kg")
+                    
+                    with result_col2:
+                        st.metric("Diameter Used", f"{diameter_mm:.2f} mm")
+                    
+                    with result_col3:
+                        st.metric("Length", f"{length_mm:.2f} mm")
+                    
+                    # Show calculation details
+                    with st.expander("Calculation Details"):
+                        st.info(f"""
+                        **Parameters Used:**
+                        - Product: {selected_product}
+                        - Series: {selected_series}
+                        - Dimensional Standard: {selected_dimensional_standard}
+                        - Size: {selected_size}
+                        - Diameter Type: {diameter_type}
+                        - {diameter_source}
+                        - Length: {length_value} {length_unit} ({length_mm:.2f} mm)
+                        - Thread Standard: {selected_thread_standard if selected_thread_standard else 'N/A'}
+                        - Material: Carbon Steel (7.85 g/cm³)
+                        """)
+                    
+                    # Save to history
                     calculation_data = {
                         'product': selected_product,
                         'size': selected_size,
                         'weight': weight_kg,
                         'diameter': diameter_mm,
                         'length': length_mm,
-                        'standard': selected_standard,
+                        'series': selected_series,
+                        'dimensional_standard': selected_dimensional_standard,
                         'diameter_type': diameter_type,
-                        'class': selected_class
+                        'thread_standard': selected_thread_standard
                     }
                     save_calculation_history(calculation_data)
+                    
                 else:
-                    st.error("Failed to calculate weight. Please check inputs.")
+                    st.error("Failed to calculate weight. Please check your inputs.")
             else:
-                st.error("Please provide valid diameter information.")
+                st.error("Invalid diameter or length values")
         
+        # Show calculation history
         show_calculation_history()
     
     with tab2:
@@ -3744,12 +3829,12 @@ def show_enhanced_home():
     st.markdown("""
     <div class="engineering-header">
         <h1 style="margin:0; font-size: 2.5rem;">JSC Industries</h1>
-        <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED</p>
+        <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0 - UPDATED</p>
         <div style="margin-top: 1rem;">
-            <span class="engineering-badge">RECTIFIED Formulas</span>
-            <span class="material-badge">Database Connected</span>
-            <span class="grade-badge">Carbon Steel Density</span>
-            <span class="technical-badge">Pitch Diameter Auto-fetch</span>
+            <span class="engineering-badge">Updated Calculator</span>
+            <span class="material-badge">Product-Based Workflow</span>
+            <span class="grade-badge">Dynamic Standards</span>
+            <span class="technical-badge">Enhanced UI</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3797,12 +3882,12 @@ def show_enhanced_home():
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown('<h2 class="section-header">Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">Engineering Tools - UPDATED</h2>', unsafe_allow_html=True)
     
     cols = st.columns(3)
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
-        ("Engineering Calculator", "RECTIFIED weight calculations with database connections", "calculator"),
+        ("Engineering Calculator", "UPDATED weight calculations with enhanced workflow", "calculator"),
         ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("AI Assistant", "Technical queries and material analysis", "ai"),
@@ -3823,7 +3908,7 @@ def show_enhanced_home():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<h3 class="section-header">System Status - RECTIFIED</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">System Status - UPDATED</h3>', unsafe_allow_html=True)
         
         status_items = [
             ("ASME B18.2.1 Data", not df.empty, "engineering-badge"),
@@ -3833,7 +3918,7 @@ def show_enhanced_home():
             ("ME&CERT Data", not df_mechem.empty, "engineering-badge"),
             ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "technical-badge"),
             ("Weight Calculations", True, "engineering-badge"),
-            ("Database Connections", True, "technical-badge"),
+            ("Updated Calculator", True, "technical-badge"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -3843,19 +3928,19 @@ def show_enhanced_home():
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<h3 class="section-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">UPDATED Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "Professional dimensional analysis",
-            "Material science and chemistry", 
-            "Grade specifications and standards",
-            "Technical data visualization",
-            "AI-powered technical assistance",
+            "Product-based calculator workflow",
+            "Dynamic dimensional standards", 
+            "Automatic size selection",
+            "Flexible diameter input options",
+            "Threaded rod and stud support",
+            "Database-connected calculations",
+            "Enhanced user interface",
             "Professional reporting",
-            "RECTIFIED weight calculations",
-            "Database-connected pitch diameter",
-            "Proper geometric formulas",
-            "Carbon steel density (7.85 g/cm³)"
+            "Carbon steel density calculations",
+            "Batch processing capabilities"
         ]
         
         for feature in features:
@@ -3870,26 +3955,23 @@ def show_help_system():
     """Show contextual help system"""
     with st.sidebar:
         st.markdown("---")
-        with st.expander("RECTIFIED Weight Calculation Guide"):
+        with st.expander("UPDATED Weight Calculator Guide"):
             st.markdown("""
-            **RECTIFIED WEIGHT CALCULATIONS:**
+            **UPDATED SINGLE ITEM CALCULATOR:**
             
-            **Database Connections:**
-            - Pitch Diameter automatically fetched from thread databases
-            - Head Height and Width Across Flats from dimensional databases
-            - Proper column name mapping for all databases
+            **Workflow:**
+            1. **Product Type**: Select from dropdown
+            2. **Series**: Choose Inch or Metric
+            3. **Dimensional Standards**: Auto-populated based on product and series
+            4. **Size Specification**: Auto-populated based on selections
+            5. **Diameter Type**: Choose Body or Pitch Diameter
+            6. **Thread Standards**: Auto-shown only for Pitch Diameter
+            7. **Length**: Enter value with unit selection
             
-            **Rectified Formulas:**
-            - Hex Head Volume: V = (3√3/2) × s² × h
-            - Shank Volume: V = πr²h  
-            - Carbon Steel Density: 7.85 g/cm³
-            - Thread Volume Reduction: 20% for threaded products
-            
-            **Product Specific Calculations:**
-            - Hex Bolts: Database dimensions for Head Height & Width Across Flats
-            - Threaded Rod: Pitch Diameter with thread volume reduction
-            - Socket Head: Proper cylindrical head volume
-            - All products use correct geometric formulas
+            **Special Cases:**
+            - Threaded Rod & Stud: No dimensional standard required
+            - Pitch Diameter: Automatically fetched from thread databases
+            - Body Diameter: Manual user input required
             """)
 
 # ======================================================
@@ -3952,13 +4034,13 @@ def main():
         <hr>
         <div style='text-align: center; color: gray; padding: 2rem;'>
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="engineering-badge">RECTIFIED Formulas</span>
-                <span class="technical-badge">Database Connected</span>
-                <span class="material-badge">Carbon Steel</span>
+                <span class="engineering-badge">UPDATED Calculator</span>
+                <span class="technical-badge">Enhanced Workflow</span>
+                <span class="material-badge">Dynamic Standards</span>
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculations</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - UPDATED Weight Calculator</p>
         </div>
     """, unsafe_allow_html=True)
 
