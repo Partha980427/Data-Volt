@@ -2175,7 +2175,7 @@ def process_batch_calculation_optimized(batch_df):
         return None
 
 # ======================================================
-# ADVANCED AI ASSISTANT (COMPLETE IMPLEMENTATION)
+# ADVANCED AI ASSISTANT (FIXED IMPLEMENTATION)
 # ======================================================
 
 class AdvancedFastenerAI:
@@ -2187,6 +2187,12 @@ class AdvancedFastenerAI:
         self.df_asme_b18_3 = df_asme_b18_3
         self.thread_files = thread_files
         
+        # Initialize AI models with error handling
+        self.sentence_model = None
+        self.qa_pipeline = None
+        self.chroma_client = None
+        self.collection = None
+        
         try:
             self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
             self.qa_pipeline = pipeline("question-answering", 
@@ -2196,17 +2202,25 @@ class AdvancedFastenerAI:
             st.warning(f"AI models loading issue: {str(e)}")
             st.session_state.ai_model_loaded = False
         
+        # Initialize ChromaDB with error handling
         try:
             self.chroma_client = chromadb.Client()
-            self.collection = self.chroma_client.create_collection(name="fastener_knowledge")
-        except:
+            # Check if collection exists, create if not
+            try:
+                self.collection = self.chroma_client.get_collection(name="fastener_knowledge")
+            except:
+                self.collection = self.chroma_client.create_collection(name="fastener_knowledge")
+        except Exception as e:
+            st.warning(f"ChromaDB initialization issue: {str(e)}")
             self.collection = None
         
         self.knowledge_base = self._build_knowledge_base()
         self.learning_memory = {}
         self.conversation_history = []
         
-        self._index_database_content()
+        # Index database content only if ChromaDB is available
+        if self.collection is not None:
+            self._index_database_content()
     
     def _build_knowledge_base(self):
         """Build comprehensive fastener knowledge base"""
@@ -2271,54 +2285,66 @@ class AdvancedFastenerAI:
     
     def _index_database_content(self):
         """Index all database content for semantic search"""
-        if not st.session_state.ai_model_loaded:
+        if not st.session_state.ai_model_loaded or self.collection is None:
             return
             
         try:
+            # Clear existing collection
+            try:
+                self.collection.delete()
+                self.collection = self.chroma_client.create_collection(name="fastener_knowledge")
+            except:
+                pass
+            
             if not self.df.empty:
                 for idx, row in self.df.iterrows():
                     text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "main_db", "row_index": idx}],
-                        ids=[f"main_{idx}"]
-                    )
+                    if text_content.strip():
+                        self.collection.add(
+                            documents=[text_content],
+                            metadatas=[{"source": "main_db", "row_index": idx}],
+                            ids=[f"main_{idx}"]
+                        )
             
             if not self.df_iso4014.empty:
                 for idx, row in self.df_iso4014.iterrows():
                     text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "iso_db", "row_index": idx}],
-                        ids=[f"iso_{idx}"]
-                    )
+                    if text_content.strip():
+                        self.collection.add(
+                            documents=[text_content],
+                            metadatas=[{"source": "iso_db", "row_index": idx}],
+                            ids=[f"iso_{idx}"]
+                        )
             
             if not self.df_mechem.empty:
                 for idx, row in self.df_mechem.iterrows():
                     text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "mecert_db", "row_index": idx}],
-                        ids=[f"mecert_{idx}"]
-                    )
+                    if text_content.strip():
+                        self.collection.add(
+                            documents=[text_content],
+                            metadatas=[{"source": "mecert_db", "row_index": idx}],
+                            ids=[f"mecert_{idx}"]
+                        )
             
             if self.df_din7991 is not None and not self.df_din7991.empty:
                 for idx, row in self.df_din7991.iterrows():
                     text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "din7991_db", "row_index": idx}],
-                        ids=[f"din7991_{idx}"]
-                    )
+                    if text_content.strip():
+                        self.collection.add(
+                            documents=[text_content],
+                            metadatas=[{"source": "din7991_db", "row_index": idx}],
+                            ids=[f"din7991_{idx}"]
+                        )
             
             if self.df_asme_b18_3 is not None and not self.df_asme_b18_3.empty:
                 for idx, row in self.df_asme_b18_3.iterrows():
                     text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "asme_b18_3_db", "row_index": idx}],
-                        ids=[f"asme_b18_3_{idx}"]
-                    )
+                    if text_content.strip():
+                        self.collection.add(
+                            documents=[text_content],
+                            metadatas=[{"source": "asme_b18_3_db", "row_index": idx}],
+                            ids=[f"asme_b18_3_{idx}"]
+                        )
         except Exception as e:
             st.warning(f"Database indexing issue: {str(e)}")
     
@@ -2333,7 +2359,8 @@ class AdvancedFastenerAI:
                 n_results=n_results
             )
             return results
-        except:
+        except Exception as e:
+            st.warning(f"Semantic search issue: {str(e)}")
             return []
     
     def _extract_entities_advanced(self, query):
@@ -2518,8 +2545,12 @@ class AdvancedFastenerAI:
         
         self.learning_memory[interaction_key]['last_used'] = datetime.now().isoformat()
 
-# Initialize AI Assistant
-ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files, df_din7991, df_asme_b18_3)
+# Initialize AI Assistant with proper error handling
+try:
+    ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files, df_din7991, df_asme_b18_3)
+except Exception as e:
+    st.warning(f"AI Assistant initialization failed: {str(e)}")
+    ai_assistant = None
 
 def show_chat_interface():
     """Show AI assistant chat interface"""
@@ -2529,6 +2560,10 @@ def show_chat_interface():
         <p style="margin:0; opacity: 0.9;">Ask technical questions about fasteners, materials, and standards</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Initialize chat messages if not exists
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
     
     # Chat container
     st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True)
@@ -2541,7 +2576,7 @@ def show_chat_interface():
             st.markdown(f'<div class="message ai-message">{message["content"]}</div>', unsafe_allow_html=True)
     
     # Typing indicator
-    if st.session_state.ai_thinking:
+    if st.session_state.get('ai_thinking', False):
         st.markdown('''
         <div class="typing-indicator">
             <div class="typing-dot"></div>
@@ -2586,13 +2621,17 @@ def process_user_message(message):
     
     # Generate AI response
     try:
-        response = ai_assistant.process_complex_query(message)
+        if ai_assistant is None:
+            response = "AI Assistant is currently unavailable. Please check the model installations."
+        else:
+            response = ai_assistant.process_complex_query(message)
         
         # Add AI response to chat
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
         
-        # Learn from interaction
-        ai_assistant.learn_from_interaction(message, response, True)
+        # Learn from interaction if AI is available
+        if ai_assistant is not None:
+            ai_assistant.learn_from_interaction(message, response, True)
         
     except Exception as e:
         error_response = f"I apologize, but I encountered an error processing your question: {str(e)}"
