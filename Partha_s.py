@@ -201,6 +201,7 @@ def initialize_session_state():
         "weight_calc_product": "Select Product",
         "weight_calc_series": "Select Series",
         "weight_calc_standard": "Select Standard",
+        "weight_calc_size": "Select Size",
         "weight_calc_diameter_type": "Blank Diameter",
         "weight_calc_blank_diameter": 10.0,
         "weight_calc_blank_dia_unit": "mm",
@@ -1550,6 +1551,32 @@ def get_standards_for_product_series(product, series):
     
     return ["Select Standard"] + sorted(available_standards)
 
+def get_sizes_for_standard_product(standard, product):
+    """Get available sizes for specific standard and product in weight calculator"""
+    if standard == "Select Standard" or product == "Select Product":
+        return ["Select Size"]
+    
+    # Get the appropriate dataframe based on standard
+    if standard == "ASME B18.2.1":
+        temp_df = df.copy()
+    elif standard == "ISO 4014":
+        temp_df = df_iso4014.copy()
+    elif standard == "DIN-7991":
+        temp_df = df_din7991.copy()
+    elif standard == "ASME B18.3":
+        temp_df = df_asme_b18_3.copy()
+    else:
+        return ["Select Size"]
+    
+    # Filter by product if specified
+    if product != "All" and 'Product' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product'] == product]
+    
+    # Get size options
+    size_options = get_safe_size_options(temp_df)
+    
+    return ["Select Size"] + [size for size in size_options if size != "All"]
+
 def get_thread_standards_for_series(series):
     """Get thread standards based on series"""
     if series == "Inch":
@@ -1653,7 +1680,7 @@ def show_weight_calculator_enhanced():
     """, unsafe_allow_html=True)
     
     st.info("""
-    **Enhanced Workflow:** Product Type → Series → Standard → Diameter Type → (Manual Input or Thread Specs)
+    **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
     """)
     
     # Initialize session state for form inputs
@@ -1664,7 +1691,7 @@ def show_weight_calculator_enhanced():
     with st.form("weight_calculator_enhanced"):
         st.markdown("### Product Standards Selection")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             # A. Product Type
@@ -1705,22 +1732,35 @@ def show_weight_calculator_enhanced():
             if selected_standard != "Select Standard":
                 st.caption(f"Standard: {selected_standard}")
         
+        with col4:
+            # D. Size (based on Standard + Product) - NEW ADDITION
+            size_options = get_sizes_for_standard_product(selected_standard, selected_product)
+            selected_size = st.selectbox(
+                "D. Size",
+                size_options,
+                key="weight_calc_size_select"
+            )
+            
+            # Show size info
+            if selected_size != "Select Size":
+                st.caption(f"Size: {selected_size}")
+        
         st.markdown("---")
         st.markdown("### Diameter Specification")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # D. Cylinder Diameter Type
+            # E. Cylinder Diameter Type
             diameter_type_options = ["Blank Diameter", "Pitch Diameter"]
             selected_diameter_type = st.radio(
-                "D. Cylinder Diameter Type",
+                "E. Cylinder Diameter Type",
                 diameter_type_options,
                 key="weight_calc_diameter_type_select"
             )
         
         with col2:
-            # E. Conditional Input based on Diameter Type
+            # F. Conditional Input based on Diameter Type
             if selected_diameter_type == "Blank Diameter":
                 st.markdown("**Blank Diameter Input**")
                 dia_col1, dia_col2 = st.columns(2)
@@ -1832,6 +1872,8 @@ def show_weight_calculator_enhanced():
             validation_errors.append("Please select a Series")
         if selected_standard == "Select Standard":
             validation_errors.append("Please select a Standard")
+        if selected_size == "Select Size":
+            validation_errors.append("Please select a Size")
         if selected_diameter_type == "Pitch Diameter" and thread_standard == "Select Thread Standard":
             validation_errors.append("Please select a Thread Standard for Pitch Diameter")
         
@@ -1872,7 +1914,8 @@ def show_weight_calculator_enhanced():
                 # Save to calculation history
                 calculation_data = {
                     'product': selected_product,
-                    'size': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
+                    'size': selected_size,
+                    'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
                     'length': f"{length} {length_unit}",
                     'material': material,
                     'weight_kg': result['weight_kg'],
@@ -1895,6 +1938,7 @@ def show_weight_calculator_enhanced():
             - **Product Type:** {selected_product}
             - **Series:** {selected_series}
             - **Standard:** {selected_standard}
+            - **Size:** {selected_size}
             """)
         
         with summary_col2:
@@ -1963,6 +2007,7 @@ def show_batch_calculator_enhanced():
         'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Hex Cap Screws'],
         'Series': ['Inch', 'Inch', 'Inch'],
         'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1'],
+        'Size': ['1/4', '5/16', '3/8'],
         'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Blank Diameter'],
         'Blank_Diameter': [6.35, 0, 9.525],
         'Blank_Diameter_Unit': ['mm', 'mm', 'mm'],
@@ -1999,7 +2044,7 @@ def show_batch_calculator_enhanced():
             st.dataframe(batch_df.head())
             
             # Validate required columns
-            required_cols = ['Product_Type', 'Series', 'Standard', 'Diameter_Type', 'Length']
+            required_cols = ['Product_Type', 'Series', 'Standard', 'Size', 'Diameter_Type', 'Length']
             missing_cols = [col for col in required_cols if col not in batch_df.columns]
             
             if missing_cols:
@@ -3858,8 +3903,9 @@ def show_help_system():
             1. **A. Product Type** - Select from standards database
             2. **B. Series** (Inch/Metric) - Filtered by product type
             3. **C. Standard** - Filtered by product + series (for dimensional data)
-            4. **D. Cylinder Diameter Type** - Blank Diameter (Body) or Pitch Diameter (Thread)
-            5. **E. Conditional Input:**
+            4. **D. Size** - Filtered by standard + product
+            5. **E. Cylinder Diameter Type** - Blank Diameter (Body) or Pitch Diameter (Thread)
+            6. **F. Conditional Input:**
                - **Blank Diameter**: Manual value input
                - **Pitch Diameter**: Thread specification dropdown
             
