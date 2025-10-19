@@ -1132,6 +1132,11 @@ def process_standard_data():
             standard_products['ISO 4014'] = ["All", "Hex Bolt"]
         standard_series['ISO 4014'] = "Metric"
     
+    # ADD THREADED ROD TO ALL STANDARDS
+    for standard in standard_products:
+        if "Threaded Rod" not in standard_products[standard]:
+            standard_products[standard] = ["All", "Threaded Rod"] + [p for p in standard_products[standard] if p != "All" and p != "Threaded Rod"]
+    
     # Store in session state
     st.session_state.available_products = standard_products
     st.session_state.available_series = standard_series
@@ -1592,9 +1597,45 @@ def get_material_density(material):
         "Stainless Steel": 8000,
         "Alloy Steel": 7850,
         "Brass": 8500,
-        "Aluminum": 2700
+        "Aluminum": 2700,
+        "Copper": 8960,
+        "Titanium": 4500,
+        "Bronze": 8800,
+        "Inconel": 8200,
+        "Monel": 8800,
+        "Nickel": 8900
     }
     return density_map.get(material, 7850)  # Default to carbon steel
+
+def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
+    """Get pitch diameter from thread data for threaded rod calculation"""
+    try:
+        df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
+        
+        if df_thread.empty:
+            return None
+        
+        # Look for pitch diameter columns
+        pitch_dia_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
+        
+        if not pitch_dia_cols:
+            # Look for any diameter column that might contain pitch diameter
+            dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
+            for col in dia_cols:
+                if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
+                    pitch_dia_cols.append(col)
+        
+        if pitch_dia_cols:
+            # Get the first pitch diameter value
+            pitch_diameter = df_thread[pitch_dia_cols[0]].iloc[0]
+            if pd.notna(pitch_diameter):
+                return float(pitch_diameter)
+        
+        return None
+        
+    except Exception as e:
+        st.warning(f"Could not retrieve pitch diameter: {str(e)}")
+        return None
 
 def calculate_weight_enhanced(parameters):
     """Enhanced weight calculation with proper material densities and geometry"""
@@ -1613,6 +1654,8 @@ def calculate_weight_enhanced(parameters):
             diameter_m = diameter_value / 1000
         elif diameter_unit == 'inch':
             diameter_m = diameter_value * 0.0254
+        elif diameter_unit == 'ft':
+            diameter_m = diameter_value * 0.3048
         else:  # meters
             diameter_m = diameter_value
         
@@ -1620,6 +1663,8 @@ def calculate_weight_enhanced(parameters):
             length_m = length / 1000
         elif length_unit == 'inch':
             length_m = length * 0.0254
+        elif length_unit == 'ft':
+            length_m = length * 0.3048
         else:  # meters
             length_m = length
         
@@ -1640,7 +1685,8 @@ def calculate_weight_enhanced(parameters):
             "Hex Cap Screws": 0.95,
             "Heavy Hex Screws": 1.1,
             "Hexagon Socket Head Cap Screws": 0.9,
-            "Hexagon Socket Countersunk Head Cap Screw": 0.85
+            "Hexagon Socket Countersunk Head Cap Screw": 0.85,
+            "Threaded Rod": 1.0  # Threaded rod uses full cylinder volume
         }
         
         factor = product_factors.get(product_type, 1.0)
@@ -1681,6 +1727,7 @@ def show_weight_calculator_enhanced():
     
     st.info("""
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
+    **NEW:** Threaded Rod support with pitch diameter calculation
     """)
     
     # Initialize session state for form inputs
@@ -1775,7 +1822,7 @@ def show_weight_calculator_enhanced():
                 with dia_col2:
                     blank_dia_unit = st.selectbox(
                         "Unit",
-                        ["mm", "inch"],
+                        ["mm", "inch", "ft"],
                         key="weight_calc_blank_dia_unit_select"
                     )
                 
@@ -1804,8 +1851,8 @@ def show_weight_calculator_enhanced():
                         key="weight_calc_thread_size_select"
                     )
                     
-                    # Thread Class
-                    if thread_standard == "ASME B1.1":
+                    # Thread Class - Only show for Inch series
+                    if selected_series == "Inch" and thread_standard == "ASME B1.1":
                         thread_class_options = get_thread_classes_enhanced(thread_standard)
                         if len(thread_class_options) == 1:  # Only "All"
                             thread_class_options = ["2A", "3A", "1A"]
@@ -1815,14 +1862,19 @@ def show_weight_calculator_enhanced():
                             key="weight_calc_thread_class_select"
                         )
                     else:
-                        thread_class_options = get_thread_classes_enhanced(thread_standard)
-                        thread_class = st.selectbox(
-                            "Tolerance Class",
-                            thread_class_options,
-                            key="weight_calc_thread_class_select"
-                        )
+                        # For metric threads or non-ASME standards, don't show tolerance class
+                        thread_class = "N/A"
+                        st.caption("Tolerance Class: Not applicable for metric threads")
                     
                     st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
+                    
+                    # NEW: Show pitch diameter information for threaded rod
+                    if selected_product == "Threaded Rod" and thread_size != "All":
+                        pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
+                        if pitch_diameter:
+                            st.success(f"Pitch Diameter: {pitch_diameter:.4f} mm")
+                        else:
+                            st.warning("Pitch diameter not found in thread data")
         
         st.markdown("---")
         st.markdown("### Additional Parameters")
@@ -1830,7 +1882,7 @@ def show_weight_calculator_enhanced():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # Length
+            # Length - UPDATED WITH FT UNIT
             length_col1, length_col2 = st.columns(2)
             with length_col1:
                 length = st.number_input(
@@ -1843,18 +1895,23 @@ def show_weight_calculator_enhanced():
             with length_col2:
                 length_unit = st.selectbox(
                     "Unit",
-                    ["mm", "inch", "meter"],
+                    ["mm", "inch", "ft", "meter"],
                     key="weight_calc_length_unit_select"
                 )
         
         with col2:
-            # Material
-            material_options = ["Carbon Steel", "Stainless Steel", "Alloy Steel", "Brass", "Aluminum"]
+            # Material - UPDATED WITH MORE MATERIALS
+            material_options = ["Carbon Steel", "Stainless Steel", "Alloy Steel", "Brass", "Aluminum", 
+                              "Copper", "Titanium", "Bronze", "Inconel", "Monel", "Nickel"]
             material = st.selectbox(
                 "Material",
                 material_options,
                 key="weight_calc_material_select"
             )
+            
+            # Show material density
+            density = get_material_density(material)
+            st.caption(f"Density: {density} kg/m³")
         
         with col3:
             # Calculate button space
@@ -1897,12 +1954,23 @@ def show_weight_calculator_enhanced():
                     'diameter_unit': blank_dia_unit
                 })
             else:
-                # For pitch diameter, we would need to lookup the actual diameter from thread data
-                # For now, use a simplified approach
-                calculation_params.update({
-                    'diameter_value': 10.0,  # Default value - should be looked up from thread data
-                    'diameter_unit': 'mm'
-                })
+                # For pitch diameter, get the actual diameter from thread data
+                if selected_product == "Threaded Rod" and thread_size != "All":
+                    pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
+                    if pitch_diameter:
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'mm'  # Thread data is typically in mm
+                        })
+                    else:
+                        st.error("Could not retrieve pitch diameter from thread data")
+                        return
+                else:
+                    # For other products with pitch diameter, use a default approach
+                    calculation_params.update({
+                        'diameter_value': 10.0,  # Default value
+                        'diameter_unit': 'mm'
+                    })
             
             # Perform calculation
             result = calculate_weight_enhanced(calculation_params)
@@ -1961,6 +2029,7 @@ def show_weight_calculator_enhanced():
         **Additional Parameters:**
         - **Length:** {length} {length_unit}
         - **Material:** {material}
+        - **Material Density:** {get_material_density(material)} kg/m³
         """)
     
     # Display calculation results
@@ -2004,19 +2073,19 @@ def show_batch_calculator_enhanced():
     # Download template
     st.markdown("### Download Enhanced Batch Template")
     template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Hex Cap Screws'],
-        'Series': ['Inch', 'Inch', 'Inch'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1'],
-        'Size': ['1/4', '5/16', '3/8'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 9.525],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', 'N/A'],
-        'Thread_Class': ['N/A', '2A', 'N/A'],
-        'Length': [50, 100, 75],
-        'Length_Unit': ['mm', 'mm', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Carbon Steel']
+        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws'],
+        'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1'],
+        'Size': ['1/4', '5/16', '1/2', '3/8'],
+        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter'],
+        'Blank_Diameter': [6.35, 0, 0, 9.525],
+        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm'],
+        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A'],
+        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A'],
+        'Thread_Class': ['N/A', '2A', '2A', 'N/A'],
+        'Length': [50, 100, 200, 75],
+        'Length_Unit': ['mm', 'mm', 'ft', 'mm'],
+        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel']
     }
     template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
@@ -3909,6 +3978,12 @@ def show_help_system():
                - **Blank Diameter**: Manual value input
                - **Pitch Diameter**: Thread specification dropdown
             
+            **NEW THREADED ROD SUPPORT:**
+            - Threaded Rod added to all product lists
+            - Uses pitch diameter from thread standards data
+            - Automatic pitch diameter lookup from thread database
+            - Support for both inch and metric threaded rods
+            
             **Purpose:**
             - Get accurate dimensional data from standards for weight calculations
             - Handle both body diameter and thread pitch diameter scenarios
@@ -3981,7 +4056,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Threaded Rod Support</p>
         </div>
     """, unsafe_allow_html=True)
 
