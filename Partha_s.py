@@ -1608,18 +1608,28 @@ def get_material_density(material):
     return density_map.get(material, 7850)  # Default to carbon steel
 
 def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
-    """Get pitch diameter from thread data for threaded rod calculation"""
+    """Get pitch diameter from thread data for threaded rod calculation - ENHANCED FOR THREADED ROD"""
     try:
         df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
         
         if df_thread.empty:
             return None
         
-        # Look for pitch diameter columns
-        pitch_dia_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
+        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
+        pitch_dia_cols = []
         
+        # First priority: Pitch diameter minimum columns
+        min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
+        if min_pitch_cols:
+            pitch_dia_cols.extend(min_pitch_cols)
+        
+        # Second priority: Any pitch diameter columns
+        general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
+        if general_pitch_cols:
+            pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
+        
+        # Third priority: Any diameter column that might contain pitch diameter
         if not pitch_dia_cols:
-            # Look for any diameter column that might contain pitch diameter
             dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
             for col in dia_cols:
                 if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
@@ -1767,29 +1777,39 @@ def show_weight_calculator_enhanced():
                 st.caption(f"Series: {selected_series}")
         
         with col3:
-            # C. Standard (based on Product + Series)
-            standard_options = get_standards_for_product_series(selected_product, selected_series)
-            selected_standard = st.selectbox(
-                "C. Standard",
-                standard_options,
-                key="weight_calc_standard_select"
-            )
+            # C. Standard (based on Product + Series) - DISABLED FOR THREADED ROD
+            if selected_product == "Threaded Rod":
+                st.info("Standard not required for Threaded Rod")
+                selected_standard = "Not Required"
+                st.session_state.weight_calc_standard_select = "Not Required"
+            else:
+                standard_options = get_standards_for_product_series(selected_product, selected_series)
+                selected_standard = st.selectbox(
+                    "C. Standard",
+                    standard_options,
+                    key="weight_calc_standard_select"
+                )
             
             # Show standard info
-            if selected_standard != "Select Standard":
+            if selected_standard != "Select Standard" and selected_standard != "Not Required":
                 st.caption(f"Standard: {selected_standard}")
         
         with col4:
-            # D. Size (based on Standard + Product) - NEW ADDITION
-            size_options = get_sizes_for_standard_product(selected_standard, selected_product)
-            selected_size = st.selectbox(
-                "D. Size",
-                size_options,
-                key="weight_calc_size_select"
-            )
+            # D. Size (based on Standard + Product) - DISABLED FOR THREADED ROD
+            if selected_product == "Threaded Rod":
+                st.info("Size not required for Threaded Rod")
+                selected_size = "Not Required"
+                st.session_state.weight_calc_size_select = "Not Required"
+            else:
+                size_options = get_sizes_for_standard_product(selected_standard, selected_product)
+                selected_size = st.selectbox(
+                    "D. Size",
+                    size_options,
+                    key="weight_calc_size_select"
+                )
             
             # Show size info
-            if selected_size != "Select Size":
+            if selected_size != "Select Size" and selected_size != "Not Required":
                 st.caption(f"Size: {selected_size}")
         
         st.markdown("---")
@@ -1872,7 +1892,9 @@ def show_weight_calculator_enhanced():
                     if selected_product == "Threaded Rod" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
-                            st.success(f"Pitch Diameter: {pitch_diameter:.4f} mm")
+                            st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
+                            # Store the pitch diameter for calculation
+                            st.session_state.pitch_diameter_value = pitch_diameter
                         else:
                             st.warning("Pitch diameter not found in thread data")
         
@@ -1927,10 +1949,14 @@ def show_weight_calculator_enhanced():
             validation_errors.append("Please select a Product Type")
         if selected_series == "Select Series":
             validation_errors.append("Please select a Series")
-        if selected_standard == "Select Standard":
-            validation_errors.append("Please select a Standard")
-        if selected_size == "Select Size":
-            validation_errors.append("Please select a Size")
+        
+        # Skip Standard and Size validation for Threaded Rod
+        if selected_product != "Threaded Rod":
+            if selected_standard == "Select Standard":
+                validation_errors.append("Please select a Standard")
+            if selected_size == "Select Size":
+                validation_errors.append("Please select a Size")
+        
         if selected_diameter_type == "Pitch Diameter" and thread_standard == "Select Thread Standard":
             validation_errors.append("Please select a Thread Standard for Pitch Diameter")
         
@@ -1962,6 +1988,7 @@ def show_weight_calculator_enhanced():
                             'diameter_value': pitch_diameter,
                             'diameter_unit': 'mm'  # Thread data is typically in mm
                         })
+                        st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} mm for Threaded Rod")
                     else:
                         st.error("Could not retrieve pitch diameter from thread data")
                         return
@@ -1982,7 +2009,7 @@ def show_weight_calculator_enhanced():
                 # Save to calculation history
                 calculation_data = {
                     'product': selected_product,
-                    'size': selected_size,
+                    'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
                     'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
                     'length': f"{length} {length_unit}",
                     'material': material,
@@ -2005,8 +2032,8 @@ def show_weight_calculator_enhanced():
             **Product Standards:**
             - **Product Type:** {selected_product}
             - **Series:** {selected_series}
-            - **Standard:** {selected_standard}
-            - **Size:** {selected_size}
+            - **Standard:** {selected_standard if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Size:** {selected_size if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
             """)
         
         with summary_col2:
@@ -2075,8 +2102,8 @@ def show_batch_calculator_enhanced():
     template_data = {
         'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws'],
         'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.2.1'],
-        'Size': ['1/4', '5/16', '1/2', '3/8'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
+        'Size': ['1/4', '5/16', 'Not Required', '3/8'],
         'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter'],
         'Blank_Diameter': [6.35, 0, 0, 9.525],
         'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm'],
@@ -2113,7 +2140,7 @@ def show_batch_calculator_enhanced():
             st.dataframe(batch_df.head())
             
             # Validate required columns
-            required_cols = ['Product_Type', 'Series', 'Standard', 'Size', 'Diameter_Type', 'Length']
+            required_cols = ['Product_Type', 'Series', 'Diameter_Type', 'Length']
             missing_cols = [col for col in required_cols if col not in batch_df.columns]
             
             if missing_cols:
