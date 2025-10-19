@@ -1680,15 +1680,22 @@ def calculate_weight_rectified_fixed(product, diameter_mm, length_mm, diameter_t
                                    dimensional_standard=None, dimensional_product=None, dimensional_size=None):
     """COMPLETELY FIXED WEIGHT CALCULATION with robust error handling"""
     
+    # Input validation
     if diameter_mm <= 0 or length_mm <= 0:
+        st.error(f"Invalid dimensions: diameter={diameter_mm}mm, length={diameter_mm}mm")
         return 0.0
     
     try:
         # Density of Carbon Steel (7.85 g/cm³ = 0.00785 g/mm³)
-        density = 0.00785
+        density_g_per_mm3 = 0.00785
         
         # Calculate shank volume = πr²h
-        V_shank = math.pi * (diameter_mm / 2) ** 2 * length_mm
+        radius_mm = diameter_mm / 2
+        V_shank = math.pi * (radius_mm ** 2) * length_mm
+        
+        # Debug info
+        if st.session_state.debug_mode:
+            st.write(f"DEBUG: Shank volume = {V_shank:.2f} mm³")
         
         head_volume = 0.0
         product_lower = product.lower()
@@ -1700,11 +1707,15 @@ def calculate_weight_rectified_fixed(product, diameter_mm, length_mm, diameter_t
             width_flats = get_width_across_flats_from_database_fixed(dimensional_standard, dimensional_product, dimensional_size)
             
             if head_height and width_flats:
+                # Convert to mm if needed (assuming inches from database)
+                head_height_mm = head_height * 25.4
+                width_flats_mm = width_flats * 25.4
+                
                 # Use actual dimensions from database
-                side_length = width_flats / math.sqrt(3)  # s = W / √3
-                head_volume = (3 * math.sqrt(3) / 2) * (side_length ** 2) * head_height
+                side_length = width_flats_mm / math.sqrt(3)  # s = W / √3
+                head_volume = (3 * math.sqrt(3) / 2) * (side_length ** 2) * head_height_mm
             else:
-                # Fallback calculations
+                # Fallback calculations in mm
                 if "heavy" in product_lower:
                     # Heavy hex: s = 1.5D, h = 0.667D
                     s = 1.5 * diameter_mm
@@ -1780,16 +1791,24 @@ def calculate_weight_rectified_fixed(product, diameter_mm, length_mm, diameter_t
             h = 0.625 * diameter_mm
             head_volume = (3 * math.sqrt(3) / 2) * (s ** 2) * h
         
+        # Debug info
+        if st.session_state.debug_mode:
+            st.write(f"DEBUG: Head volume = {head_volume:.2f} mm³")
+        
         # Calculate total weight
         total_volume = V_shank + head_volume  # mm³
-        weight_grams = total_volume * density  # grams
+        weight_grams = total_volume * density_g_per_mm3  # grams
         weight_kg = weight_grams / 1000  # convert to kilograms
+        
+        # Debug info
+        if st.session_state.debug_mode:
+            st.write(f"DEBUG: Total volume = {total_volume:.2f} mm³")
+            st.write(f"DEBUG: Weight = {weight_grams:.2f} g = {weight_kg:.4f} kg")
         
         return round(weight_kg, 4)
         
     except Exception as e:
-        if st.session_state.debug_mode:
-            st.error(f"Error in weight calculation: {str(e)}")
+        st.error(f"Error in weight calculation: {str(e)}")
         return 0.0
 
 def convert_length_to_mm_fixed(length_val, unit):
@@ -1797,14 +1816,18 @@ def convert_length_to_mm_fixed(length_val, unit):
     try:
         length_val = float(length_val)
         unit = unit.lower()
+        
         if unit == "inch":
             return length_val * 25.4
         elif unit == "meter":
             return length_val * 1000
         elif unit == "ft":
             return length_val * 304.8
-        return length_val
+        elif unit == "cm":
+            return length_val * 10
+        return length_val  # Assume mm if no conversion needed
     except (ValueError, TypeError):
+        st.error(f"Invalid length value: {length_val}")
         return 0.0
 
 # ======================================================
@@ -1898,6 +1921,11 @@ def show_enhanced_single_item_calculator():
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Debug mode toggle
+    debug_col1, debug_col2 = st.columns([3, 1])
+    with debug_col2:
+        debug_enabled = st.checkbox("Debug Mode", value=False, key="calc_debug")
     
     # Main input form
     with st.form("single_item_calculator_form"):
@@ -2110,6 +2138,15 @@ def show_enhanced_single_item_calculator():
                         return
         
         if diameter_mm > 0 and length_mm > 0:
+            # Debug information
+            if debug_enabled:
+                st.markdown("### 🐛 Debug Information")
+                st.write(f"- Product: {selected_product}")
+                st.write(f"- Diameter: {diameter_mm} mm")
+                st.write(f"- Length: {length_mm} mm")
+                st.write(f"- Diameter Type: {selected_diameter_type}")
+                st.write(f"- Diameter Source: {diameter_source}")
+            
             # Calculate weight using FIXED function
             weight_kg = calculate_weight_rectified_fixed(
                 product=selected_product,
@@ -4290,4 +4327,3 @@ def main():
 # Run the application
 if __name__ == "__main__":
     main()
-
