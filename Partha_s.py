@@ -212,7 +212,16 @@ def initialize_session_state():
         "weight_calc_length_unit": "mm",
         "weight_calc_material": "Carbon Steel",
         "weight_calc_result": None,
-        "weight_calculation_performed": False
+        "weight_calculation_performed": False,
+        # NEW: Weight calculator section states for step-by-step workflow
+        "weight_section_a_submitted": False,
+        "weight_section_b_submitted": False,
+        "weight_section_c_submitted": False,
+        "weight_section_d_submitted": False,
+        "weight_temp_product": "Select Product",
+        "weight_temp_series": "Select Series",
+        "weight_temp_standard": "Select Standard",
+        "weight_temp_size": "Select Size"
     }
     
     for key, value in defaults.items():
@@ -1985,31 +1994,52 @@ def show_weight_calculator_enhanced():
         st.session_state.weight_form_submitted = False
     
     # Main input form with enhanced workflow
-    with st.form("weight_calculator_enhanced"):
-        st.markdown("### Product Standards Selection")
+    st.markdown("### Product Standards Selection")
+    
+    # SECTION A: Product Type
+    st.markdown("#### A. Product Type Selection")
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        # A. Product Type
+        product_options = get_available_products()
+        selected_product = st.selectbox(
+            "A. Product Type",
+            product_options,
+            key="weight_calc_product_select",
+            index=product_options.index(st.session_state.weight_temp_product) if st.session_state.weight_temp_product in product_options else 0
+        )
         
-        col1, col2, col3, col4 = st.columns(4)
+        # Show product info
+        if selected_product != "Select Product":
+            st.caption(f"Selected: {selected_product}")
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_a_submit = st.button("Submit Section A", key="submit_section_a", use_container_width=True)
+    
+    if section_a_submit:
+        st.session_state.weight_temp_product = selected_product
+        st.session_state.weight_section_a_submitted = True
+        st.session_state.weight_section_b_submitted = False
+        st.session_state.weight_section_c_submitted = False
+        st.session_state.weight_section_d_submitted = False
+        st.rerun()
+    
+    # SECTION B: Series (only show if Section A is submitted)
+    if st.session_state.weight_section_a_submitted:
+        st.markdown("---")
+        st.markdown("#### B. Series Selection")
+        col1, col2 = st.columns([3, 1])
         
         with col1:
-            # A. Product Type
-            product_options = get_available_products()
-            selected_product = st.selectbox(
-                "A. Product Type",
-                product_options,
-                key="weight_calc_product_select"
-            )
-            
-            # Show product info
-            if selected_product != "Select Product":
-                st.caption(f"Selected: {selected_product}")
-        
-        with col2:
             # B. Series (Inch/Metric)
-            series_options = get_series_for_product(selected_product)
+            series_options = get_series_for_product(st.session_state.weight_temp_product)
             selected_series = st.selectbox(
                 "B. Series",
                 series_options,
-                key="weight_calc_series_select"
+                key="weight_calc_series_select",
+                index=series_options.index(st.session_state.weight_temp_series) if st.session_state.weight_temp_series in series_options else 0
             )
             
             # Show series info with unit conversion note
@@ -2018,42 +2048,88 @@ def show_weight_calculator_enhanced():
                 if selected_series == "Inch":
                     st.caption("⚠️ Dimensions will be converted from inches to mm")
         
-        with col3:
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section_b_submit = st.button("Submit Section B", key="submit_section_b", use_container_width=True)
+        
+        if section_b_submit:
+            st.session_state.weight_temp_series = selected_series
+            st.session_state.weight_section_b_submitted = True
+            st.session_state.weight_section_c_submitted = False
+            st.session_state.weight_section_d_submitted = False
+            st.rerun()
+    
+    # SECTION C: Standard (only show if Section B is submitted)
+    if st.session_state.weight_section_b_submitted:
+        st.markdown("---")
+        st.markdown("#### C. Standard Selection")
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
             # C. Standard (based on Product + Series) - DISABLED FOR THREADED ROD
-            if selected_product == "Threaded Rod":
+            if st.session_state.weight_temp_product == "Threaded Rod":
                 st.info("Standard not required for Threaded Rod")
                 selected_standard = "Not Required"
-                st.session_state.weight_calc_standard_select = "Not Required"
+                st.session_state.weight_temp_standard = "Not Required"
             else:
-                standard_options = get_standards_for_product_series(selected_product, selected_series)
+                standard_options = get_standards_for_product_series(st.session_state.weight_temp_product, st.session_state.weight_temp_series)
                 selected_standard = st.selectbox(
                     "C. Standard",
                     standard_options,
-                    key="weight_calc_standard_select"
+                    key="weight_calc_standard_select",
+                    index=standard_options.index(st.session_state.weight_temp_standard) if st.session_state.weight_temp_standard in standard_options else 0
                 )
             
             # Show standard info
             if selected_standard != "Select Standard" and selected_standard != "Not Required":
                 st.caption(f"Standard: {selected_standard}")
         
-        with col4:
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section_c_submit = st.button("Submit Section C", key="submit_section_c", use_container_width=True)
+        
+        if section_c_submit:
+            st.session_state.weight_temp_standard = selected_standard
+            st.session_state.weight_section_c_submitted = True
+            st.session_state.weight_section_d_submitted = False
+            st.rerun()
+    
+    # SECTION D: Size (only show if Section C is submitted)
+    if st.session_state.weight_section_c_submitted:
+        st.markdown("---")
+        st.markdown("#### D. Size Selection")
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
             # D. Size (based on Standard + Product) - DISABLED FOR THREADED ROD
-            if selected_product == "Threaded Rod":
+            if st.session_state.weight_temp_product == "Threaded Rod":
                 st.info("Size not required for Threaded Rod")
                 selected_size = "Not Required"
-                st.session_state.weight_calc_size_select = "Not Required"
+                st.session_state.weight_temp_size = "Not Required"
             else:
-                size_options = get_sizes_for_standard_product(selected_standard, selected_product)
+                size_options = get_sizes_for_standard_product(st.session_state.weight_temp_standard, st.session_state.weight_temp_product)
                 selected_size = st.selectbox(
                     "D. Size",
                     size_options,
-                    key="weight_calc_size_select"
+                    key="weight_calc_size_select",
+                    index=size_options.index(st.session_state.weight_temp_size) if st.session_state.weight_temp_size in size_options else 0
                 )
             
             # Show size info
             if selected_size != "Select Size" and selected_size != "Not Required":
                 st.caption(f"Size: {selected_size}")
         
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section_d_submit = st.button("Submit Section D", key="submit_section_d", use_container_width=True)
+        
+        if section_d_submit:
+            st.session_state.weight_temp_size = selected_size
+            st.session_state.weight_section_d_submitted = True
+            st.rerun()
+    
+    # Only show the rest of the form if all sections are submitted
+    if st.session_state.weight_section_d_submitted:
         st.markdown("---")
         st.markdown("### Diameter Specification")
         
@@ -2089,15 +2165,15 @@ def show_weight_calculator_enhanced():
                     )
                 
                 st.caption(f"Blank Diameter: {blank_diameter} {blank_dia_unit}")
-                if selected_series == "Inch" and blank_dia_unit == "inch":
+                if st.session_state.weight_temp_series == "Inch" and blank_dia_unit == "inch":
                     st.caption(f"→ {blank_diameter * 25.4:.2f} mm (converted)")
             
             else:  # Pitch Diameter
                 st.markdown("**Thread Specification**")
                 
                 # Thread Standard
-                thread_std_options = get_thread_standards_for_series(selected_series)
-                if selected_series == "Select Series":
+                thread_std_options = get_thread_standards_for_series(st.session_state.weight_temp_series)
+                if st.session_state.weight_temp_series == "Select Series":
                     thread_std_options = ["Select Thread Standard"]
                 
                 thread_standard = st.selectbox(
@@ -2116,7 +2192,7 @@ def show_weight_calculator_enhanced():
                     )
                     
                     # Thread Class - Only show for Inch series
-                    if selected_series == "Inch" and thread_standard == "ASME B1.1":
+                    if st.session_state.weight_temp_series == "Inch" and thread_standard == "ASME B1.1":
                         thread_class_options = get_thread_classes_enhanced(thread_standard)
                         if len(thread_class_options) == 1:  # Only "All"
                             thread_class_options = ["2A", "3A", "1A"]
@@ -2133,11 +2209,11 @@ def show_weight_calculator_enhanced():
                     st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
                     
                     # NEW: Show pitch diameter information for threaded rod
-                    if selected_product == "Threaded Rod" and thread_size != "All":
+                    if st.session_state.weight_temp_product == "Threaded Rod" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
                             # Convert pitch diameter based on series
-                            if selected_series == "Inch":
+                            if st.session_state.weight_temp_series == "Inch":
                                 # For Inch series, pitch diameter from ASME B1.1 is in inches, convert to mm
                                 pitch_diameter_mm = pitch_diameter * 25.4
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
@@ -2174,7 +2250,7 @@ def show_weight_calculator_enhanced():
                 )
             
             # Show length conversion for Inch series
-            if selected_series == "Inch" and length_unit == "inch":
+            if st.session_state.weight_temp_series == "Inch" and length_unit == "inch":
                 st.caption(f"→ {length * 25.4:.2f} mm (converted)")
         
         with col2:
@@ -2194,23 +2270,23 @@ def show_weight_calculator_enhanced():
         with col3:
             # Calculate button space
             st.markdown("<br>", unsafe_allow_html=True)
-            calculate_btn = st.form_submit_button("Calculate Weight", use_container_width=True, type="primary")
+            calculate_btn = st.button("Calculate Weight", use_container_width=True, type="primary")
     
     # Handle form submission
     if calculate_btn:
         # Validate inputs
         validation_errors = []
         
-        if selected_product == "Select Product":
+        if st.session_state.weight_temp_product == "Select Product":
             validation_errors.append("Please select a Product Type")
-        if selected_series == "Select Series":
+        if st.session_state.weight_temp_series == "Select Series":
             validation_errors.append("Please select a Series")
         
         # Skip Standard and Size validation for Threaded Rod
-        if selected_product != "Threaded Rod":
-            if selected_standard == "Select Standard":
+        if st.session_state.weight_temp_product != "Threaded Rod":
+            if st.session_state.weight_temp_standard == "Select Standard":
                 validation_errors.append("Please select a Standard")
-            if selected_size == "Select Size":
+            if st.session_state.weight_temp_size == "Select Size":
                 validation_errors.append("Please select a Size")
         
         if selected_diameter_type == "Pitch Diameter" and thread_standard == "Select Thread Standard":
@@ -2222,14 +2298,14 @@ def show_weight_calculator_enhanced():
         else:
             # Prepare calculation parameters
             calculation_params = {
-                'product_type': selected_product,
+                'product_type': st.session_state.weight_temp_product,
                 'diameter_type': selected_diameter_type,
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'series': selected_series,  # Pass series for unit conversion
-                'standard': selected_standard,
-                'size': selected_size
+                'series': st.session_state.weight_temp_series,  # Pass series for unit conversion
+                'standard': st.session_state.weight_temp_standard,
+                'size': st.session_state.weight_temp_size
             }
             
             # Add diameter parameters based on type
@@ -2240,11 +2316,11 @@ def show_weight_calculator_enhanced():
                 })
             else:
                 # For pitch diameter, get the actual diameter from thread data
-                if selected_product == "Threaded Rod" and thread_size != "All":
+                if st.session_state.weight_temp_product == "Threaded Rod" and thread_size != "All":
                     pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                     if pitch_diameter:
                         # For Inch series, pitch diameter from ASME B1.1 is in inches
-                        if selected_series == "Inch":
+                        if st.session_state.weight_temp_series == "Inch":
                             calculation_params.update({
                                 'diameter_value': pitch_diameter,
                                 'diameter_unit': 'inch'  # ASME B1.1 data is in inches
@@ -2276,9 +2352,9 @@ def show_weight_calculator_enhanced():
                 
                 # Save to calculation history
                 calculation_data = {
-                    'product': selected_product,
-                    'series': selected_series,
-                    'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
+                    'product': st.session_state.weight_temp_product,
+                    'series': st.session_state.weight_temp_series,
+                    'size': st.session_state.weight_temp_size if st.session_state.weight_temp_product != "Threaded Rod" else "Threaded Rod",
                     'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
                     'length': f"{length} {length_unit}",
                     'material': material,
@@ -2291,7 +2367,7 @@ def show_weight_calculator_enhanced():
                 st.success("**Weight Calculation Completed Successfully!**")
     
     # Display current selection summary
-    if selected_product != "Select Product":
+    if st.session_state.weight_section_a_submitted:
         st.markdown("### Current Selection Summary")
         
         summary_col1, summary_col2 = st.columns(2)
@@ -2299,35 +2375,37 @@ def show_weight_calculator_enhanced():
         with summary_col1:
             st.markdown(f"""
             **Product Standards:**
-            - **Product Type:** {selected_product}
-            - **Series:** {selected_series}
-            - **Standard:** {selected_standard if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
-            - **Size:** {selected_size if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Product Type:** {st.session_state.weight_temp_product}
+            - **Series:** {st.session_state.weight_temp_series}
+            - **Standard:** {st.session_state.weight_temp_standard if st.session_state.weight_temp_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Size:** {st.session_state.weight_temp_size if st.session_state.weight_temp_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
             """)
         
         with summary_col2:
-            if selected_diameter_type == "Blank Diameter":
-                st.markdown(f"""
-                **Diameter Specification:**
-                - **Type:** {selected_diameter_type}
-                - **Value:** {blank_diameter} {blank_dia_unit}
-                """)
-            else:
-                st.markdown(f"""
-                **Diameter Specification:**
-                - **Type:** {selected_diameter_type}
-                - **Thread Standard:** {thread_standard}
-                - **Thread Size:** {thread_size}
-                - **Thread Class:** {thread_class}
-                """)
+            if st.session_state.weight_section_d_submitted:
+                if selected_diameter_type == "Blank Diameter":
+                    st.markdown(f"""
+                    **Diameter Specification:**
+                    - **Type:** {selected_diameter_type}
+                    - **Value:** {blank_diameter} {blank_dia_unit}
+                    """)
+                else:
+                    st.markdown(f"""
+                    **Diameter Specification:**
+                    - **Type:** {selected_diameter_type}
+                    - **Thread Standard:** {thread_standard}
+                    - **Thread Size:** {thread_size}
+                    - **Thread Class:** {thread_class}
+                    """)
         
-        st.markdown(f"""
-        **Additional Parameters:**
-        - **Length:** {length} {length_unit}
-        - **Material:** {material}
-        - **Material Density:** {get_material_density(material)} kg/m³
-        - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
-        """)
+        if st.session_state.weight_section_d_submitted:
+            st.markdown(f"""
+            **Additional Parameters:**
+            - **Length:** {length} {length_unit}
+            - **Material:** {material}
+            - **Material Density:** {get_material_density(material)} kg/m³
+            - **Series Unit Handling:** {'Inch → mm conversion' if st.session_state.weight_temp_series == 'Inch' else 'Metric (mm)'}
+            """)
     
     # Display calculation results
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
@@ -2381,6 +2459,21 @@ def show_weight_calculator_enhanced():
                 - Conversion factor: 1 inch = 25.4 mm
                 - Weight calculations performed in metric units (kg/m³)
                 """)
+    
+    # Reset button
+    if st.session_state.weight_section_a_submitted:
+        if st.button("Reset All Sections", use_container_width=True, key="reset_weight_sections"):
+            st.session_state.weight_section_a_submitted = False
+            st.session_state.weight_section_b_submitted = False
+            st.session_state.weight_section_c_submitted = False
+            st.session_state.weight_section_d_submitted = False
+            st.session_state.weight_temp_product = "Select Product"
+            st.session_state.weight_temp_series = "Select Series"
+            st.session_state.weight_temp_standard = "Select Standard"
+            st.session_state.weight_temp_size = "Select Size"
+            st.session_state.weight_calculation_performed = False
+            st.session_state.weight_calc_result = None
+            st.rerun()
 
 def show_batch_calculator_enhanced():
     """Enhanced batch calculator with same workflow"""
