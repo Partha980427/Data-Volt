@@ -1575,6 +1575,165 @@ def convert_to_meters(value, from_unit, series=None):
         return value / 1000
 
 # ======================================================
+# ENHANCED WEIGHT CALCULATION FUNCTIONS FOR HEX PRODUCTS
+# ======================================================
+
+def get_hex_head_dimensions(standard, product, size):
+    """Get width across flats and head height for hex products from database"""
+    try:
+        # Get the appropriate dataframe based on standard
+        if standard == "ASME B18.2.1":
+            temp_df = df.copy()
+        elif standard == "ISO 4014":
+            temp_df = df_iso4014.copy()
+        elif standard == "DIN-7991":
+            temp_df = df_din7991.copy()
+        elif standard == "ASME B18.3":
+            temp_df = df_asme_b18_3.copy()
+        else:
+            return None, None
+        
+        # Filter by product and size
+        if 'Product' in temp_df.columns and product != "All":
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        if 'Size' in temp_df.columns and size != "All":
+            # Normalize size comparison
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        if temp_df.empty:
+            return None, None
+        
+        # Look for width across flats column
+        width_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['width', 'across', 'flats', 'w_'])]
+        width_col = None
+        for col in width_cols:
+            if 'min' in col.lower():
+                width_col = col
+                break
+        if not width_col and width_cols:
+            width_col = width_cols[0]
+        
+        # Look for head height column
+        height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
+        height_col = None
+        for col in height_cols:
+            if 'min' in col.lower():
+                height_col = col
+                break
+        if not height_col and height_cols:
+            height_col = height_cols[0]
+        
+        width_across_flats = None
+        head_height = None
+        
+        if width_col and width_col in temp_df.columns:
+            width_across_flats = temp_df[width_col].iloc[0]
+            if pd.notna(width_across_flats):
+                width_across_flats = float(width_across_flats)
+        
+        if height_col and height_col in temp_df.columns:
+            head_height = temp_df[height_col].iloc[0]
+            if pd.notna(head_height):
+                head_height = float(head_height)
+        
+        return width_across_flats, head_height
+        
+    except Exception as e:
+        st.warning(f"Error getting hex head dimensions: {str(e)}")
+        return None, None
+
+def calculate_hex_product_weight(parameters, width_across_flats, head_height):
+    """Calculate weight for hex products (Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws)"""
+    try:
+        # Extract parameters
+        product_type = parameters.get('product_type', 'Hex Bolt')
+        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
+        diameter_value = parameters.get('diameter_value', 0.0)
+        diameter_unit = parameters.get('diameter_unit', 'mm')
+        length = parameters.get('length', 0.0)
+        length_unit = parameters.get('length_unit', 'mm')
+        material = parameters.get('material', 'Carbon Steel')
+        series = parameters.get('series', 'Metric')
+        
+        # Convert all dimensions to meters for calculation
+        if diameter_unit == 'mm':
+            diameter_m = convert_to_meters(diameter_value, 'mm', series)
+        elif diameter_unit == 'inch':
+            diameter_m = convert_to_meters(diameter_value, 'inch', series)
+        elif diameter_unit == 'ft':
+            diameter_m = convert_to_meters(diameter_value, 'ft', series)
+        else:  # meters
+            diameter_m = convert_to_meters(diameter_value, 'meter', series)
+        
+        if length_unit == 'mm':
+            length_m = convert_to_meters(length, 'mm', series)
+        elif length_unit == 'inch':
+            length_m = convert_to_meters(length, 'inch', series)
+        elif length_unit == 'ft':
+            length_m = convert_to_meters(length, 'ft', series)
+        else:  # meters
+            length_m = convert_to_meters(length, 'meter', series)
+        
+        # Convert head dimensions to meters
+        if width_across_flats is not None:
+            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
+        else:
+            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+        
+        if head_height is not None:
+            head_height_m = convert_to_meters(head_height, 'mm', series)
+        else:
+            head_height_m = diameter_m * 0.65  # Default ratio if not available
+        
+        # Get material density
+        density = get_material_density(material)  # kg/m³
+        
+        # 1. Calculate Shank Volume (Cylinder Volume)
+        shank_radius = diameter_m / 2
+        shank_volume = math.pi * shank_radius**2 * length_m  # m³
+        
+        # 2. Calculate Head Volume (Hexagonal Prism)
+        # Calculate side length from width across flats: Side = (Width Across Flats / √3) × 2
+        side_length = (width_across_flats_m / math.sqrt(3)) * 2
+        
+        # Area of regular hexagon = (3√3 × side²) / 2
+        hexagon_area = (3 * math.sqrt(3) * side_length**2) / 2
+        
+        # Head volume = hexagon area × head height
+        head_volume = hexagon_area * head_height_m
+        
+        # 3. Total Volume = Shank Volume + Head Volume
+        total_volume = shank_volume + head_volume
+        
+        # 4. Calculate Weight
+        weight_kg = total_volume * density
+        
+        return {
+            'weight_kg': weight_kg,
+            'weight_g': weight_kg * 1000,
+            'weight_lb': weight_kg * 2.20462,
+            'shank_volume_m3': shank_volume,
+            'head_volume_m3': head_volume,
+            'total_volume_m3': total_volume,
+            'diameter_m': diameter_m,
+            'length_m': length_m,
+            'width_across_flats_m': width_across_flats_m,
+            'head_height_m': head_height_m,
+            'side_length_m': side_length,
+            'hexagon_area_m2': hexagon_area,
+            'density': density,
+            'series': series,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}",
+            'calculation_method': 'Hex Product Formula'
+        }
+        
+    except Exception as e:
+        st.error(f"Hex product calculation error: {str(e)}")
+        return None
+
+# ======================================================
 # WEIGHT CALCULATION SECTION - COMPLETE WORKFLOW IMPLEMENTATION
 # ======================================================
 
@@ -1705,7 +1864,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH UNIT CONVERSION"""
+    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH HEX PRODUCT FORMULAS"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1715,9 +1874,25 @@ def calculate_weight_enhanced(parameters):
         length = parameters.get('length', 0.0)
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
-        series = parameters.get('series', 'Metric')  # Get series for unit conversion
+        series = parameters.get('series', 'Metric')
+        standard = parameters.get('standard', 'ASME B18.2.1')
+        size = parameters.get('size', 'All')
         
-        # NEW: Convert all dimensions to meters for calculation, considering series
+        # Check if this is a hex product that uses the special formula
+        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
+        
+        if product_type in hex_products:
+            # Get head dimensions from database
+            width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
+            
+            if width_across_flats is not None and head_height is not None:
+                # Use the specialized hex product calculation
+                return calculate_hex_product_weight(parameters, width_across_flats, head_height)
+            else:
+                st.warning(f"Could not retrieve head dimensions for {product_type}. Using standard calculation.")
+        
+        # Standard calculation for other products
+        # Convert all dimensions to meters for calculation, considering series
         # For Inch series, assume dimensions are in inches and convert to meters
         if diameter_unit == 'mm':
             diameter_m = convert_to_meters(diameter_value, 'mm', series)
@@ -1772,7 +1947,8 @@ def calculate_weight_enhanced(parameters):
             'product_factor': factor,
             'series': series,
             'original_diameter': f"{diameter_value} {diameter_unit}",
-            'original_length': f"{length} {length_unit}"
+            'original_length': f"{length} {length_unit}",
+            'calculation_method': 'Standard Cylinder Formula'
         }
         
     except Exception as e:
@@ -1801,6 +1977,7 @@ def show_weight_calculator_enhanced():
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
+    **HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws
     """)
     
     # Initialize session state for form inputs
@@ -2050,7 +2227,9 @@ def show_weight_calculator_enhanced():
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'series': selected_series  # Pass series for unit conversion
+                'series': selected_series,  # Pass series for unit conversion
+                'standard': selected_standard,
+                'size': selected_size
             }
             
             # Add diameter parameters based on type
@@ -2171,15 +2350,28 @@ def show_weight_calculator_enhanced():
         with st.expander("Detailed Calculation Parameters"):
             st.markdown(f"""
             **Calculation Details:**
+            - **Calculation Method:** {result.get('calculation_method', 'Standard Cylinder Formula')}
             - Volume: {result['volume_m3']:.8f} m³
             - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
             - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
-            - Product Factor: {result['product_factor']}
             - Material Density: {result['density']} kg/m³
             - Series: {result['series']}
             - Original Diameter: {result['original_diameter']}
             - Original Length: {result['original_length']}
             """)
+            
+            # Show hex product specific details if available
+            if result.get('calculation_method') == 'Hex Product Formula':
+                st.markdown(f"""
+                **Hex Product Specific Details:**
+                - Shank Volume: {result['shank_volume_m3']:.8f} m³
+                - Head Volume: {result['head_volume_m3']:.8f} m³
+                - Total Volume: {result['total_volume_m3']:.8f} m³
+                - Width Across Flats: {result['width_across_flats_m']:.4f} m ({result['width_across_flats_m'] * 1000:.2f} mm)
+                - Head Height: {result['head_height_m']:.4f} m ({result['head_height_m'] * 1000:.2f} mm)
+                - Side Length: {result['side_length_m']:.4f} m ({result['side_length_m'] * 1000:.2f} mm)
+                - Hexagon Area: {result['hexagon_area_m2']:.6f} m²
+                """)
             
             # Show unit conversion details for Inch series
             if result['series'] == "Inch":
@@ -2199,6 +2391,7 @@ def show_batch_calculator_enhanced():
     **Batch processing with the same product standards workflow**
     Upload a CSV/Excel file with columns matching the single calculator inputs.
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
+    **HEX PRODUCT FORMULA:** Specialized calculation for hex products
     """)
     
     # Download template
@@ -4081,7 +4274,8 @@ def show_enhanced_home():
             "Professional reporting",
             "Carbon steel density calculations",
             "Batch processing capabilities",
-            "Automatic inch-to-mm conversion"
+            "Automatic inch-to-mm conversion",
+            "Hex product specialized formulas"
         ]
         
         for feature in features:
@@ -4116,6 +4310,17 @@ def show_help_system():
             - Automatic pitch diameter lookup from thread database
             - Support for both inch and metric threaded rods
             
+            **HEX PRODUCT FORMULA:**
+            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use specialized calculation
+            - **Shank Volume**: Cylinder volume based on diameter and length
+            - **Head Volume**: Hexagonal prism volume calculated from:
+              - Width Across Flats (Min) from database
+              - Head Height (Min) from database
+              - Side Length = (Width Across Flats / √3) × 2
+              - Hexagon Area = (3√3 × side²) / 2
+              - Head Volume = Hexagon Area × Head Height
+            - **Total Volume** = Shank Volume + Head Volume
+            
             **UNIT CONVERSION FEATURE:**
             - **Inch Series**: All dimensions automatically converted from inches to mm
             - **ASME B1.1**: Pitch diameter data in inches converted to mm
@@ -4127,6 +4332,7 @@ def show_help_system():
             - Handle both body diameter and thread pitch diameter scenarios
             - Maintain smooth filtering like Product Database section
             - Automatic unit conversion for accurate calculations
+            - Specialized formulas for hex products with head volume calculation
             """)
 
 # ======================================================
@@ -4195,7 +4401,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion and Hex Product Formulas</p>
         </div>
     """, unsafe_allow_html=True)
 
