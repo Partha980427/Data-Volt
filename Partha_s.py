@@ -1518,6 +1518,63 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
+# UNIT CONVERSION FUNCTIONS - ENHANCED FOR INCH SERIES
+# ======================================================
+def convert_to_mm(value, from_unit, series=None):
+    """Convert any unit to millimeters - ENHANCED with series detection"""
+    try:
+        if pd.isna(value):
+            return 0.0
+        
+        value = float(value)
+        
+        # If series is specified as "Inch", assume the value is in inches and convert to mm
+        if series == "Inch":
+            return value * 25.4
+        
+        # Standard unit conversion
+        if from_unit == 'mm':
+            return value
+        elif from_unit == 'inch':
+            return value * 25.4
+        elif from_unit == 'ft':
+            return value * 304.8
+        elif from_unit == 'meter':
+            return value * 1000
+        else:
+            return value  # Assume mm if unknown unit
+    except Exception as e:
+        st.warning(f"Unit conversion error: {str(e)}")
+        return value
+
+def convert_to_meters(value, from_unit, series=None):
+    """Convert any unit to meters - ENHANCED with series detection"""
+    try:
+        if pd.isna(value):
+            return 0.0
+        
+        value = float(value)
+        
+        # If series is specified as "Inch", assume the value is in inches and convert to meters
+        if series == "Inch":
+            return value * 0.0254
+        
+        # Standard unit conversion
+        if from_unit == 'mm':
+            return value / 1000
+        elif from_unit == 'inch':
+            return value * 0.0254
+        elif from_unit == 'ft':
+            return value * 0.3048
+        elif from_unit == 'meter':
+            return value
+        else:
+            return value / 1000  # Assume mm if unknown unit
+    except Exception as e:
+        st.warning(f"Unit conversion error: {str(e)}")
+        return value / 1000
+
+# ======================================================
 # WEIGHT CALCULATION SECTION - COMPLETE WORKFLOW IMPLEMENTATION
 # ======================================================
 
@@ -1648,7 +1705,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
+    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH UNIT CONVERSION"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1658,25 +1715,27 @@ def calculate_weight_enhanced(parameters):
         length = parameters.get('length', 0.0)
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
+        series = parameters.get('series', 'Metric')  # Get series for unit conversion
         
-        # Convert all to meters for calculation
+        # NEW: Convert all dimensions to meters for calculation, considering series
+        # For Inch series, assume dimensions are in inches and convert to meters
         if diameter_unit == 'mm':
-            diameter_m = diameter_value / 1000
+            diameter_m = convert_to_meters(diameter_value, 'mm', series)
         elif diameter_unit == 'inch':
-            diameter_m = diameter_value * 0.0254
+            diameter_m = convert_to_meters(diameter_value, 'inch', series)
         elif diameter_unit == 'ft':
-            diameter_m = diameter_value * 0.3048
+            diameter_m = convert_to_meters(diameter_value, 'ft', series)
         else:  # meters
-            diameter_m = diameter_value
+            diameter_m = convert_to_meters(diameter_value, 'meter', series)
         
         if length_unit == 'mm':
-            length_m = length / 1000
+            length_m = convert_to_meters(length, 'mm', series)
         elif length_unit == 'inch':
-            length_m = length * 0.0254
+            length_m = convert_to_meters(length, 'inch', series)
         elif length_unit == 'ft':
-            length_m = length * 0.3048
+            length_m = convert_to_meters(length, 'ft', series)
         else:  # meters
-            length_m = length
+            length_m = convert_to_meters(length, 'meter', series)
         
         # Get material density
         density = get_material_density(material)  # kg/m³
@@ -1710,7 +1769,10 @@ def calculate_weight_enhanced(parameters):
             'length_m': length_m,
             'volume_m3': volume,
             'density': density,
-            'product_factor': factor
+            'product_factor': factor,
+            'series': series,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}"
         }
         
     except Exception as e:
@@ -1738,6 +1800,7 @@ def show_weight_calculator_enhanced():
     st.info("""
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
+    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
     """)
     
     # Initialize session state for form inputs
@@ -1772,9 +1835,11 @@ def show_weight_calculator_enhanced():
                 key="weight_calc_series_select"
             )
             
-            # Show series info
+            # Show series info with unit conversion note
             if selected_series != "Select Series":
                 st.caption(f"Series: {selected_series}")
+                if selected_series == "Inch":
+                    st.caption("⚠️ Dimensions will be converted from inches to mm")
         
         with col3:
             # C. Standard (based on Product + Series) - DISABLED FOR THREADED ROD
@@ -1847,6 +1912,8 @@ def show_weight_calculator_enhanced():
                     )
                 
                 st.caption(f"Blank Diameter: {blank_diameter} {blank_dia_unit}")
+                if selected_series == "Inch" and blank_dia_unit == "inch":
+                    st.caption(f"→ {blank_diameter * 25.4:.2f} mm (converted)")
             
             else:  # Pitch Diameter
                 st.markdown("**Thread Specification**")
@@ -1892,7 +1959,15 @@ def show_weight_calculator_enhanced():
                     if selected_product == "Threaded Rod" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
-                            st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
+                            # Convert pitch diameter based on series
+                            if selected_series == "Inch":
+                                # For Inch series, pitch diameter from ASME B1.1 is in inches, convert to mm
+                                pitch_diameter_mm = pitch_diameter * 25.4
+                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
+                            else:
+                                # For Metric series, pitch diameter is already in mm
+                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
+                            
                             # Store the pitch diameter for calculation
                             st.session_state.pitch_diameter_value = pitch_diameter
                         else:
@@ -1920,6 +1995,10 @@ def show_weight_calculator_enhanced():
                     ["mm", "inch", "ft", "meter"],
                     key="weight_calc_length_unit_select"
                 )
+            
+            # Show length conversion for Inch series
+            if selected_series == "Inch" and length_unit == "inch":
+                st.caption(f"→ {length * 25.4:.2f} mm (converted)")
         
         with col2:
             # Material - UPDATED WITH MORE MATERIALS
@@ -1970,7 +2049,8 @@ def show_weight_calculator_enhanced():
                 'diameter_type': selected_diameter_type,
                 'material': material,
                 'length': length,
-                'length_unit': length_unit
+                'length_unit': length_unit,
+                'series': selected_series  # Pass series for unit conversion
             }
             
             # Add diameter parameters based on type
@@ -1984,11 +2064,20 @@ def show_weight_calculator_enhanced():
                 if selected_product == "Threaded Rod" and thread_size != "All":
                     pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                     if pitch_diameter:
-                        calculation_params.update({
-                            'diameter_value': pitch_diameter,
-                            'diameter_unit': 'mm'  # Thread data is typically in mm
-                        })
-                        st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} mm for Threaded Rod")
+                        # For Inch series, pitch diameter from ASME B1.1 is in inches
+                        if selected_series == "Inch":
+                            calculation_params.update({
+                                'diameter_value': pitch_diameter,
+                                'diameter_unit': 'inch'  # ASME B1.1 data is in inches
+                            })
+                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
+                        else:
+                            # For Metric series, pitch diameter is in mm
+                            calculation_params.update({
+                                'diameter_value': pitch_diameter,
+                                'diameter_unit': 'mm'  # ISO thread data is in mm
+                            })
+                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} mm for Threaded Rod")
                     else:
                         st.error("Could not retrieve pitch diameter from thread data")
                         return
@@ -2009,6 +2098,7 @@ def show_weight_calculator_enhanced():
                 # Save to calculation history
                 calculation_data = {
                     'product': selected_product,
+                    'series': selected_series,
                     'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
                     'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
                     'length': f"{length} {length_unit}",
@@ -2057,6 +2147,7 @@ def show_weight_calculator_enhanced():
         - **Length:** {length} {length_unit}
         - **Material:** {material}
         - **Material Density:** {get_material_density(material)} kg/m³
+        - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
         """)
     
     # Display calculation results
@@ -2081,11 +2172,23 @@ def show_weight_calculator_enhanced():
             st.markdown(f"""
             **Calculation Details:**
             - Volume: {result['volume_m3']:.8f} m³
-            - Diameter: {result['diameter_m']:.4f} m
-            - Length: {result['length_m']:.4f} m
+            - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
+            - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
             - Product Factor: {result['product_factor']}
             - Material Density: {result['density']} kg/m³
+            - Series: {result['series']}
+            - Original Diameter: {result['original_diameter']}
+            - Original Length: {result['original_length']}
             """)
+            
+            # Show unit conversion details for Inch series
+            if result['series'] == "Inch":
+                st.markdown("""
+                **Unit Conversion (Inch Series):**
+                - All inch dimensions automatically converted to mm for calculation
+                - Conversion factor: 1 inch = 25.4 mm
+                - Weight calculations performed in metric units (kg/m³)
+                """)
 
 def show_batch_calculator_enhanced():
     """Enhanced batch calculator with same workflow"""
@@ -2095,6 +2198,7 @@ def show_batch_calculator_enhanced():
     st.info("""
     **Batch processing with the same product standards workflow**
     Upload a CSV/Excel file with columns matching the single calculator inputs.
+    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
     """)
     
     # Download template
@@ -3976,7 +4080,8 @@ def show_enhanced_home():
             "Enhanced user interface",
             "Professional reporting",
             "Carbon steel density calculations",
-            "Batch processing capabilities"
+            "Batch processing capabilities",
+            "Automatic inch-to-mm conversion"
         ]
         
         for feature in features:
@@ -4011,10 +4116,17 @@ def show_help_system():
             - Automatic pitch diameter lookup from thread database
             - Support for both inch and metric threaded rods
             
+            **UNIT CONVERSION FEATURE:**
+            - **Inch Series**: All dimensions automatically converted from inches to mm
+            - **ASME B1.1**: Pitch diameter data in inches converted to mm
+            - **Weight calculations**: Always performed in metric units (kg/m³)
+            - **Display**: Shows both original and converted values
+            
             **Purpose:**
             - Get accurate dimensional data from standards for weight calculations
             - Handle both body diameter and thread pitch diameter scenarios
             - Maintain smooth filtering like Product Database section
+            - Automatic unit conversion for accurate calculations
             """)
 
 # ======================================================
@@ -4083,7 +4195,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Threaded Rod Support</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion</p>
         </div>
     """, unsafe_allow_html=True)
 
