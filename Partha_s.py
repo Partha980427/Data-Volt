@@ -3585,7 +3585,26 @@ def apply_section_c_filters():
                                     return value / 1000  # Default assume mm if unknown unit
                             except Exception as e:
                                 st.warning(f"Unit conversion error: {str(e)}")
-                                return value / 1000  # Removed the "ak" typo hereak
+                                return value / 1000  # Removed the "ak" typo here                                # ... existing code ...
+                                
+                                # Apply property class filter using ALL possible columns
+                                filtered_data = pd.DataFrame()
+                                
+                                for prop_col in property_class_cols:
+                                    if prop_col in result_df.columns:
+                                        # Try exact match first
+                                        exact_match = result_df[result_df[prop_col] == property_class]
+                                        if not exact_match.empty:
+                                            filtered_data = exact_match
+                                            break  # Remove 'bre' and add proper break statement
+                                            
+                                        # Try string contains for more flexible matching
+                                        str_match = result_df[result_df[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
+                                        if not str_match.empty:
+                                            filtered_data = str_match
+                                            break
+                                
+                                # ... rest of the code ...ak
             # Try string contains for more flexible matching
             str_match = result_df[result_df[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
             if not str_match.empty:
