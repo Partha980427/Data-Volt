@@ -1643,8 +1643,8 @@ def get_hex_head_dimensions(standard, product, size):
         st.warning(f"Error getting hex head dimensions: {str(e)}")
         return None, None
 
-def calculate_hex_product_weight(parameters, width_across_flats, head_height):
-    """Calculate weight for hex products (Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws)"""
+def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_height):
+    """ENHANCED: Calculate weight for hex products using the specific formula provided"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1690,23 +1690,21 @@ def calculate_hex_product_weight(parameters, width_across_flats, head_height):
         density = get_material_density(material)  # kg/m³
         
         # 1. Calculate Shank Volume (Cylinder Volume)
+        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
         shank_radius = diameter_m / 2
         shank_volume = math.pi * shank_radius**2 * length_m  # m³
         
-        # 2. Calculate Head Volume (Hexagonal Prism)
-        # Calculate side length from width across flats: Side = (Width Across Flats / √3) × 2
+        # 2. Calculate Head Volume using the specific formula
+        # Side Length = (Width Across the Flat (Min)/√3) X 2
         side_length = (width_across_flats_m / math.sqrt(3)) * 2
         
-        # Area of regular hexagon = (3√3 × side²) / 2
-        hexagon_area = (3 * math.sqrt(3) * side_length**2) / 2
+        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
+        head_volume = 0.65 * (side_length**2) * head_height_m
         
-        # Head volume = hexagon area × head height
-        head_volume = hexagon_area * head_height_m
-        
-        # 3. Total Volume = Shank Volume + Head Volume
+        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
         total_volume = shank_volume + head_volume
         
-        # 4. Calculate Weight
+        # 4. Calculate Weight = Total volume x Density
         weight_kg = total_volume * density
         
         return {
@@ -1721,16 +1719,22 @@ def calculate_hex_product_weight(parameters, width_across_flats, head_height):
             'width_across_flats_m': width_across_flats_m,
             'head_height_m': head_height_m,
             'side_length_m': side_length,
-            'hexagon_area_m2': hexagon_area,
             'density': density,
             'series': series,
             'original_diameter': f"{diameter_value} {diameter_unit}",
             'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Hex Product Formula'
+            'calculation_method': 'Enhanced Hex Product Formula',
+            'formula_details': {
+                'shank_volume_formula': 'π × (diameter/2)² × length',
+                'head_volume_formula': '0.65 × side_length² × head_height',
+                'side_length_formula': '(width_across_flats / √3) × 2',
+                'total_volume_formula': 'shank_volume + head_volume',
+                'weight_formula': 'total_volume × density'
+            }
         }
         
     except Exception as e:
-        st.error(f"Hex product calculation error: {str(e)}")
+        st.error(f"Enhanced hex product calculation error: {str(e)}")
         return None
 
 # ======================================================
@@ -1831,20 +1835,25 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         if df_thread.empty:
             return None
         
-        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
+        # Look for pitch diameter columns - MODIFIED: For Threaded Rod in Inch series, use MAX pitch diameter
         pitch_dia_cols = []
         
-        # First priority: Pitch diameter minimum columns
+        # MODIFIED: For Threaded Rod in Inch series, prioritize MAX pitch diameter
+        max_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'max' in col.lower()]
+        if max_pitch_cols:
+            pitch_dia_cols.extend(max_pitch_cols)
+        
+        # Second priority: Pitch diameter minimum columns
         min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
         if min_pitch_cols:
             pitch_dia_cols.extend(min_pitch_cols)
         
-        # Second priority: Any pitch diameter columns
+        # Third priority: Any pitch diameter columns
         general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
         if general_pitch_cols:
             pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
         
-        # Third priority: Any diameter column that might contain pitch diameter
+        # Fourth priority: Any diameter column that might contain pitch diameter
         if not pitch_dia_cols:
             dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
             for col in dia_cols:
@@ -1864,7 +1873,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH HEX PRODUCT FORMULAS"""
+    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH ENHANCED HEX PRODUCT FORMULAS"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1878,7 +1887,7 @@ def calculate_weight_enhanced(parameters):
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
         
-        # Check if this is a hex product that uses the special formula
+        # Check if this is a hex product that uses the ENHANCED formula
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
         if product_type in hex_products:
@@ -1886,8 +1895,8 @@ def calculate_weight_enhanced(parameters):
             width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
             
             if width_across_flats is not None and head_height is not None:
-                # Use the specialized hex product calculation
-                return calculate_hex_product_weight(parameters, width_across_flats, head_height)
+                # Use the ENHANCED hex product calculation with specific formula
+                return calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_height)
             else:
                 st.warning(f"Could not retrieve head dimensions for {product_type}. Using standard calculation.")
         
@@ -1977,7 +1986,8 @@ def show_weight_calculator_enhanced():
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
-    **HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws
+    **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas
+    **MODIFIED:** Threaded Rod in Inch series now uses Pitch Diameter (Max) for weight calculation
     """)
     
     # Initialize session state for form inputs
@@ -2132,7 +2142,7 @@ def show_weight_calculator_enhanced():
                     
                     st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
                     
-                    # NEW: Show pitch diameter information for threaded rod
+                    # MODIFIED: Show pitch diameter information for threaded rod with MAX diameter for Inch series
                     if selected_product == "Threaded Rod" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
@@ -2140,9 +2150,11 @@ def show_weight_calculator_enhanced():
                             if selected_series == "Inch":
                                 # For Inch series, pitch diameter from ASME B1.1 is in inches, convert to mm
                                 pitch_diameter_mm = pitch_diameter * 25.4
-                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
+                                # MODIFIED: Show MAX pitch diameter message for Threaded Rod in Inch series
+                                st.success(f"Pitch Diameter (Max): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
+                                st.info("ℹ️ Using **Pitch Diameter (Max)** for Threaded Rod weight calculation in Inch series")
                             else:
-                                # For Metric series, pitch diameter is already in mm
+                                # For Metric series, pitch diameter is already in mm (use Min as before)
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
                             
                             # Store the pitch diameter for calculation
@@ -2249,9 +2261,10 @@ def show_weight_calculator_enhanced():
                                 'diameter_value': pitch_diameter,
                                 'diameter_unit': 'inch'  # ASME B1.1 data is in inches
                             })
-                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
+                            # MODIFIED: Show MAX pitch diameter message for Threaded Rod in Inch series
+                            st.success(f"Using Pitch Diameter (Max): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
                         else:
-                            # For Metric series, pitch diameter is in mm
+                            # For Metric series, pitch diameter is in mm (use Min as before)
                             calculation_params.update({
                                 'diameter_value': pitch_diameter,
                                 'diameter_unit': 'mm'  # ISO thread data is in mm
@@ -2360,17 +2373,23 @@ def show_weight_calculator_enhanced():
             - Original Length: {result['original_length']}
             """)
             
-            # Show hex product specific details if available
-            if result.get('calculation_method') == 'Hex Product Formula':
+            # Show ENHANCED hex product specific details if available
+            if result.get('calculation_method') == 'Enhanced Hex Product Formula':
                 st.markdown(f"""
-                **Hex Product Specific Details:**
-                - Shank Volume: {result['shank_volume_m3']:.8f} m³
-                - Head Volume: {result['head_volume_m3']:.8f} m³
-                - Total Volume: {result['total_volume_m3']:.8f} m³
-                - Width Across Flats: {result['width_across_flats_m']:.4f} m ({result['width_across_flats_m'] * 1000:.2f} mm)
-                - Head Height: {result['head_height_m']:.4f} m ({result['head_height_m'] * 1000:.2f} mm)
-                - Side Length: {result['side_length_m']:.4f} m ({result['side_length_m'] * 1000:.2f} mm)
-                - Hexagon Area: {result['hexagon_area_m2']:.6f} m²
+                **ENHANCED Hex Product Specific Details:**
+                - **Shank Volume:** {result['shank_volume_m3']:.8f} m³
+                - **Head Volume:** {result['head_volume_m3']:.8f} m³
+                - **Total Volume:** {result['total_volume_m3']:.8f} m³
+                - **Width Across Flats:** {result['width_across_flats_m']:.4f} m ({result['width_across_flats_m'] * 1000:.2f} mm)
+                - **Head Height:** {result['head_height_m']:.4f} m ({result['head_height_m'] * 1000:.2f} mm)
+                - **Side Length:** {result['side_length_m']:.4f} m ({result['side_length_m'] * 1000:.2f} mm)
+                
+                **Formulas Used:**
+                - Shank Volume = π × (diameter/2)² × length
+                - Side Length = (Width Across Flats / √3) × 2
+                - Head Volume = 0.65 × side_length² × head_height
+                - Total Volume = shank_volume + head_volume
+                - Weight = total_volume × density
                 """)
             
             # Show unit conversion details for Inch series
@@ -2380,6 +2399,16 @@ def show_weight_calculator_enhanced():
                 - All inch dimensions automatically converted to mm for calculation
                 - Conversion factor: 1 inch = 25.4 mm
                 - Weight calculations performed in metric units (kg/m³)
+                """)
+            
+            # MODIFIED: Show special note for Threaded Rod in Inch series using MAX pitch diameter
+            if (selected_product == "Threaded Rod" and selected_series == "Inch" and 
+                selected_diameter_type == "Pitch Diameter"):
+                st.markdown("""
+                **Special Note for Threaded Rod (Inch Series):**
+                - Using **Pitch Diameter (Max)** for weight calculation
+                - This provides a conservative weight estimate for threaded rods
+                - Max pitch diameter ensures the calculation accounts for maximum material volume
                 """)
 
 def show_batch_calculator_enhanced():
@@ -2391,7 +2420,8 @@ def show_batch_calculator_enhanced():
     **Batch processing with the same product standards workflow**
     Upload a CSV/Excel file with columns matching the single calculator inputs.
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
-    **HEX PRODUCT FORMULA:** Specialized calculation for hex products
+    **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas
+    **MODIFIED:** Threaded Rod in Inch series uses Pitch Diameter (Max) for weight calculation
     """)
     
     # Download template
@@ -4275,7 +4305,8 @@ def show_enhanced_home():
             "Carbon steel density calculations",
             "Batch processing capabilities",
             "Automatic inch-to-mm conversion",
-            "Hex product specialized formulas"
+            "ENHANCED hex product formulas with specific volume calculations",
+            "MODIFIED: Threaded Rod in Inch series uses Pitch Diameter (Max)"
         ]
         
         for feature in features:
@@ -4310,16 +4341,13 @@ def show_help_system():
             - Automatic pitch diameter lookup from thread database
             - Support for both inch and metric threaded rods
             
-            **HEX PRODUCT FORMULA:**
-            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use specialized calculation
-            - **Shank Volume**: Cylinder volume based on diameter and length
-            - **Head Volume**: Hexagonal prism volume calculated from:
-              - Width Across Flats (Min) from database
-              - Head Height (Min) from database
-              - Side Length = (Width Across Flats / √3) × 2
-              - Hexagon Area = (3√3 × side²) / 2
-              - Head Volume = Hexagon Area × Head Height
+            **ENHANCED HEX PRODUCT FORMULA:**
+            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use ENHANCED calculation
+            - **Shank Volume**: π × (diameter/2)² × length
+            - **Head Volume**: 0.65 × side_length² × head_height
+            - **Side Length**: (Width Across Flats / √3) × 2
             - **Total Volume** = Shank Volume + Head Volume
+            - **Weight** = Total Volume × Density
             
             **UNIT CONVERSION FEATURE:**
             - **Inch Series**: All dimensions automatically converted from inches to mm
@@ -4327,12 +4355,19 @@ def show_help_system():
             - **Weight calculations**: Always performed in metric units (kg/m³)
             - **Display**: Shows both original and converted values
             
+            **MODIFIED PITCH DIAMETER SELECTION:**
+            - **Threaded Rod in Inch Series**: Now uses **Pitch Diameter (Max)** for weight calculation
+            - **Purpose**: Provides conservative weight estimate for threaded rods
+            - **Benefit**: Ensures calculation accounts for maximum material volume
+            - **Other Products**: Continue to use Pitch Diameter (Min) as before
+            
             **Purpose:**
             - Get accurate dimensional data from standards for weight calculations
             - Handle both body diameter and thread pitch diameter scenarios
             - Maintain smooth filtering like Product Database section
             - Automatic unit conversion for accurate calculations
-            - Specialized formulas for hex products with head volume calculation
+            - ENHANCED formulas for hex products with specific volume calculation
+            - Conservative weight estimates for Threaded Rod using Max pitch diameter
             """)
 
 # ======================================================
@@ -4401,7 +4436,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion and Hex Product Formulas</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, Enhanced Hex Product Formulas, and Modified Threaded Rod Pitch Diameter Selection</p>
         </div>
     """, unsafe_allow_html=True)
 
