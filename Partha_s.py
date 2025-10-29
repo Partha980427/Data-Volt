@@ -1885,7 +1885,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH ENHANCED HEX PRODUCT FORMULAS"""
+    """Enhanced weight calculation with proper material densities and geometry"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1896,8 +1896,26 @@ def calculate_weight_enhanced(parameters):
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
         series = parameters.get('series', 'Metric')
-        standard = parameters.get('standard', 'ASME B18.2.1')
-        size = parameters.get('size', 'All')
+        
+        # ADD DEBUG STATEMENTS HERE
+        st.write("Debug - Length Conversion:")
+        st.write(f"Original Length: {length} {length_unit}")
+        
+        # Convert length to meters
+        if length_unit == 'mm':
+            length_m = convert_to_meters(length, 'mm', series)
+        elif length_unit == 'inch':
+            length_m = convert_to_meters(length, 'inch', series)
+        elif length_unit == 'ft':
+            length_m = convert_to_meters(length, 'ft', series)
+        else:  # meters
+            length_m = convert_to_meters(length, 'meter', series)
+            
+        # ADD MORE DEBUG STATEMENTS HERE
+        st.write(f"Converted Length: {length_m} meters")
+        st.write(f"In millimeters: {length_m * 1000} mm")
+
+        # ...rest of the function continues...
         
         # Check if this is a hex product that uses the ENHANCED formula
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
