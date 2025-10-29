@@ -1547,7 +1547,6 @@ def convert_to_mm(value, from_unit, series=None):
         st.warning(f"Unit conversion error: {str(e)}")
         return value
 
-# Find and replace the convert_to_meters function in your code (around line 3538)
 def convert_to_meters(value, from_unit, series=None):
     """Convert any unit to meters - ENHANCED with series detection"""
     try:
@@ -1556,32 +1555,21 @@ def convert_to_meters(value, from_unit, series=None):
         
         value = float(value)
         
-        # For Inch series, handle all units differently
+        # If series is specified as "Inch", assume the value is in inches and convert to meters
         if series == "Inch":
-            # For Inch series, assume input values are in inches unless specified otherwise
-            if from_unit == 'mm':
-                return value / 1000  # mm to meters
-            elif from_unit == 'inch':
-                return value * 0.0254  # inches to meters (1 inch = 25.4 mm)
-            elif from_unit == 'ft':
-                return value * 0.3048  # feet to meters (1 foot = 304.8 mm)
-            elif from_unit == 'meter':
-                return value  # already in meters
-            else:
-                return value * 0.0254  # Default to inches for Inch series
+            return value * 0.0254
         
-        # For Metric series or unspecified series
+        # Standard unit conversion
         if from_unit == 'mm':
-            return value / 1000  # mm to meters
+            return value / 1000
         elif from_unit == 'inch':
-            return value * 0.0254  # inches to meters
+            return value * 0.0254
         elif from_unit == 'ft':
-            return value * 0.3048  # feet to meters
+            return value * 0.3048
         elif from_unit == 'meter':
-            return value  # already in meters
+            return value
         else:
-            return value / 1000  # Default assume mm if unknown unit
-            
+            return value / 1000  # Assume mm if unknown unit
     except Exception as e:
         st.warning(f"Unit conversion error: {str(e)}")
         return value / 1000
@@ -1880,7 +1868,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH ENHANCED HEX PRODUCT FORMULAS"""
+    """Enhanced weight calculation with proper material densities and geometry"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1897,48 +1885,45 @@ def calculate_weight_enhanced(parameters):
         # Check if this is a hex product that uses the ENHANCED formula
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
-        if product_type in hex_products:
-            # Get head dimensions from database
-            width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
-            
-            if width_across_flats is not None and head_height is not None:
-                # Use the ENHANCED hex product calculation with specific formula
-                return calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_height)
-            else:
-                st.warning(f"Could not retrieve head dimensions for {product_type}. Using standard calculation.")
-        
-        # Standard calculation for other products
-        # Convert all dimensions to meters for calculation, considering series
-        # For Inch series, assume dimensions are in inches and convert to meters
-        if diameter_unit == 'mm':
-            diameter_m = convert_to_meters(diameter_value, 'mm', series)
-        elif diameter_unit == 'inch':
-            diameter_m = convert_to_meters(diameter_value, 'inch', series)
-        elif diameter_unit == 'ft':
-            diameter_m = convert_to_meters(diameter_value, 'ft', series)
-        else:  # meters
-            diameter_m = convert_to_meters(diameter_value, 'meter', series)
-        
-        if length_unit == 'mm':
-            length_m = convert_to_meters(length, 'mm', series)
+        # Convert length to meters based on unit and series
+        if length_unit == 'ft':
+            length_m = length * 0.3048  # 1 ft = 0.3048 meters
         elif length_unit == 'inch':
-            length_m = convert_to_meters(length, 'inch', series)
-        elif length_unit == 'ft':
-            length_m = convert_to_meters(length, 'ft', series)
+            length_m = length * 0.0254  # 1 inch = 0.0254 meters
+        elif length_unit == 'mm':
+            length_m = length / 1000  # 1 mm = 0.001 meters
         else:  # meters
-            length_m = convert_to_meters(length, 'meter', series)
+            length_m = length
+
+        # For Inch series, if no unit specified, assume inches
+        if series == "Inch" and length_unit == 'mm':
+            length_m = length * 0.0254  # Convert from inches to meters
         
+        # Convert diameter to meters
+        if diameter_unit == 'ft':
+            diameter_m = diameter_value * 0.3048
+        elif diameter_unit == 'inch':
+            diameter_m = diameter_value * 0.0254
+        elif diameter_unit == 'mm':
+            diameter_m = diameter_value / 1000
+        else:  # meters
+            diameter_m = diameter_value
+
+        # For Inch series, if no unit specified, assume inches
+        if series == "Inch" and diameter_unit == 'mm':
+            diameter_m = diameter_value * 0.0254
+
         # Get material density
         density = get_material_density(material)  # kg/m³
         
-        # Calculate volume of cylinder (simplified calculation)
+        # Calculate volume of cylinder
         radius = diameter_m / 2
         volume = math.pi * radius**2 * length_m  # m³
         
         # Calculate weight
         weight_kg = volume * density
         
-        # Apply product type factor (simplified - in reality would use actual product geometry)
+        # Apply product type factor
         product_factors = {
             "Hex Bolt": 1.0,
             "Heavy Hex Bolt": 1.1,
@@ -1946,7 +1931,7 @@ def calculate_weight_enhanced(parameters):
             "Heavy Hex Screws": 1.1,
             "Hexagon Socket Head Cap Screws": 0.9,
             "Hexagon Socket Countersunk Head Cap Screw": 0.85,
-            "Threaded Rod": 1.0  # Threaded rod uses full cylinder volume
+            "Threaded Rod": 1.0
         }
         
         factor = product_factors.get(product_type, 1.0)
