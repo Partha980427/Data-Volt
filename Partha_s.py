@@ -3535,7 +3535,32 @@ def apply_section_c_filters():
             exact_match = result_df[result_df[prop_col] == property_class]
             if not exact_match.empty:
                 filtered_data = exact_match
-                break
+                bre                def convert_to_meters(value, from_unit, series=None):
+                    """Convert any unit to meters - ENHANCED with series detection"""
+                    try:
+                        if pd.isna(value):
+                            return 0.0
+                        
+                        value = float(value)
+                        
+                        # If series is specified as "Inch", assume the value is in inches and convert to meters
+                        if series == "Inch":
+                            return value * 0.0254  # 1 inch = 0.0254 meters
+                        
+                        # Standard unit conversion - FIXED FOR ALL UNITS
+                        if from_unit == 'mm':
+                            return value / 1000  # Convert mm to meters (1 m = 1000 mm)
+                        elif from_unit == 'inch':
+                            return value * 0.0254  # Convert inches to meters (1 inch = 0.0254 m)
+                        elif from_unit == 'ft':
+                            return value * 0.3048  # Convert feet to meters (1 ft = 0.3048 m)
+                        elif from_unit == 'meter':
+                            return value  # Already in meters
+                        else:
+                            return value / 1000  # Default assume mm if unknown unit
+                    except Exception as e:
+                        st.warning(f"Unit conversion error: {str(e)}")
+                        return value / 1000ak
             # Try string contains for more flexible matching
             str_match = result_df[result_df[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
             if not str_match.empty:
