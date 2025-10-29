@@ -212,8 +212,7 @@ def initialize_session_state():
         "weight_calc_length_unit": "mm",
         "weight_calc_material": "Carbon Steel",
         "weight_calc_result": None,
-        "weight_calculation_performed": False,
-        "weight_form_submitted": False
+        "weight_calculation_performed": False
     }
     
     for key, value in defaults.items():
@@ -1519,10 +1518,10 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
-# FIXED UNIT CONVERSION FUNCTIONS - CORRECTED LENGTH CONVERSIONS
+# UNIT CONVERSION FUNCTIONS - ENHANCED FOR INCH SERIES
 # ======================================================
 def convert_to_mm(value, from_unit, series=None):
-    """Convert any unit to millimeters - FIXED with correct conversion factors"""
+    """Convert any unit to millimeters - ENHANCED with series detection"""
     try:
         if pd.isna(value):
             return 0.0
@@ -1533,15 +1532,15 @@ def convert_to_mm(value, from_unit, series=None):
         if series == "Inch":
             return value * 25.4
         
-        # CORRECTED unit conversion factors
+        # Standard unit conversion
         if from_unit == 'mm':
             return value
         elif from_unit == 'inch':
-            return value * 25.4  # 1 inch = 25.4 mm
+            return value * 25.4
         elif from_unit == 'ft':
-            return value * 304.8  # 1 foot = 304.8 mm (FIXED: was incorrect)
+            return value * 304.8
         elif from_unit == 'meter':
-            return value * 1000  # 1 meter = 1000 mm
+            return value * 1000
         else:
             return value  # Assume mm if unknown unit
     except Exception as e:
@@ -1549,7 +1548,7 @@ def convert_to_mm(value, from_unit, series=None):
         return value
 
 def convert_to_meters(value, from_unit, series=None):
-    """Convert any unit to meters - FIXED with correct conversion factors"""
+    """Convert any unit to meters - ENHANCED with series detection"""
     try:
         if pd.isna(value):
             return 0.0
@@ -1558,15 +1557,15 @@ def convert_to_meters(value, from_unit, series=None):
         
         # If series is specified as "Inch", assume the value is in inches and convert to meters
         if series == "Inch":
-            return value * 0.0254  # 1 inch = 0.0254 meters
+            return value * 0.0254
         
-        # CORRECTED unit conversion factors
+        # Standard unit conversion
         if from_unit == 'mm':
-            return value / 1000  # 1 mm = 0.001 meters
+            return value / 1000
         elif from_unit == 'inch':
-            return value * 0.0254  # 1 inch = 0.0254 meters
+            return value * 0.0254
         elif from_unit == 'ft':
-            return value * 0.3048  # 1 foot = 0.3048 meters (FIXED: was incorrect)
+            return value * 0.3048
         elif from_unit == 'meter':
             return value
         else:
@@ -1657,7 +1656,7 @@ def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_h
         material = parameters.get('material', 'Carbon Steel')
         series = parameters.get('series', 'Metric')
         
-        # Convert all dimensions to meters for calculation using FIXED conversion functions
+        # Convert all dimensions to meters for calculation
         if diameter_unit == 'mm':
             diameter_m = convert_to_meters(diameter_value, 'mm', series)
         elif diameter_unit == 'inch':
@@ -1836,25 +1835,20 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         if df_thread.empty:
             return None
         
-        # Look for pitch diameter columns - MODIFIED: For Threaded Rod in Inch series, use MAX pitch diameter
+        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
         pitch_dia_cols = []
         
-        # MODIFIED: For Threaded Rod in Inch series, prioritize MAX pitch diameter
-        max_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'max' in col.lower()]
-        if max_pitch_cols:
-            pitch_dia_cols.extend(max_pitch_cols)
-        
-        # Second priority: Pitch diameter minimum columns
+        # First priority: Pitch diameter minimum columns
         min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
         if min_pitch_cols:
             pitch_dia_cols.extend(min_pitch_cols)
         
-        # Third priority: Any pitch diameter columns
+        # Second priority: Any pitch diameter columns
         general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
         if general_pitch_cols:
             pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
         
-        # Fourth priority: Any diameter column that might contain pitch diameter
+        # Third priority: Any diameter column that might contain pitch diameter
         if not pitch_dia_cols:
             dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
             for col in dia_cols:
@@ -1986,9 +1980,8 @@ def show_weight_calculator_enhanced():
     st.info("""
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
-    **UNIT CONVERSION FIXED:** Correct length conversions for all units (mm, inch, ft, meter)
+    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
     **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas
-    **MODIFIED:** Threaded Rod in Inch series now uses Pitch Diameter (Max) for weight calculation
     """)
     
     # Initialize session state for form inputs
@@ -2143,7 +2136,7 @@ def show_weight_calculator_enhanced():
                     
                     st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
                     
-                    # MODIFIED: Show pitch diameter information for threaded rod with MAX diameter for Inch series
+                    # NEW: Show pitch diameter information for threaded rod
                     if selected_product == "Threaded Rod" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
@@ -2151,11 +2144,9 @@ def show_weight_calculator_enhanced():
                             if selected_series == "Inch":
                                 # For Inch series, pitch diameter from ASME B1.1 is in inches, convert to mm
                                 pitch_diameter_mm = pitch_diameter * 25.4
-                                # MODIFIED: Show MAX pitch diameter message for Threaded Rod in Inch series
-                                st.success(f"Pitch Diameter (Max): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
-                                st.info("ℹ️ Using **Pitch Diameter (Max)** for Threaded Rod weight calculation in Inch series")
+                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
                             else:
-                                # For Metric series, pitch diameter is already in mm (use Min as before)
+                                # For Metric series, pitch diameter is already in mm
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
                             
                             # Store the pitch diameter for calculation
@@ -2169,7 +2160,7 @@ def show_weight_calculator_enhanced():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # Length - UPDATED WITH CORRECTED UNIT CONVERSIONS
+            # Length - UPDATED WITH FT UNIT
             length_col1, length_col2 = st.columns(2)
             with length_col1:
                 length = st.number_input(
@@ -2186,15 +2177,9 @@ def show_weight_calculator_enhanced():
                     key="weight_calc_length_unit_select"
                 )
             
-            # Show length conversion for all units
-            if length_unit == "mm":
-                st.caption(f"→ {convert_to_meters(length, 'mm', selected_series):.4f} m")
-            elif length_unit == "inch":
-                st.caption(f"→ {length * 25.4:.2f} mm → {convert_to_meters(length, 'inch', selected_series):.4f} m")
-            elif length_unit == "ft":
-                st.caption(f"→ {length * 304.8:.2f} mm → {convert_to_meters(length, 'ft', selected_series):.4f} m")
-            elif length_unit == "meter":
-                st.caption(f"→ {length * 1000:.2f} mm → {convert_to_meters(length, 'meter', selected_series):.4f} m")
+            # Show length conversion for Inch series
+            if selected_series == "Inch" and length_unit == "inch":
+                st.caption(f"→ {length * 25.4:.2f} mm (converted)")
         
         with col2:
             # Material - UPDATED WITH MORE MATERIALS
@@ -2268,10 +2253,9 @@ def show_weight_calculator_enhanced():
                                 'diameter_value': pitch_diameter,
                                 'diameter_unit': 'inch'  # ASME B1.1 data is in inches
                             })
-                            # MODIFIED: Show MAX pitch diameter message for Threaded Rod in Inch series
-                            st.success(f"Using Pitch Diameter (Max): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
+                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
                         else:
-                            # For Metric series, pitch diameter is in mm (use Min as before)
+                            # For Metric series, pitch diameter is in mm
                             calculation_params.update({
                                 'diameter_value': pitch_diameter,
                                 'diameter_unit': 'mm'  # ISO thread data is in mm
@@ -2407,16 +2391,6 @@ def show_weight_calculator_enhanced():
                 - Conversion factor: 1 inch = 25.4 mm
                 - Weight calculations performed in metric units (kg/m³)
                 """)
-            
-            # MODIFIED: Show special note for Threaded Rod in Inch series using MAX pitch diameter
-            if (selected_product == "Threaded Rod" and selected_series == "Inch" and 
-                selected_diameter_type == "Pitch Diameter"):
-                st.markdown("""
-                **Special Note for Threaded Rod (Inch Series):**
-                - Using **Pitch Diameter (Max)** for weight calculation
-                - This provides a conservative weight estimate for threaded rods
-                - Max pitch diameter ensures the calculation accounts for maximum material volume
-                """)
 
 def show_batch_calculator_enhanced():
     """Enhanced batch calculator with same workflow"""
@@ -2426,9 +2400,8 @@ def show_batch_calculator_enhanced():
     st.info("""
     **Batch processing with the same product standards workflow**
     Upload a CSV/Excel file with columns matching the single calculator inputs.
-    **UNIT CONVERSION FIXED:** Correct length conversions for all units
+    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
     **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas
-    **MODIFIED:** Threaded Rod in Inch series uses Pitch Diameter (Max) for weight calculation
     """)
     
     # Download template
@@ -3064,70 +3037,46 @@ def export_to_excel(df, filename_prefix):
         st.error(f"Export error: {str(e)}")
         return None
 
-def enhanced_export_data(filtered_df, export_format, filename_prefix="fastener_data"):
+def enhanced_export_data(filtered_df, export_format):
     """Enhanced export with multiple format options"""
-    try:
-        if filtered_df.empty:
-            st.warning("No data to export")
-            return None
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{filename_prefix}_{timestamp}"
-        
-        if export_format == "Excel":
-            excel_file = export_to_excel(filtered_df, filename)
-            if excel_file:
-                with open(excel_file, 'rb') as f:
-                    st.download_button(
-                        label="Download Excel File",
-                        data=f,
-                        file_name=f"{filename}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key=f"excel_export_{timestamp}"
-                    )
-                return True
-        else:  # CSV
-            csv_data = filtered_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV File",
-                data=csv_data,
-                file_name=f"{filename}.csv",
-                mime="text/csv",
-                use_container_width=True,
-                key=f"csv_export_{timestamp}"
-            )
-            return True
-    except Exception as e:
-        st.error(f"Export error: {str(e)}")
-        return None
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    if export_format == "Excel":
+        excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
+        if excel_file:
+            with open(excel_file, 'rb') as f:
+                st.download_button(
+                    label="Download Excel File",
+                    data=f,
+                    file_name=f"fastener_data_{timestamp}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key=f"excel_export_{timestamp}"
+                )
+    else:
+        csv_data = filtered_df.to_csv(index=False)
+        st.download_button(
+            label="Download CSV File",
+            data=csv_data,
+            file_name=f"fastener_data_{timestamp}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key=f"csv_export_{timestamp}"
+        )
 
 # ======================================================
 # Enhanced Calculation History
 # ======================================================
 def save_calculation_history(calculation_data):
-    """Save calculation to history with proper validation"""
-    try:
-        if 'calculation_history' not in st.session_state:
-            st.session_state.calculation_history = []
-        
-        # Validate calculation data
-        required_fields = ['product', 'weight_kg', 'timestamp']
-        if not all(field in calculation_data for field in required_fields):
-            st.warning("Calculation data missing required fields")
-            return False
-        
-        calculation_data['timestamp'] = datetime.now().isoformat()
-        st.session_state.calculation_history.append(calculation_data)
-        
-        # Keep only last 20 calculations
-        if len(st.session_state.calculation_history) > 20:
-            st.session_state.calculation_history = st.session_state.calculation_history[-20:]
-        
-        return True
-    except Exception as e:
-        st.error(f"Error saving calculation history: {str(e)}")
-        return False
+    """Save calculation to history"""
+    if 'calculation_history' not in st.session_state:
+        st.session_state.calculation_history = []
+    
+    calculation_data['timestamp'] = datetime.now().isoformat()
+    st.session_state.calculation_history.append(calculation_data)
+    
+    if len(st.session_state.calculation_history) > 20:
+        st.session_state.calculation_history = st.session_state.calculation_history[-20:]
 
 def show_calculation_history():
     """Display calculation history"""
@@ -4335,9 +4284,8 @@ def show_enhanced_home():
             "Professional reporting",
             "Carbon steel density calculations",
             "Batch processing capabilities",
-            "FIXED unit conversion for all length units",
-            "ENHANCED hex product formulas with specific volume calculations",
-            "MODIFIED: Threaded Rod in Inch series uses Pitch Diameter (Max)"
+            "Automatic inch-to-mm conversion",
+            "ENHANCED hex product formulas with specific volume calculations"
         ]
         
         for feature in features:
@@ -4380,26 +4328,18 @@ def show_help_system():
             - **Total Volume** = Shank Volume + Head Volume
             - **Weight** = Total Volume × Density
             
-            **FIXED UNIT CONVERSION:**
-            - **mm to meters**: value / 1000
-            - **inch to meters**: value × 0.0254
-            - **feet to meters**: value × 0.3048 (FIXED: was incorrect)
-            - **meter to meters**: value
-            - **6 feet** = 1.8288 meters (was calculating 0.1778 meters)
-            
-            **MODIFIED PITCH DIAMETER SELECTION:**
-            - **Threaded Rod in Inch Series**: Now uses **Pitch Diameter (Max)** for weight calculation
-            - **Purpose**: Provides conservative weight estimate for threaded rods
-            - **Benefit**: Ensures calculation accounts for maximum material volume
-            - **Other Products**: Continue to use Pitch Diameter (Min) as before
+            **UNIT CONVERSION FEATURE:**
+            - **Inch Series**: All dimensions automatically converted from inches to mm
+            - **ASME B1.1**: Pitch diameter data in inches converted to mm
+            - **Weight calculations**: Always performed in metric units (kg/m³)
+            - **Display**: Shows both original and converted values
             
             **Purpose:**
             - Get accurate dimensional data from standards for weight calculations
             - Handle both body diameter and thread pitch diameter scenarios
             - Maintain smooth filtering like Product Database section
-            - FIXED unit conversion for accurate calculations
+            - Automatic unit conversion for accurate calculations
             - ENHANCED formulas for hex products with specific volume calculation
-            - Conservative weight estimates for Threaded Rod using Max pitch diameter
             """)
 
 # ======================================================
@@ -4463,12 +4403,12 @@ def main():
         <div style='text-align: center; color: gray; padding: 2rem;'>
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
                 <span class="engineering-badge">ENHANCED Calculator</span>
-                <span class="technical-badge">FIXED Unit Conversion</span>
+                <span class="technical-badge">Improved Workflow</span>
                 <span class="material-badge">Dynamic Standards</span>
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with FIXED Unit Conversion, Enhanced Hex Product Formulas, and Modified Threaded Rod Pitch Diameter Selection</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion and Enhanced Hex Product Formulas</p>
         </div>
     """, unsafe_allow_html=True)
 
