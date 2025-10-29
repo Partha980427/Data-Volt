@@ -1547,6 +1547,8 @@ def convert_to_mm(value, from_unit, series=None):
         st.warning(f"Unit conversion error: {str(e)}")
         return value
 
+# Replace existing convert_to_meters function with this:
+
 def convert_to_meters(value, from_unit, series=None):
     """Convert any unit to meters - ENHANCED with series detection"""
     try:
