@@ -1547,8 +1547,6 @@ def convert_to_mm(value, from_unit, series=None):
         st.warning(f"Unit conversion error: {str(e)}")
         return value
 
-# Replace existing convert_to_meters function with this:
-
 def convert_to_meters(value, from_unit, series=None):
     """Convert any unit to meters - ENHANCED with series detection"""
     try:
@@ -1559,22 +1557,7 @@ def convert_to_meters(value, from_unit, series=None):
         
         # If series is specified as "Inch", assume the value is in inches and convert to meters
         if series == "Inch":
-            return value * 0.0254  # 1 inch = 0.0254 meters
-        
-        # Standard unit conversion - FIXED FOR ALL UNITS
-        if from_unit == 'mm':
-            return value / 1000  # Convert mm to meters (1 m = 1000 mm)
-        elif from_unit == 'inch':
-            return value * 0.0254  # Convert inches to meters (1 inch = 0.0254 m)
-        elif from_unit == 'ft':
-            return value * 0.3048  # Convert feet to meters (1 ft = 0.3048 m)
-        elif from_unit == 'meter':
-            return value  # Already in meters
-        else:
-            return value / 1000  # Default assume mm if unknown unit
-    except Exception as e:
-        st.warning(f"Unit conversion error: {str(e)}")
-        return value / 1000
+            return value * 0.0254
         
         # Standard unit conversion
         if from_unit == 'mm':
@@ -1885,7 +1868,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
+    """Enhanced weight calculation with proper material densities and geometry - UPDATED WITH ENHANCED HEX PRODUCT FORMULAS"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1896,26 +1879,8 @@ def calculate_weight_enhanced(parameters):
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
         series = parameters.get('series', 'Metric')
-        
-        # ADD DEBUG STATEMENTS HERE
-        st.write("Debug - Length Conversion:")
-        st.write(f"Original Length: {length} {length_unit}")
-        
-        # Convert length to meters
-        if length_unit == 'mm':
-            length_m = convert_to_meters(length, 'mm', series)
-        elif length_unit == 'inch':
-            length_m = convert_to_meters(length, 'inch', series)
-        elif length_unit == 'ft':
-            length_m = convert_to_meters(length, 'ft', series)
-        else:  # meters
-            length_m = convert_to_meters(length, 'meter', series)
-            
-        # ADD MORE DEBUG STATEMENTS HERE
-        st.write(f"Converted Length: {length_m} meters")
-        st.write(f"In millimeters: {length_m * 1000} mm")
-
-        # ...rest of the function continues...
+        standard = parameters.get('standard', 'ASME B18.2.1')
+        size = parameters.get('size', 'All')
         
         # Check if this is a hex product that uses the ENHANCED formula
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
