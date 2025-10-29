@@ -1547,6 +1547,7 @@ def convert_to_mm(value, from_unit, series=None):
         st.warning(f"Unit conversion error: {str(e)}")
         return value
 
+# Find and replace the convert_to_meters function in your code (around line 3538)
 def convert_to_meters(value, from_unit, series=None):
     """Convert any unit to meters - ENHANCED with series detection"""
     try:
@@ -1555,21 +1556,32 @@ def convert_to_meters(value, from_unit, series=None):
         
         value = float(value)
         
-        # If series is specified as "Inch", assume the value is in inches and convert to meters
+        # For Inch series, handle all units differently
         if series == "Inch":
-            return value * 0.0254
+            # For Inch series, assume input values are in inches unless specified otherwise
+            if from_unit == 'mm':
+                return value / 1000  # mm to meters
+            elif from_unit == 'inch':
+                return value * 0.0254  # inches to meters (1 inch = 25.4 mm)
+            elif from_unit == 'ft':
+                return value * 0.3048  # feet to meters (1 foot = 304.8 mm)
+            elif from_unit == 'meter':
+                return value  # already in meters
+            else:
+                return value * 0.0254  # Default to inches for Inch series
         
-        # Standard unit conversion
+        # For Metric series or unspecified series
         if from_unit == 'mm':
-            return value / 1000
+            return value / 1000  # mm to meters
         elif from_unit == 'inch':
-            return value * 0.0254
+            return value * 0.0254  # inches to meters
         elif from_unit == 'ft':
-            return value * 0.3048
+            return value * 0.3048  # feet to meters
         elif from_unit == 'meter':
-            return value
+            return value  # already in meters
         else:
-            return value / 1000  # Assume mm if unknown unit
+            return value / 1000  # Default assume mm if unknown unit
+            
     except Exception as e:
         st.warning(f"Unit conversion error: {str(e)}")
         return value / 1000
