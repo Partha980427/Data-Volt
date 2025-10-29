@@ -3535,14 +3535,7 @@ def apply_section_c_filters():
             exact_match = result_df[result_df[prop_col] == property_class]
             if not exact_match.empty:
                 filtered_data = exact_match
-                bre                # When showing any data table, wrap it like this:
-                st.markdown("""
-                    <div class="oracle-card">
-                        <h3>Product Specifications</h3>
-                    </div>
-                """, unsafe_allow_html=True)
-                # Then show your table
-                st.dataframe(your_dataframe)ak
+                break
             # Try string contains for more flexible matching
             str_match = result_df[result_df[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
             if not str_match.empty:
