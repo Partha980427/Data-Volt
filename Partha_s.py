@@ -11,14 +11,8 @@ import plotly.express as px
 import time
 import json
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-import chromadb
-from transformers import pipeline
-import spacy
-import torch
-import warnings
 import math
+import warnings
 warnings.filterwarnings('ignore')
 
 # ======================================================
@@ -128,7 +122,6 @@ def load_config():
                 'page_title': 'JSC Industries - Fastener Intelligence'
             },
             'features': {
-                'ai_assistant': True,
                 'batch_processing': True,
                 'analytics': True
             }
@@ -151,15 +144,11 @@ def initialize_session_state():
     defaults = {
         "selected_section": None,
         "batch_result_df": None,
-        "ai_history": [],
         "current_filters": {},
         "recent_searches": [],
         "favorite_products": [],
         "calculation_history": [],
         "export_format": "csv",
-        "chat_messages": [],
-        "ai_thinking": False,
-        "ai_model_loaded": False,
         "multi_search_products": [],
         "current_filters_dimensional": {},
         "current_filters_thread": {},
@@ -212,7 +201,9 @@ def initialize_session_state():
         "weight_calc_length_unit": "mm",
         "weight_calc_material": "Carbon Steel",
         "weight_calc_result": None,
-        "weight_calculation_performed": False
+        "weight_calculation_performed": False,
+        "pitch_diameter_value": None,
+        "weight_form_submitted": False
     }
     
     for key, value in defaults.items():
@@ -665,88 +656,6 @@ st.markdown("""
         margin-top: 0.3rem;
     }
 
-    .chat-container {
-        background: #f0f2f5;
-        border-radius: 15px;
-        padding: 1rem;
-        height: 600px;
-        overflow-y: auto;
-        border: 1px solid #e0e0e0;
-    }
-    .message {
-        margin: 0.5rem 0;
-        padding: 0.8rem 1rem;
-        border-radius: 18px;
-        max-width: 70%;
-        word-wrap: break-word;
-    }
-    .user-message {
-        background: #0084ff;
-        color: white;
-        margin-left: auto;
-        border-bottom-right-radius: 5px;
-    }
-    .ai-message {
-        background: white;
-        color: #1c1e21;
-        margin-right: auto;
-        border-bottom-left-radius: 5px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    }
-    .message-time {
-        font-size: 0.7rem;
-        opacity: 0.7;
-        margin-top: 0.2rem;
-    }
-    .typing-indicator {
-        display: inline-flex;
-        align-items: center;
-        background: white;
-        padding: 0.8rem 1rem;
-        border-radius: 18px;
-        border-bottom-left-radius: 5px;
-        margin-right: auto;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    }
-    .typing-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #999;
-        margin: 0 2px;
-        animation: typing 1.4s infinite;
-    }
-    .typing-dot:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-    .typing-dot:nth-child(3) {
-        animation-delay: 0.4s;
-    }
-    @keyframes typing {
-        0%, 60%, 100% { transform: translateY(0); }
-        30% { transform: translateY(-5px); }
-    }
-    .quick-question {
-        background: #f0f2f5;
-        border: 1px solid #dddfe2;
-        border-radius: 18px;
-        padding: 0.5rem 1rem;
-        margin: 0.2rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        font-size: 0.9rem;
-    }
-    .quick-question:hover {
-        background: #e4e6eb;
-    }
-    .chat-input-container {
-        background: white;
-        border-radius: 20px;
-        padding: 0.5rem;
-        margin-top: 1rem;
-        border: 1px solid #dddfe2;
-    }
-    
     .calculation-card {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 1rem;
@@ -1015,9 +924,6 @@ st.markdown("""
         }
         .property-grid {
             grid-template-columns: repeat(2, 1fr);
-        }
-        .message {
-            max-width: 85%;
         }
         .specification-grid {
             grid-template-columns: 1fr;
@@ -1868,7 +1774,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
+    """Enhanced weight calculation with proper material densities and geometry - FIXED DIAMETER CONVERSION"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1882,6 +1788,26 @@ def calculate_weight_enhanced(parameters):
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
         
+        # Get hex head dimensions from database
+        width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
+        
+        # If dimensions not found in database, use default ratios
+        if width_across_flats is None:
+            # Estimate width across flats based on diameter
+            if diameter_unit == 'inch':
+                diameter_mm = diameter_value * 25.4
+            else:
+                diameter_mm = diameter_value
+            width_across_flats = diameter_mm * 1.5  # Default ratio
+        
+        if head_height is None:
+            # Estimate head height based on diameter
+            if diameter_unit == 'inch':
+                diameter_mm = diameter_value * 25.4
+            else:
+                diameter_mm = diameter_value
+            head_height = diameter_mm * 0.65  # Default ratio
+        
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
         # Convert length to meters based on unit and series
@@ -1894,142 +1820,141 @@ def calculate_weight_enhanced(parameters):
         else:  # meters
             length_m = length
 
-        # For Inch series, if no unit specified, assume inches
-        if series == "Inch" and length_unit == 'mm':
-            length_m = length * 0.0254  # Convert from inches to meters
-        
-        # --- FIXED DIAMETER CONVERSION LOGIC ---
-        # For Inch series hex products (except Threaded Rod), if diameter_type is Pitch Diameter, convert inches to meters
-        if (
-            series == "Inch"
-            and diameter_type == "Pitch Diameter"
-            and product_type in hex_products
-            and product_type != "Threaded Rod"
-            and diameter_unit == "inch"
-        ):
-            diameter_m = diameter_value * 0.0254
-        else:
-            # Convert diameter to meters
-            if diameter_unit == 'ft':
-                diameter_m = diameter_value * 0.3048
-            elif diameter_unit == 'inch':
-                diameter_m = diameter_value * 0.0254
-            elif diameter_unit == 'mm':
-                diameter_m = diameter_value / 1000
-            else:  # meters
-                diameter_m = diameter_value
+        # --- CORRECTED DIAMETER CONVERSION LOGIC ---
+        # ALWAYS convert diameter to meters based on the input unit
+        if diameter_unit == 'ft':
+            diameter_m = diameter_value * 0.3048  # feet to meters
+        elif diameter_unit == 'inch':
+            diameter_m = diameter_value * 0.0254  # inches to meters
+        elif diameter_unit == 'mm':
+            diameter_m = diameter_value / 1000    # mm to meters
+        else:  # meters or unknown
+            diameter_m = diameter_value
 
-            # For Inch series, if no unit specified, assume inches
-            if series == "Inch" and diameter_unit == 'mm':
-                diameter_m = diameter_value * 0.0254
+        # SPECIAL CASE: For Pitch Diameter from thread data in Inch series
+        # Thread data from ASME B1.1 is in inches, so if we have pitch diameter value from thread data
+        # and the series is Inch, we need to ensure it's converted from inches to meters
+        if (diameter_type == "Pitch Diameter" and 
+            series == "Inch" and 
+            'pitch_diameter_value' in st.session_state):
+            
+            # Use the pitch diameter from thread data and convert from inches to meters
+            pitch_diameter_inches = st.session_state.pitch_diameter_value
+            diameter_m = pitch_diameter_inches * 0.0254  # Convert inches to meters
 
         # Convert head dimensions to meters
         if width_across_flats is not None:
-            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
+            width_across_flats_m = width_across_flats / 1000  # Convert mm to meters
         else:
             width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
         
         if head_height is not None:
-            head_height_m = convert_to_meters(head_height, 'mm', series)
+            head_height_m = head_height / 1000  # Convert mm to meters
         else:
             head_height_m = diameter_m * 0.65  # Default ratio if not available
         
         # Get material density
         density = get_material_density(material)  # kg/m³
         
-        # 1. Calculate Shank Volume (Cylinder Volume)
-        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-        shank_radius = diameter_m / 2
-        shank_volume = math.pi * shank_radius**2 * length_m  # m³
-        
-        # 2. Calculate Head Volume using the specific formula
-        # Side Length = (Width Across the Flat (Min)/√3) X 2
-        side_length = (width_across_flats_m / math.sqrt(3)) * 2
-        
-        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-        head_volume = 0.65 * (side_length**2) * head_height_m
-        
-        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-        total_volume = shank_volume + head_volume
-        
-        # 4. Calculate Weight = Total volume x Density
-        weight_kg = total_volume * density
-        
-        return {
-            'weight_kg': weight_kg,
-            'weight_g': weight_kg * 1000,
-            'weight_lb': weight_kg * 2.20462,
-            'shank_volume_m3': shank_volume,
-            'head_volume_m3': head_volume,
-            'total_volume_m3': total_volume,
-            'diameter_m': diameter_m,
-            'length_m': length_m,
-            'width_across_flats_m': width_across_flats_m,
-            'head_height_m': head_height_m,
-            'side_length_m': side_length,
-            'density': density,
-            'series': series,
-            'original_diameter': f"{diameter_value} {diameter_unit}",
-            'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Enhanced Hex Product Formula',
-            'formula_details': {
-                'shank_volume_formula': 'π × (diameter/2)² × length',
-                'head_volume_formula': '0.65 × side_length² × head_height',
-                'side_length_formula': '(width_across_flats / √3) × 2',
-                'total_volume_formula': 'shank_volume + head_volume',
-                'weight_formula': 'total_volume × density'
+        # For Threaded Rod, use simple cylinder volume calculation
+        if product_type == "Threaded Rod":
+            # Simple cylinder volume for threaded rod
+            radius = diameter_m / 2
+            volume = math.pi * radius**2 * length_m
+            weight_kg = volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'volume_m3': volume,
+                'density': density,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Threaded Rod Cylinder Formula'
             }
-        }
         
+        # For hex products, use enhanced hex product formula
+        elif product_type in hex_products:
+            # 1. Calculate Shank Volume (Cylinder Volume)
+            # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
+            shank_radius = diameter_m / 2
+            shank_volume = math.pi * shank_radius**2 * length_m  # m³
+            
+            # 2. Calculate Head Volume using the specific formula
+            # Side Length = (Width Across the Flat (Min)/√3) X 2
+            side_length = (width_across_flats_m / math.sqrt(3)) * 2
+            
+            # Head Volume = 0.65 x (Side Length²) x Head height (Min)
+            head_volume = 0.65 * (side_length**2) * head_height_m
+            
+            # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
+            total_volume = shank_volume + head_volume
+            
+            # 4. Calculate Weight = Total volume x Density
+            weight_kg = total_volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'shank_volume_m3': shank_volume,
+                'head_volume_m3': head_volume,
+                'total_volume_m3': total_volume,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'width_across_flats_m': width_across_flats_m,
+                'head_height_m': head_height_m,
+                'side_length_m': side_length,
+                'density': density,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Enhanced Hex Product Formula',
+                'formula_details': {
+                    'shank_volume_formula': 'π × (diameter/2)² × length',
+                    'head_volume_formula': '0.65 × side_length² × head_height',
+                    'side_length_formula': '(width_across_flats / √3) × 2',
+                    'total_volume_formula': 'shank_volume + head_volume',
+                    'weight_formula': 'total_volume × density'
+                }
+            }
+        
+        # For other products, use simple cylinder calculation
+        else:
+            radius = diameter_m / 2
+            volume = math.pi * radius**2 * length_m
+            weight_kg = volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'volume_m3': volume,
+                'density': density,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Standard Cylinder Formula'
+            }
+            
     except Exception as e:
-        st.error(f"Enhanced hex product calculation error: {str(e)}")
+        st.error(f"Calculation error: {str(e)}")
+        import traceback
+        st.error(f"Detailed error: {traceback.format_exc()}")
         return None
 
 # ======================================================
-# WEIGHT CALCULATION SECTION - COMPLETE WORKFLOW IMPLEMENTATION
+# MISSING FUNCTIONS - ADD THESE TO FIX THE ERRORS
 # ======================================================
 
-def get_available_products():
-    """Get all available products from standards database"""
-    all_products = set()
-    for standard_products_list in st.session_state.available_products.values():
-        all_products.update(standard_products_list)
-    return ["Select Product"] + sorted([p for p in all_products if p != "All"])
-
-def get_series_for_product(product):
-    """Get available series for a specific product"""
-    if product == "Select Product":
-        return ["Select Series"]
-    
-    available_series = set()
-    for standard, products in st.session_state.available_products.items():
-        if product in products:
-            series = st.session_state.available_series.get(standard, "")
-            if series:
-                available_series.add(series)
-    
-    return ["Select Series"] + sorted(list(available_series))
-
-def get_standards_for_product_series(product, series):
-    """Get available standards for specific product and series"""
-    if product == "Select Product" or series == "Select Series":
-        return ["Select Standard"]
-    
-    available_standards = []
-    for standard, products in st.session_state.available_products.items():
-        if product in products:
-            std_series = st.session_state.available_series.get(standard, "")
-            if std_series == series:
-                available_standards.append(standard)
-    
-    return ["Select Standard"] + sorted(available_standards)
-
-def get_sizes_for_standard_product(standard, product):
-    """Get available sizes for specific standard and product in weight calculator"""
-    if standard == "Select Standard" or product == "Select Product":
-        return ["Select Size"]
-    
-    # Get the appropriate dataframe based on standard
+def get_filtered_dataframe(product, standard):
+    """Get filtered dataframe based on product and standard selection"""
     if standard == "ASME B18.2.1":
         temp_df = df.copy()
     elif standard == "ISO 4014":
@@ -2039,199 +1964,228 @@ def get_sizes_for_standard_product(standard, product):
     elif standard == "ASME B18.3":
         temp_df = df_asme_b18_3.copy()
     else:
-        return ["Select Size"]
+        return pd.DataFrame()
     
-    # Filter by product if specified
+    # Apply product filter if specified
     if product != "All" and 'Product' in temp_df.columns:
         temp_df = temp_df[temp_df['Product'] == product]
     
-    # Get size options
-    size_options = get_safe_size_options(temp_df)
+    return temp_df
+
+def apply_section_a_filters():
+    """Apply filters for Section A - Dimensional Specifications"""
+    filters = st.session_state.section_a_filters
     
-    return ["Select Size"] + [size for size in size_options if size != "All"]
+    if not filters:
+        return pd.DataFrame()
+    
+    product = filters.get('product', 'All')
+    series = filters.get('series', 'All')
+    standard = filters.get('standard', 'All')
+    size = filters.get('size', 'All')
+    
+    # Get appropriate dataframe
+    if standard == "ASME B18.2.1":
+        temp_df = df.copy()
+    elif standard == "ISO 4014":
+        temp_df = df_iso4014.copy()
+    elif standard == "DIN-7991":
+        temp_df = df_din7991.copy()
+    elif standard == "ASME B18.3":
+        temp_df = df_asme_b18_3.copy()
+    else:
+        return pd.DataFrame()
+    
+    # Apply filters
+    if product != "All" and 'Product' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product'] == product]
+    
+    if size != "All" and 'Size' in temp_df.columns:
+        temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+    
+    return temp_df
 
-def get_thread_standards_for_series(series):
-    """Get thread standards based on series"""
-    if series == "Inch":
-        return ["ASME B1.1"]
-    elif series == "Metric":
-        return ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-    return ["Select Thread Standard"]
+def apply_section_b_filters():
+    """Apply filters for Section B - Thread Specifications"""
+    filters = st.session_state.section_b_filters
+    
+    if not filters:
+        return pd.DataFrame()
+    
+    standard = filters.get('standard', 'All')
+    size = filters.get('size', 'All')
+    thread_class = filters.get('class', 'All')
+    
+    if standard == "All":
+        return pd.DataFrame()
+    
+    return get_thread_data_enhanced(standard, size, thread_class)
 
-def get_material_density(material):
-    """Get density for different materials in kg/m³"""
-    density_map = {
-        "Carbon Steel": 7850,
-        "Stainless Steel": 8000,
-        "Alloy Steel": 7850,
-        "Brass": 8500,
-        "Aluminum": 2700,
-        "Copper": 8960,
-        "Titanium": 4500,
-        "Bronze": 8800,
-        "Inconel": 8200,
-        "Monel": 8800,
-        "Nickel": 8900
-    }
-    return density_map.get(material, 7850)  # Default to carbon steel
+def apply_section_c_filters():
+    """Apply filters for Section C - Material Properties"""
+    filters = st.session_state.section_c_filters
+    
+    if not filters or df_mechem.empty:
+        return pd.DataFrame()
+    
+    property_class = filters.get('property_class', 'All')
+    standard = filters.get('standard', 'All')
+    
+    if property_class == "All":
+        return df_mechem.copy()
+    
+    # Find property class columns
+    property_class_cols = []
+    possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation', 'Material']
+    
+    for col in df_mechem.columns:
+        col_lower = str(col).lower()
+        for possible in possible_class_cols:
+            if possible.lower() in col_lower:
+                property_class_cols.append(col)
+                break
+    
+    # Try to find matching data
+    filtered_data = pd.DataFrame()
+    
+    for prop_col in property_class_cols:
+        if prop_col in df_mechem.columns:
+            # Try exact match
+            exact_match = df_mechem[df_mechem[prop_col] == property_class]
+            if not exact_match.empty:
+                filtered_data = exact_match
+                break
+            # Try string contains
+            str_match = df_mechem[df_mechem[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
+            if not str_match.empty:
+                filtered_data = str_match
+                break
+    
+    # Apply standard filter if specified
+    if standard != "All" and not filtered_data.empty:
+        standard_cols = []
+        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type', 'Designation']
+        
+        for col in filtered_data.columns:
+            col_lower = str(col).lower()
+            for possible in possible_standard_cols:
+                if possible.lower() in col_lower:
+                    standard_cols.append(col)
+                    break
+        
+        if standard_cols:
+            for std_col in standard_cols:
+                std_filtered = filtered_data[filtered_data[std_col].astype(str).str.contains(str(standard), na=False, case=False)]
+                if not std_filtered.empty:
+                    filtered_data = std_filtered
+                    break
+    
+    return filtered_data
 
-def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
-    """Get pitch diameter from thread data for threaded rod calculation - ENHANCED FOR THREADED ROD"""
-    try:
-        df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
+def show_section_a_results():
+    """Display results for Section A"""
+    if not st.session_state.section_a_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section A Results - Dimensional Specifications")
         
-        if df_thread.empty:
-            return None
+        st.dataframe(
+            st.session_state.section_a_results,
+            use_container_width=True,
+            height=400
+        )
         
-        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
-        pitch_dia_cols = []
+        # Show professional card button
+        if len(st.session_state.section_a_results) == 1:
+            if st.button("Show Professional Specification Card", key="show_card_a"):
+                st.session_state.show_professional_card = True
+                st.session_state.selected_product_details = extract_product_details(st.session_state.section_a_results.iloc[0])
+                st.rerun()
         
-        # First priority: Pitch diameter minimum columns
-        min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
-        if min_pitch_cols:
-            pitch_dia_cols.extend(min_pitch_cols)
-        
-        # Second priority: Any pitch diameter columns
-        general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
-        if general_pitch_cols:
-            pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
-        
-        # Third priority: Any diameter column that might contain pitch diameter
-        if not pitch_dia_cols:
-            dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
-            for col in dia_cols:
-                if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
-                    pitch_dia_cols.append(col)
-        
-        if pitch_dia_cols:
-            # Get the first pitch diameter value
-            pitch_diameter = df_thread[pitch_dia_cols[0]].iloc[0]
-            if pd.notna(pitch_diameter):
-                return float(pitch_diameter)
-        
-        return None
-        
-    except Exception as e:
-        st.warning(f"Could not retrieve pitch diameter: {str(e)}")
-        return None
+        st.markdown('</div>', unsafe_allow_html=True)
 
-def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
-    try:
-        # Extract parameters
-        product_type = parameters.get('product_type', 'Hex Bolt')
-        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
-        diameter_value = parameters.get('diameter_value', 0.0)
-        diameter_unit = parameters.get('diameter_unit', 'mm')
-        length = parameters.get('length', 0.0)
-        length_unit = parameters.get('length_unit', 'mm')
-        material = parameters.get('material', 'Carbon Steel')
-        series = parameters.get('series', 'Metric')
-        standard = parameters.get('standard', 'ASME B18.2.1')
-        size = parameters.get('size', 'All')
+def show_section_b_results():
+    """Display results for Section B"""
+    if not st.session_state.section_b_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section B Results - Thread Specifications")
         
-        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
+        st.dataframe(
+            st.session_state.section_b_results,
+            use_container_width=True,
+            height=400
+        )
         
-        # Convert length to meters based on unit and series
-        if length_unit == 'ft':
-            length_m = length * 0.3048  # 1 ft = 0.3048 meters
-        elif length_unit == 'inch':
-            length_m = length * 0.0254  # 1 inch = 0.0254 meters
-        elif length_unit == 'mm':
-            length_m = length / 1000  # 1 mm = 0.001 meters
-        else:  # meters
-            length_m = length
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # For Inch series, if no unit specified, assume inches
-        if series == "Inch" and length_unit == 'mm':
-            length_m = length * 0.0254  # Convert from inches to meters
+def show_section_c_results():
+    """Display results for Section C"""
+    if not st.session_state.section_c_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section C Results - Material Properties")
         
-        # For Inch series hex products (except Threaded Rod), if diameter_type is Pitch Diameter, convert inches to meters
-        if (
-            series == "Inch"
-            and diameter_type == "Pitch Diameter"
-            and product_type in hex_products
-            and product_type != "Threaded Rod"
-            and diameter_unit == "inch"
-        ):
-            diameter_m = diameter_value * 0.0254
-        else:
-            # Convert diameter to meters
-            if diameter_unit == 'ft':
-                diameter_m = diameter_value * 0.3048
-            elif diameter_unit == 'inch':
-                diameter_m = diameter_value * 0.0254
-            elif diameter_unit == 'mm':
-                diameter_m = diameter_value / 1000
-            else:  # meters
-                diameter_m = diameter_value
+        st.dataframe(
+            st.session_state.section_c_results,
+            use_container_width=True,
+            height=400
+        )
+        
+        # Show detailed properties
+        filters = st.session_state.section_c_filters
+        if filters and filters.get('property_class') != "All":
+            show_mechanical_chemical_details(filters.get('property_class'))
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            # For Inch series, if no unit specified, assume inches
-            if series == "Inch" and diameter_unit == 'mm':
-                diameter_m = diameter_value * 0.0254
+def combine_all_results():
+    """Combine results from all sections"""
+    combined = pd.DataFrame()
+    
+    # Add section A results
+    if not st.session_state.section_a_results.empty:
+        section_a_with_type = st.session_state.section_a_results.copy()
+        section_a_with_type['Section'] = 'A - Dimensional'
+        combined = pd.concat([combined, section_a_with_type], ignore_index=True)
+    
+    # Add section B results
+    if not st.session_state.section_b_results.empty:
+        section_b_with_type = st.session_state.section_b_results.copy()
+        section_b_with_type['Section'] = 'B - Thread'
+        combined = pd.concat([combined, section_b_with_type], ignore_index=True)
+    
+    # Add section C results
+    if not st.session_state.section_c_results.empty:
+        section_c_with_type = st.session_state.section_c_results.copy()
+        section_c_with_type['Section'] = 'C - Material'
+        combined = pd.concat([combined, section_c_with_type], ignore_index=True)
+    
+    return combined
 
-        # Convert head dimensions to meters
-        if width_across_flats is not None:
-            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
-        else:
-            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+def show_combined_results():
+    """Display combined results from all sections"""
+    if not st.session_state.combined_results.empty:
+        st.markdown('<div class="combined-results">', unsafe_allow_html=True)
+        st.markdown("### Combined Results - All Sections")
         
-        if head_height is not None:
-            head_height_m = convert_to_meters(head_height, 'mm', series)
-        else:
-            head_height_m = diameter_m * 0.65  # Default ratio if not available
+        st.dataframe(
+            st.session_state.combined_results,
+            use_container_width=True,
+            height=600
+        )
         
-        # Get material density
-        density = get_material_density(material)  # kg/m³
+        # Export options
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Export to Excel", use_container_width=True):
+                enhanced_export_data(st.session_state.combined_results, "Excel")
+        with col2:
+            if st.button("Export to CSV", use_container_width=True):
+                enhanced_export_data(st.session_state.combined_results, "CSV")
         
-        # 1. Calculate Shank Volume (Cylinder Volume)
-        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-        shank_radius = diameter_m / 2
-        shank_volume = math.pi * shank_radius**2 * length_m  # m³
-        
-        # 2. Calculate Head Volume using the specific formula
-        # Side Length = (Width Across the Flat (Min)/√3) X 2
-        side_length = (width_across_flats_m / math.sqrt(3)) * 2
-        
-        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-        head_volume = 0.65 * (side_length**2) * head_height_m
-        
-        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-        total_volume = shank_volume + head_volume
-        
-        # 4. Calculate Weight = Total volume x Density
-        weight_kg = total_volume * density
-        
-        # Apply product type factor
-        product_factors = {
-            "Hex Bolt": 1.0,
-            "Heavy Hex Bolt": 1.1,
-            "Hex Cap Screws": 0.95,
-            "Heavy Hex Screws": 1.1,
-            "Hexagon Socket Head Cap Screws": 0.9,
-            "Hexagon Socket Countersunk Head Cap Screw": 0.85,
-            "Threaded Rod": 1.0
-        }
-        factor = product_factors.get(product_type, 1.0)
-        final_weight_kg = weight_kg * factor
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        return {
-            'weight_kg': final_weight_kg,
-            'weight_g': final_weight_kg * 1000,
-            'weight_lb': final_weight_kg * 2.20462,
-            'diameter_m': diameter_m,
-            'length_m': length_m,
-            'volume_m3': volume,
-            'density': density,
-            'product_factor': factor,
-            'series': series,
-            'original_diameter': f"{diameter_value} {diameter_unit}",
-            'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Standard Cylinder Formula'
-        }
-    except Exception as e:
-        st.error(f"Calculation error: {str(e)}")
-        return None
+# ======================================================
+# WEIGHT CALCULATOR SECTION - COMPLETE WORKFLOW IMPLEMENTATION
+# ======================================================
 
 def show_weight_calculator_enhanced():
     """Enhanced weight calculator with complete product standards workflow"""
@@ -2410,21 +2364,23 @@ def show_weight_calculator_enhanced():
                     
                     st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
                     
-                    # NEW: Show pitch diameter information for threaded rod
-                    if selected_product == "Threaded Rod" and thread_size != "All":
+                    # Show pitch diameter information for ALL products using Pitch Diameter
+                    if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter:
-                            # Convert pitch diameter based on series
+                            # Store the pitch diameter in session state for calculation
+                            st.session_state.pitch_diameter_value = pitch_diameter
+                            
+                            # Display information
                             if selected_series == "Inch":
-                                # For Inch series, pitch diameter from ASME B1.1 is in inches, convert to mm
+                                # For Inch series, pitch diameter from ASME B1.1 is in inches
                                 pitch_diameter_mm = pitch_diameter * 25.4
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
+                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} in will be converted to meters")
                             else:
                                 # For Metric series, pitch diameter is already in mm
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
-                            
-                            # Store the pitch diameter for calculation
-                            st.session_state.pitch_diameter_value = pitch_diameter
+                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} mm will be converted to meters")
                         else:
                             st.warning("Pitch diameter not found in thread data")
         
@@ -2517,33 +2473,27 @@ def show_weight_calculator_enhanced():
                     'diameter_unit': blank_dia_unit
                 })
             else:
-                # For pitch diameter, get the actual diameter from thread data
-                if selected_product == "Threaded Rod" and thread_size != "All":
-                    pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
-                    if pitch_diameter:
-                        # For Inch series, pitch diameter from ASME B1.1 is in inches
-                        if selected_series == "Inch":
-                            calculation_params.update({
-                                'diameter_value': pitch_diameter,
-                                'diameter_unit': 'inch'  # ASME B1.1 data is in inches
-                            })
-                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter * 25.4:.4f} mm for Threaded Rod")
-                        else:
-                            # For Metric series, pitch diameter is in mm
-                            calculation_params.update({
-                                'diameter_value': pitch_diameter,
-                                'diameter_unit': 'mm'  # ISO thread data is in mm
-                            })
-                            st.success(f"Using Pitch Diameter (Min): {pitch_diameter:.4f} mm for Threaded Rod")
+                # For pitch diameter, use the pitch diameter value stored in session state
+                if 'pitch_diameter_value' in st.session_state:
+                    pitch_diameter = st.session_state.pitch_diameter_value
+                    
+                    # For Inch series, pitch diameter from ASME B1.1 is in inches
+                    if selected_series == "Inch":
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'inch'  # ASME B1.1 data is in inches
+                        })
+                        st.success(f"Using Pitch Diameter: {pitch_diameter:.4f} inches for calculation")
                     else:
-                        st.error("Could not retrieve pitch diameter from thread data")
-                        return
+                        # For Metric series, pitch diameter is in mm
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'mm'  # ISO thread data is in mm
+                        })
+                        st.success(f"Using Pitch Diameter: {pitch_diameter:.4f} mm for calculation")
                 else:
-                    # For other products with pitch diameter, use a default approach
-                    calculation_params.update({
-                        'diameter_value': 10.0,  # Default value
-                        'diameter_unit': 'mm'
-                    })
+                    st.error("Pitch diameter not available for calculation")
+                    return
             
             # Perform calculation
             result = calculate_weight_enhanced(calculation_params)
@@ -2758,350 +2708,7 @@ def show_enhanced_calculations():
             st.write("No calculation history yet. Perform calculations to see analytics here.")
 
 # ======================================================
-# ADVANCED AI ASSISTANT WITH SELF-LEARNING CAPABILITIES
-# ======================================================
-class AdvancedFastenerAI:
-    def __init__(self, df, df_iso4014, df_mechem, thread_files, df_din7991=None, df_asme_b18_3=None):
-        self.df = df
-        self.df_iso4014 = df_iso4014
-        self.df_mechem = df_mechem
-        self.df_din7991 = df_din7991
-        self.df_asme_b18_3 = df_asme_b18_3
-        self.thread_files = thread_files
-        
-        try:
-            self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
-            self.qa_pipeline = pipeline("question-answering", 
-                                      model="distilbert-base-cased-distilled-squad")
-            st.session_state.ai_model_loaded = True
-        except Exception as e:
-            st.warning(f"AI models loading issue: {str(e)}")
-            st.session_state.ai_model_loaded = False
-        
-        try:
-            self.chroma_client = chromadb.Client()
-            self.collection = self.chroma_client.create_collection(name="fastener_knowledge")
-        except:
-            self.collection = None
-        
-        self.knowledge_base = self._build_knowledge_base()
-        self.learning_memory = {}
-        self.conversation_history = []
-        
-        self._index_database_content()
-    
-    def _build_knowledge_base(self):
-        """Build comprehensive fastener knowledge base"""
-        return {
-            'technical_terms': {
-                'tensile_strength': "The maximum stress a material can withstand while being stretched or pulled before breaking",
-                'yield_strength': "The stress at which a material begins to deform plastically. Beyond this point, permanent deformation occurs",
-                'hardness': "Resistance to permanent indentation. Common scales: Rockwell (HRC, HRB), Brinell (HB)",
-                'thread_pitch': "Distance between thread peaks. In metric: distance in mm. In inch: threads per inch (TPI)",
-                'proof_load': "Maximum load a fastener can withstand without permanent deformation",
-                'carbon_content': "Carbon percentage in steel. Affects hardness and strength. C% typically 0.05-0.55% for fastener steels",
-                'manganese': "Mn% improves hardenability and strength. Typically 0.30-1.00% in fastener steels",
-                'phosphorus': "P% impurity that reduces toughness. Limited to 0.04% max in quality fasteners",
-                'sulfur': "S% impurity that reduces ductility. Limited to 0.05% max in quality fasteners",
-            },
-            'material_science': {
-                'carbon_steel': "Iron-carbon alloy with carbon content up to 2.1%. Most common fastener material. Grades: 2, 5, 8",
-                'stainless_steel': "Steel alloy with minimum 10.5% chromium for corrosion resistance. Types: 304, 316, 410",
-                'alloy_steel': "Steel with additional alloying elements like chromium, nickel, molybdenum for enhanced properties",
-                'brass': "Copper-zinc alloy with good corrosion resistance and electrical conductivity",
-            },
-            'grade_properties': {
-                'Grade 2': {
-                    'description': 'Low carbon steel for general purpose applications',
-                    'chemistry': 'C: 0.05-0.31%, Mn: 0.90% max, P: 0.04% max, S: 0.05% max',
-                    'mechanical': 'Tensile: 74,000 psi min, Yield: 57,000 psi min',
-                    'hardness': 'RB 70-100',
-                    'applications': 'General purpose, low stress applications'
-                },
-                'Grade 5': {
-                    'description': 'Medium carbon steel, quenched and tempered',
-                    'chemistry': 'C: 0.28-0.55%, Mn: 0.60% max, P: 0.04% max, S: 0.05% max',
-                    'mechanical': 'Tensile: 120,000 psi min, Yield: 92,000 psi min',
-                    'hardness': 'RC 25-34',
-                    'applications': 'Automotive, machinery, construction'
-                },
-                'Grade 8': {
-                    'description': 'Medium carbon alloy steel, quenched and tempered',
-                    'chemistry': 'C: 0.36-0.55%, Mn: 0.90% max, P: 0.04% max, S: 0.05% max',
-                    'mechanical': 'Tensile: 150,000 psi min, Yield: 130,000 psi min',
-                    'hardness': 'RC 33-39',
-                    'applications': 'High-strength applications, automotive suspension'
-                },
-                'Stainless 304': {
-                    'description': 'Austenitic stainless steel, excellent corrosion resistance',
-                    'chemistry': 'C: 0.08% max, Cr: 18-20%, Ni: 8-10.5%',
-                    'mechanical': 'Tensile: 75,000 psi min, Yield: 30,000 psi min',
-                    'applications': 'Corrosive environments, food processing'
-                }
-            },
-            'column_mappings': {
-                'carbon': ['C%', 'Carbon', 'Carbon Content', 'C'],
-                'manganese': ['Mn%', 'Manganese', 'Mn Content'],
-                'phosphorus': ['P%', 'Phosphorus', 'P Content'],
-                'sulfur': ['S%', 'Sulfur', 'S Content'],
-                'tensile': ['Tensile Strength', 'Tensile', 'UTS'],
-                'yield': ['Yield Strength', 'Yield', 'Proof Strength'],
-                'hardness': ['Hardness', 'HRC', 'HRB', 'Brinell'],
-                'grade': ['Grade', 'Product Grade', 'Class'],
-            }
-        }
-    
-    def _index_database_content(self):
-        """Index all database content for semantic search"""
-        if not st.session_state.ai_model_loaded:
-            return
-            
-        try:
-            if not self.df.empty:
-                for idx, row in self.df.iterrows():
-                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "main_db", "row_index": idx}],
-                        ids=[f"main_{idx}"]
-                    )
-            
-            if not self.df_iso4014.empty:
-                for idx, row in self.df_iso4014.iterrows():
-                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "iso_db", "row_index": idx}],
-                        ids=[f"iso_{idx}"]
-                    )
-            
-            if not self.df_mechem.empty:
-                for idx, row in self.df_mechem.iterrows():
-                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "mecert_db", "row_index": idx}],
-                        ids=[f"mecert_{idx}"]
-                    )
-            
-            if self.df_din7991 is not None and not self.df_din7991.empty:
-                for idx, row in self.df_din7991.iterrows():
-                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "din7991_db", "row_index": idx}],
-                        ids=[f"din7991_{idx}"]
-                    )
-            
-            if self.df_asme_b18_3 is not None and not self.df_asme_b18_3.empty:
-                for idx, row in self.df_asme_b18_3.iterrows():
-                    text_content = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    self.collection.add(
-                        documents=[text_content],
-                        metadatas=[{"source": "asme_b18_3_db", "row_index": idx}],
-                        ids=[f"asme_b18_3_{idx}"]
-                    )
-        except Exception as e:
-            st.warning(f"Database indexing issue: {str(e)}")
-    
-    def _semantic_search(self, query, n_results=5):
-        """Perform semantic search on database content"""
-        if not st.session_state.ai_model_loaded or self.collection is None:
-            return []
-            
-        try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=n_results
-            )
-            return results
-        except:
-            return []
-    
-    def _extract_entities_advanced(self, query):
-        """Advanced entity extraction using multiple methods"""
-        entities = {
-            'property': None,
-            'material': None,
-            'grade': None,
-            'size': None,
-            'value_type': None,
-        }
-        
-        query_lower = query.lower()
-        
-        property_keywords = {
-            'carbon': ['c%', 'carbon', 'carbon content'],
-            'tensile': ['tensile', 'ultimate strength', 'uts'],
-            'yield': ['yield', 'proof strength'],
-            'hardness': ['hardness', 'hrc', 'hrb', 'brinell'],
-            'elongation': ['elongation', 'ductility'],
-            'manganese': ['mn%', 'manganese'],
-            'phosphorus': ['p%', 'phosphorus'],
-            'sulfur': ['s%', 'sulfur'],
-        }
-        
-        for prop, keywords in property_keywords.items():
-            if any(keyword in query_lower for keyword in keywords):
-                entities['property'] = prop
-                break
-        
-        grade_patterns = [
-            r'grade\s+([2458]|B7|L7)',
-            r'([2458])\s+grade',
-            r'stainless\s+(304|316|410)',
-        ]
-        
-        for pattern in grade_patterns:
-            match = re.search(pattern, query_lower)
-            if match:
-                entities['grade'] = f"Grade {match.group(1)}" if match.group(1).isdigit() else match.group(1)
-                break
-        
-        if 'stainless' in query_lower:
-            entities['material'] = 'stainless steel'
-        elif 'carbon' in query_lower and 'steel' in query_lower:
-            entities['material'] = 'carbon steel'
-        elif 'alloy' in query_lower:
-            entities['material'] = 'alloy steel'
-        elif 'brass' in query_lower:
-            entities['material'] = 'brass'
-        
-        if 'minimum' in query_lower or 'min' in query_lower:
-            entities['value_type'] = 'min'
-        elif 'maximum' in query_lower or 'max' in query_lower:
-            entities['value_type'] = 'max'
-        elif 'typical' in query_lower or 'average' in query_lower:
-            entities['value_type'] = 'typical'
-        elif 'range' in query_lower:
-            entities['value_type'] = 'range'
-        
-        return entities
-    
-    def _search_database_for_property(self, entities):
-        """Search database for specific properties"""
-        results = []
-        
-        if entities.get('property') == 'carbon':
-            if not self.df_mechem.empty:
-                carbon_cols = [col for col in self.df_mechem.columns if any(keyword in col.lower() for keyword in ['carbon', 'c%'])]
-                if carbon_cols:
-                    carbon_data = self.df_mechem[carbon_cols].dropna()
-                    if not carbon_data.empty:
-                        results.append(f"Carbon content data found in ME&CERT database:")
-                        for col in carbon_cols:
-                            unique_vals = carbon_data[col].unique()[:5]
-                            results.append(f"  {col}: {', '.join(map(str, unique_vals))}")
-        
-        return results
-    
-    def _get_technical_answer(self, query, entities):
-        """Generate technical answer based on knowledge base"""
-        response_parts = []
-        
-        if entities.get('property') in ['carbon', 'manganese', 'phosphorus', 'sulfur']:
-            prop_name = entities['property']
-            grade = entities.get('grade', 'general')
-            
-            if grade in self.knowledge_base['grade_properties']:
-                grade_info = self.knowledge_base['grade_properties'][grade]
-                chemistry = grade_info.get('chemistry', '')
-                
-                if prop_name == 'carbon' and 'C:' in chemistry:
-                    response_parts.append(f"**{grade} Carbon Content (C%):**")
-                    response_parts.append(f"Chemical composition: {chemistry}")
-                    response_parts.append(f"Description: {grade_info['description']}")
-                else:
-                    response_parts.append(f"**{grade} Properties:**")
-                    response_parts.append(f"Chemistry: {chemistry}")
-                    response_parts.append(f"Mechanical: {grade_info.get('mechanical', 'N/A')}")
-                    response_parts.append(f"Hardness: {grade_info.get('hardness', 'N/A')}")
-                    response_parts.append(f"Applications: {grade_info.get('applications', 'N/A')}")
-            else:
-                if prop_name in self.knowledge_base['technical_terms']:
-                    response_parts.append(f"**{prop_name.title()} Content Information:**")
-                    response_parts.append(self.knowledge_base['technical_terms'][prop_name])
-        
-        elif entities.get('property') in ['tensile', 'yield', 'hardness']:
-            prop_name = entities['property']
-            grade = entities.get('grade', 'general')
-            
-            if grade in self.knowledge_base['grade_properties']:
-                grade_info = self.knowledge_base['grade_properties'][grade]
-                response_parts.append(f"**{grade} Mechanical Properties:**")
-                
-                if prop_name == 'tensile':
-                    response_parts.append(f"Tensile Strength: {grade_info.get('mechanical', '').split(',')[0]}")
-                elif prop_name == 'yield':
-                    mech_parts = grade_info.get('mechanical', '').split(',')
-                    if len(mech_parts) > 1:
-                        response_parts.append(f"Yield Strength: {mech_parts[1]}")
-                elif prop_name == 'hardness':
-                    response_parts.append(f"Hardness: {grade_info.get('hardness', 'N/A')}")
-                
-                response_parts.append(f"Applications: {grade_info.get('applications', 'N/A')}")
-        
-        return response_parts
-    
-    def process_complex_query(self, query):
-        """Process complex technical queries with advanced reasoning"""
-        if not st.session_state.ai_model_loaded:
-            return "AI capabilities are currently limited. Please ensure all required models are installed."
-        
-        entities = self._extract_entities_advanced(query)
-        
-        semantic_results = self._semantic_search(query)
-        
-        response_parts = []
-        
-        technical_answer = self._get_technical_answer(query, entities)
-        if technical_answer:
-            response_parts.extend(technical_answer)
-        
-        db_results = self._search_database_for_property(entities)
-        if db_results:
-            response_parts.extend([""] + db_results)
-        
-        if not response_parts:
-            query_lower = query.lower()
-            
-            if any(word in query_lower for word in ['what is', 'what does', 'explain', 'define']):
-                for term, definition in self.knowledge_base['technical_terms'].items():
-                    if term in query_lower:
-                        response_parts.append(f"**{term.title()}:** {definition}")
-                        break
-            
-            if not response_parts:
-                response_parts.append("I understand you're asking about fastener properties. ")
-                response_parts.append("I can help with:")
-                response_parts.append("• Chemical composition (C%, Mn%, P%, S%)")
-                response_parts.append("• Mechanical properties (tensile, yield, hardness)")
-                response_parts.append("• Material grades and their specifications")
-                response_parts.append("• Database queries and calculations")
-                response_parts.append("\nTry asking: 'What is the carbon content in Grade 5?' or 'Show me tensile strength data'")
-        
-        return "\n".join(response_parts)
-    
-    def learn_from_interaction(self, query, response, was_helpful=True):
-        """Learn from user interactions to improve future responses"""
-        interaction_key = query.lower().strip()
-        
-        if interaction_key not in self.learning_memory:
-            self.learning_memory[interaction_key] = {
-                'response': response,
-                'helpful_count': 0,
-                'total_uses': 0,
-                'last_used': datetime.now().isoformat()
-            }
-        
-        self.learning_memory[interaction_key]['total_uses'] += 1
-        if was_helpful:
-            self.learning_memory[interaction_key]['helpful_count'] += 1
-        
-        self.learning_memory[interaction_key]['last_used'] = datetime.now().isoformat()
-
-# ======================================================
-# Enhanced Data Quality Indicators
+# ENHANCED DATA QUALITY INDICATORS
 # ======================================================
 def show_data_quality_indicators():
     """Show data quality and validation indicators"""
@@ -3147,139 +2754,6 @@ def show_data_quality_indicators():
         st.markdown(f'<div class="data-quality-indicator quality-good">Thread Data: Available</div>', unsafe_allow_html=True)
         for status in thread_status:
             st.markdown(f'<div style="font-size: 0.8rem; margin: 0.1rem 0;">{status}</div>', unsafe_allow_html=True)
-        
-        if st.session_state.ai_model_loaded:
-            st.markdown('<div class="data-quality-indicator quality-good">AI Assistant: Advanced Mode</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="data-quality-indicator quality-warning">AI Assistant: Basic Mode</div>', unsafe_allow_html=True)
-
-# ======================================================
-# MESSENGER-STYLE CHAT INTERFACE WITH ADVANCED AI
-# ======================================================
-def add_message(role, content):
-    """Add message to chat history"""
-    timestamp = datetime.now().strftime("%H:%M")
-    st.session_state.chat_messages.append({
-        'role': role,
-        'content': content,
-        'time': timestamp
-    })
-
-def show_typing_indicator():
-    """Show typing indicator"""
-    st.markdown("""
-    <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def show_chat_interface():
-    """Show messenger-style chat interface with advanced AI"""
-    
-    ai_assistant = AdvancedFastenerAI(df, df_iso4014, df_mechem, thread_files, df_din7991, df_asme_b18_3)
-    
-    st.markdown("""
-    <div class="engineering-header">
-        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            PiU - Advanced Fastener Intelligence
-        </h1>
-        <p style="margin:0;">Ask complex technical questions about materials, properties, and specifications</p>
-        <div style="margin-top: 0.5rem;">
-            <span class="engineering-badge">Semantic Search</span>
-            <span class="technical-badge">Technical AI</span>
-            <span class="material-badge">Self-Learning</span>
-            <span class="grade-badge">Multi-Database</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.session_state.ai_model_loaded:
-        st.success("Advanced AI Mode: Semantic search and technical reasoning enabled")
-    else:
-        st.warning("Basic AI Mode: Install transformers, sentence-transformers, chromadb for full capabilities")
-    
-    st.markdown("### Technical Questions")
-    technical_questions = [
-        "What is C% in Grade 5?",
-        "Compare Grade 5 vs Grade 8 mechanical properties",
-        "Chemical composition of stainless steel 304",
-        "Tensile strength range for different grades",
-        "Hardness specifications for alloy steels"
-    ]
-    
-    cols = st.columns(5)
-    for idx, question in enumerate(technical_questions):
-        with cols[idx]:
-            if st.button(question, use_container_width=True, key=f"tech_{idx}"):
-                add_message("user", question)
-                st.session_state.ai_thinking = True
-                st.rerun()
-    
-    st.markdown("### Advanced AI Chat")
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    
-    for msg in st.session_state.chat_messages:
-        if msg['role'] == 'user':
-            st.markdown(f"""
-            <div class="message user-message">
-                <div>{msg['content']}</div>
-                <div class="message-time">{msg['time']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            formatted_content = msg['content'].replace('\n', '<br>')
-            st.markdown(f"""
-            <div class="message ai-message">
-                <div>{formatted_content}</div>
-                <div class="message-time">{msg['time']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    if st.session_state.ai_thinking:
-        show_typing_indicator()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
-    col1, col2 = st.columns([4, 1])
-    
-    with col1:
-        user_input = st.text_input("Ask complex technical questions...", key="chat_input", label_visibility="collapsed")
-    
-    with col2:
-        send_button = st.button("Send", use_container_width=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    if send_button and user_input.strip():
-        add_message("user", user_input.strip())
-        st.session_state.ai_thinking = True
-        st.rerun()
-    
-    if st.session_state.ai_thinking:
-        last_user_message = st.session_state.chat_messages[-1]['content']
-        
-        time.sleep(1)
-        
-        ai_response = ai_assistant.process_complex_query(last_user_message)
-        add_message("ai", ai_response)
-        
-        ai_assistant.learn_from_interaction(last_user_message, ai_response, was_helpful=True)
-        
-        st.session_state.ai_thinking = False
-        st.rerun()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Clear Chat History", use_container_width=True):
-            st.session_state.chat_messages = []
-            st.rerun()
-    with col2:
-        if st.button("Reload AI Models", use_container_width=True):
-            st.session_state.ai_model_loaded = False
-            st.rerun()
 
 # ======================================================
 # Enhanced Export Functionality
@@ -4152,7 +3626,6 @@ def show_enhanced_home():
         ("Engineering Calculator", "ENHANCED weight calculations with improved workflow", "calculator"),
         ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
-        ("AI Assistant", "Technical queries and material analysis", "ai"),
         ("Export Reports", "Generate professional engineering reports", "export")
     ]
     
@@ -4161,8 +3634,7 @@ def show_enhanced_home():
             if st.button(f"**{title}**\n\n{description}", key=f"home_{key}"):
                 section_map = {
                     "database": "Product Database",
-                    "calculator": "Calculations", 
-                    "ai": "PiU (AI Assistant)"
+                    "calculator": "Calculations"
                 }
                 st.session_state.selected_section = section_map.get(key, "Product Database")
                 st.rerun()
@@ -4269,8 +3741,6 @@ def show_section(title):
         show_enhanced_product_database()
     elif title == "Calculations":
         show_enhanced_calculations()
-    elif title == "PiU (AI Assistant)":
-        show_chat_interface()
     else:
         st.info(f"Section {title} is coming soon!")
     
@@ -4296,8 +3766,7 @@ def main():
         sections = [
             "Home Dashboard",
             "Product Database", 
-            "Calculations",
-            "PiU (AI Assistant)"
+            "Calculations"
         ]
         
         for section in sections:
