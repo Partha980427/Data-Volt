@@ -2051,50 +2051,11 @@ def calculate_weight_enhanced(parameters):
         return None
 
 # ======================================================
-# WEIGHT CALCULATION SECTION - COMPLETE WORKFLOW IMPLEMENTATION
+# MISSING FUNCTIONS - ADD THESE TO FIX THE ERRORS
 # ======================================================
 
-def get_available_products():
-    """Get all available products from standards database"""
-    all_products = set()
-    for standard_products_list in st.session_state.available_products.values():
-        all_products.update(standard_products_list)
-    return ["Select Product"] + sorted([p for p in all_products if p != "All"])
-
-def get_series_for_product(product):
-    """Get available series for a specific product"""
-    if product == "Select Product":
-        return ["Select Series"]
-    
-    available_series = set()
-    for standard, products in st.session_state.available_products.items():
-        if product in products:
-            series = st.session_state.available_series.get(standard, "")
-            if series:
-                available_series.add(series)
-    
-    return ["Select Series"] + sorted(list(available_series))
-
-def get_standards_for_product_series(product, series):
-    """Get available standards for specific product and series"""
-    if product == "Select Product" or series == "Select Series":
-        return ["Select Standard"]
-    
-    available_standards = []
-    for standard, products in st.session_state.available_products.items():
-        if product in products:
-            std_series = st.session_state.available_series.get(standard, "")
-            if std_series == series:
-                available_standards.append(standard)
-    
-    return ["Select Standard"] + sorted(available_standards)
-
-def get_sizes_for_standard_product(standard, product):
-    """Get available sizes for specific standard and product in weight calculator"""
-    if standard == "Select Standard" or product == "Select Product":
-        return ["Select Size"]
-    
-    # Get the appropriate dataframe based on standard
+def get_filtered_dataframe(product, standard):
+    """Get filtered dataframe based on product and standard selection"""
     if standard == "ASME B18.2.1":
         temp_df = df.copy()
     elif standard == "ISO 4014":
@@ -2104,199 +2065,228 @@ def get_sizes_for_standard_product(standard, product):
     elif standard == "ASME B18.3":
         temp_df = df_asme_b18_3.copy()
     else:
-        return ["Select Size"]
+        return pd.DataFrame()
     
-    # Filter by product if specified
+    # Apply product filter if specified
     if product != "All" and 'Product' in temp_df.columns:
         temp_df = temp_df[temp_df['Product'] == product]
     
-    # Get size options
-    size_options = get_safe_size_options(temp_df)
+    return temp_df
+
+def apply_section_a_filters():
+    """Apply filters for Section A - Dimensional Specifications"""
+    filters = st.session_state.section_a_filters
     
-    return ["Select Size"] + [size for size in size_options if size != "All"]
+    if not filters:
+        return pd.DataFrame()
+    
+    product = filters.get('product', 'All')
+    series = filters.get('series', 'All')
+    standard = filters.get('standard', 'All')
+    size = filters.get('size', 'All')
+    
+    # Get appropriate dataframe
+    if standard == "ASME B18.2.1":
+        temp_df = df.copy()
+    elif standard == "ISO 4014":
+        temp_df = df_iso4014.copy()
+    elif standard == "DIN-7991":
+        temp_df = df_din7991.copy()
+    elif standard == "ASME B18.3":
+        temp_df = df_asme_b18_3.copy()
+    else:
+        return pd.DataFrame()
+    
+    # Apply filters
+    if product != "All" and 'Product' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product'] == product]
+    
+    if size != "All" and 'Size' in temp_df.columns:
+        temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+    
+    return temp_df
 
-def get_thread_standards_for_series(series):
-    """Get thread standards based on series"""
-    if series == "Inch":
-        return ["ASME B1.1"]
-    elif series == "Metric":
-        return ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
-    return ["Select Thread Standard"]
+def apply_section_b_filters():
+    """Apply filters for Section B - Thread Specifications"""
+    filters = st.session_state.section_b_filters
+    
+    if not filters:
+        return pd.DataFrame()
+    
+    standard = filters.get('standard', 'All')
+    size = filters.get('size', 'All')
+    thread_class = filters.get('class', 'All')
+    
+    if standard == "All":
+        return pd.DataFrame()
+    
+    return get_thread_data_enhanced(standard, size, thread_class)
 
-def get_material_density(material):
-    """Get density for different materials in kg/m³"""
-    density_map = {
-        "Carbon Steel": 7850,
-        "Stainless Steel": 8000,
-        "Alloy Steel": 7850,
-        "Brass": 8500,
-        "Aluminum": 2700,
-        "Copper": 8960,
-        "Titanium": 4500,
-        "Bronze": 8800,
-        "Inconel": 8200,
-        "Monel": 8800,
-        "Nickel": 8900
-    }
-    return density_map.get(material, 7850)  # Default to carbon steel
+def apply_section_c_filters():
+    """Apply filters for Section C - Material Properties"""
+    filters = st.session_state.section_c_filters
+    
+    if not filters or df_mechem.empty:
+        return pd.DataFrame()
+    
+    property_class = filters.get('property_class', 'All')
+    standard = filters.get('standard', 'All')
+    
+    if property_class == "All":
+        return df_mechem.copy()
+    
+    # Find property class columns
+    property_class_cols = []
+    possible_class_cols = ['Grade', 'Class', 'Property Class', 'Material Grade', 'Type', 'Designation', 'Material']
+    
+    for col in df_mechem.columns:
+        col_lower = str(col).lower()
+        for possible in possible_class_cols:
+            if possible.lower() in col_lower:
+                property_class_cols.append(col)
+                break
+    
+    # Try to find matching data
+    filtered_data = pd.DataFrame()
+    
+    for prop_col in property_class_cols:
+        if prop_col in df_mechem.columns:
+            # Try exact match
+            exact_match = df_mechem[df_mechem[prop_col] == property_class]
+            if not exact_match.empty:
+                filtered_data = exact_match
+                break
+            # Try string contains
+            str_match = df_mechem[df_mechem[prop_col].astype(str).str.contains(str(property_class), na=False, case=False)]
+            if not str_match.empty:
+                filtered_data = str_match
+                break
+    
+    # Apply standard filter if specified
+    if standard != "All" and not filtered_data.empty:
+        standard_cols = []
+        possible_standard_cols = ['Standard', 'Specification', 'Norm', 'Type', 'Designation']
+        
+        for col in filtered_data.columns:
+            col_lower = str(col).lower()
+            for possible in possible_standard_cols:
+                if possible.lower() in col_lower:
+                    standard_cols.append(col)
+                    break
+        
+        if standard_cols:
+            for std_col in standard_cols:
+                std_filtered = filtered_data[filtered_data[std_col].astype(str).str.contains(str(standard), na=False, case=False)]
+                if not std_filtered.empty:
+                    filtered_data = std_filtered
+                    break
+    
+    return filtered_data
 
-def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
-    """Get pitch diameter from thread data for threaded rod calculation - ENHANCED FOR THREADED ROD"""
-    try:
-        df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
+def show_section_a_results():
+    """Display results for Section A"""
+    if not st.session_state.section_a_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section A Results - Dimensional Specifications")
         
-        if df_thread.empty:
-            return None
+        st.dataframe(
+            st.session_state.section_a_results,
+            use_container_width=True,
+            height=400
+        )
         
-        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
-        pitch_dia_cols = []
+        # Show professional card button
+        if len(st.session_state.section_a_results) == 1:
+            if st.button("Show Professional Specification Card", key="show_card_a"):
+                st.session_state.show_professional_card = True
+                st.session_state.selected_product_details = extract_product_details(st.session_state.section_a_results.iloc[0])
+                st.rerun()
         
-        # First priority: Pitch diameter minimum columns
-        min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
-        if min_pitch_cols:
-            pitch_dia_cols.extend(min_pitch_cols)
-        
-        # Second priority: Any pitch diameter columns
-        general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
-        if general_pitch_cols:
-            pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
-        
-        # Third priority: Any diameter column that might contain pitch diameter
-        if not pitch_dia_cols:
-            dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
-            for col in dia_cols:
-                if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
-                    pitch_dia_cols.append(col)
-        
-        if pitch_dia_cols:
-            # Get the first pitch diameter value
-            pitch_diameter = df_thread[pitch_dia_cols[0]].iloc[0]
-            if pd.notna(pitch_diameter):
-                return float(pitch_diameter)
-        
-        return None
-        
-    except Exception as e:
-        st.warning(f"Could not retrieve pitch diameter: {str(e)}")
-        return None
+        st.markdown('</div>', unsafe_allow_html=True)
 
-def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
-    try:
-        # Extract parameters
-        product_type = parameters.get('product_type', 'Hex Bolt')
-        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
-        diameter_value = parameters.get('diameter_value', 0.0)
-        diameter_unit = parameters.get('diameter_unit', 'mm')
-        length = parameters.get('length', 0.0)
-        length_unit = parameters.get('length_unit', 'mm')
-        material = parameters.get('material', 'Carbon Steel')
-        series = parameters.get('series', 'Metric')
-        standard = parameters.get('standard', 'ASME B18.2.1')
-        size = parameters.get('size', 'All')
+def show_section_b_results():
+    """Display results for Section B"""
+    if not st.session_state.section_b_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section B Results - Thread Specifications")
         
-        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
+        st.dataframe(
+            st.session_state.section_b_results,
+            use_container_width=True,
+            height=400
+        )
         
-        # Convert length to meters based on unit and series
-        if length_unit == 'ft':
-            length_m = length * 0.3048  # 1 ft = 0.3048 meters
-        elif length_unit == 'inch':
-            length_m = length * 0.0254  # 1 inch = 0.0254 meters
-        elif length_unit == 'mm':
-            length_m = length / 1000  # 1 mm = 0.001 meters
-        else:  # meters
-            length_m = length
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # For Inch series, if no unit specified, assume inches
-        if series == "Inch" and length_unit == 'mm':
-            length_m = length * 0.0254  # Convert from inches to meters
+def show_section_c_results():
+    """Display results for Section C"""
+    if not st.session_state.section_c_results.empty:
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
+        st.markdown("### Section C Results - Material Properties")
         
-        # For Inch series hex products (except Threaded Rod), if diameter_type is Pitch Diameter, convert inches to meters
-        if (
-            series == "Inch"
-            and diameter_type == "Pitch Diameter"
-            and product_type in hex_products
-            and product_type != "Threaded Rod"
-            and diameter_unit == "inch"
-        ):
-            diameter_m = diameter_value * 0.0254
-        else:
-            # Convert diameter to meters
-            if diameter_unit == 'ft':
-                diameter_m = diameter_value * 0.3048
-            elif diameter_unit == 'inch':
-                diameter_m = diameter_value * 0.0254
-            elif diameter_unit == 'mm':
-                diameter_m = diameter_value / 1000
-            else:  # meters
-                diameter_m = diameter_value
+        st.dataframe(
+            st.session_state.section_c_results,
+            use_container_width=True,
+            height=400
+        )
+        
+        # Show detailed properties
+        filters = st.session_state.section_c_filters
+        if filters and filters.get('property_class') != "All":
+            show_mechanical_chemical_details(filters.get('property_class'))
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            # For Inch series, if no unit specified, assume inches
-            if series == "Inch" and diameter_unit == 'mm':
-                diameter_m = diameter_value * 0.0254
+def combine_all_results():
+    """Combine results from all sections"""
+    combined = pd.DataFrame()
+    
+    # Add section A results
+    if not st.session_state.section_a_results.empty:
+        section_a_with_type = st.session_state.section_a_results.copy()
+        section_a_with_type['Section'] = 'A - Dimensional'
+        combined = pd.concat([combined, section_a_with_type], ignore_index=True)
+    
+    # Add section B results
+    if not st.session_state.section_b_results.empty:
+        section_b_with_type = st.session_state.section_b_results.copy()
+        section_b_with_type['Section'] = 'B - Thread'
+        combined = pd.concat([combined, section_b_with_type], ignore_index=True)
+    
+    # Add section C results
+    if not st.session_state.section_c_results.empty:
+        section_c_with_type = st.session_state.section_c_results.copy()
+        section_c_with_type['Section'] = 'C - Material'
+        combined = pd.concat([combined, section_c_with_type], ignore_index=True)
+    
+    return combined
 
-        # Convert head dimensions to meters
-        if width_across_flats is not None:
-            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
-        else:
-            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+def show_combined_results():
+    """Display combined results from all sections"""
+    if not st.session_state.combined_results.empty:
+        st.markdown('<div class="combined-results">', unsafe_allow_html=True)
+        st.markdown("### Combined Results - All Sections")
         
-        if head_height is not None:
-            head_height_m = convert_to_meters(head_height, 'mm', series)
-        else:
-            head_height_m = diameter_m * 0.65  # Default ratio if not available
+        st.dataframe(
+            st.session_state.combined_results,
+            use_container_width=True,
+            height=600
+        )
         
-        # Get material density
-        density = get_material_density(material)  # kg/m³
+        # Export options
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Export to Excel", use_container_width=True):
+                enhanced_export_data(st.session_state.combined_results, "Excel")
+        with col2:
+            if st.button("Export to CSV", use_container_width=True):
+                enhanced_export_data(st.session_state.combined_results, "CSV")
         
-        # 1. Calculate Shank Volume (Cylinder Volume)
-        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-        shank_radius = diameter_m / 2
-        shank_volume = math.pi * shank_radius**2 * length_m  # m³
-        
-        # 2. Calculate Head Volume using the specific formula
-        # Side Length = (Width Across the Flat (Min)/√3) X 2
-        side_length = (width_across_flats_m / math.sqrt(3)) * 2
-        
-        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-        head_volume = 0.65 * (side_length**2) * head_height_m
-        
-        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-        total_volume = shank_volume + head_volume
-        
-        # 4. Calculate Weight = Total volume x Density
-        weight_kg = total_volume * density
-        
-        # Apply product type factor
-        product_factors = {
-            "Hex Bolt": 1.0,
-            "Heavy Hex Bolt": 1.1,
-            "Hex Cap Screws": 0.95,
-            "Heavy Hex Screws": 1.1,
-            "Hexagon Socket Head Cap Screws": 0.9,
-            "Hexagon Socket Countersunk Head Cap Screw": 0.85,
-            "Threaded Rod": 1.0
-        }
-        factor = product_factors.get(product_type, 1.0)
-        final_weight_kg = weight_kg * factor
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        return {
-            'weight_kg': final_weight_kg,
-            'weight_g': final_weight_kg * 1000,
-            'weight_lb': final_weight_kg * 2.20462,
-            'diameter_m': diameter_m,
-            'length_m': length_m,
-            'volume_m3': volume,
-            'density': density,
-            'product_factor': factor,
-            'series': series,
-            'original_diameter': f"{diameter_value} {diameter_unit}",
-            'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Standard Cylinder Formula'
-        }
-    except Exception as e:
-        st.error(f"Calculation error: {str(e)}")
-        return None
+# ======================================================
+# WEIGHT CALCULATOR SECTION - COMPLETE WORKFLOW IMPLEMENTATION
+# ======================================================
 
 def show_weight_calculator_enhanced():
     """Enhanced weight calculator with complete product standards workflow"""
