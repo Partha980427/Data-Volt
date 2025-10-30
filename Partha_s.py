@@ -1882,6 +1882,26 @@ def calculate_weight_enhanced(parameters):
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
         
+        # Get hex head dimensions from database
+        width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
+        
+        # If dimensions not found in database, use default ratios
+        if width_across_flats is None:
+            # Estimate width across flats based on diameter
+            if diameter_unit == 'inch':
+                diameter_mm = diameter_value * 25.4
+            else:
+                diameter_mm = diameter_value
+            width_across_flats = diameter_mm * 1.5  # Default ratio
+        
+        if head_height is None:
+            # Estimate head height based on diameter
+            if diameter_unit == 'inch':
+                diameter_mm = diameter_value * 25.4
+            else:
+                diameter_mm = diameter_value
+            head_height = diameter_mm * 0.65  # Default ratio
+        
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
         # Convert length to meters based on unit and series
@@ -1937,52 +1957,97 @@ def calculate_weight_enhanced(parameters):
         # Get material density
         density = get_material_density(material)  # kg/m³
         
-        # 1. Calculate Shank Volume (Cylinder Volume)
-        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-        shank_radius = diameter_m / 2
-        shank_volume = math.pi * shank_radius**2 * length_m  # m³
-        
-        # 2. Calculate Head Volume using the specific formula
-        # Side Length = (Width Across the Flat (Min)/√3) X 2
-        side_length = (width_across_flats_m / math.sqrt(3)) * 2
-        
-        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-        head_volume = 0.65 * (side_length**2) * head_height_m
-        
-        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-        total_volume = shank_volume + head_volume
-        
-        # 4. Calculate Weight = Total volume x Density
-        weight_kg = total_volume * density
-        
-        return {
-            'weight_kg': weight_kg,
-            'weight_g': weight_kg * 1000,
-            'weight_lb': weight_kg * 2.20462,
-            'shank_volume_m3': shank_volume,
-            'head_volume_m3': head_volume,
-            'total_volume_m3': total_volume,
-            'diameter_m': diameter_m,
-            'length_m': length_m,
-            'width_across_flats_m': width_across_flats_m,
-            'head_height_m': head_height_m,
-            'side_length_m': side_length,
-            'density': density,
-            'series': series,
-            'original_diameter': f"{diameter_value} {diameter_unit}",
-            'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Enhanced Hex Product Formula',
-            'formula_details': {
-                'shank_volume_formula': 'π × (diameter/2)² × length',
-                'head_volume_formula': '0.65 × side_length² × head_height',
-                'side_length_formula': '(width_across_flats / √3) × 2',
-                'total_volume_formula': 'shank_volume + head_volume',
-                'weight_formula': 'total_volume × density'
+        # For Threaded Rod, use simple cylinder volume calculation
+        if product_type == "Threaded Rod":
+            # Simple cylinder volume for threaded rod
+            radius = diameter_m / 2
+            volume = math.pi * radius**2 * length_m
+            weight_kg = volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'volume_m3': volume,
+                'density': density,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Threaded Rod Cylinder Formula'
             }
-        }
         
+        # For hex products, use enhanced hex product formula
+        elif product_type in hex_products:
+            # 1. Calculate Shank Volume (Cylinder Volume)
+            # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
+            shank_radius = diameter_m / 2
+            shank_volume = math.pi * shank_radius**2 * length_m  # m³
+            
+            # 2. Calculate Head Volume using the specific formula
+            # Side Length = (Width Across the Flat (Min)/√3) X 2
+            side_length = (width_across_flats_m / math.sqrt(3)) * 2
+            
+            # Head Volume = 0.65 x (Side Length²) x Head height (Min)
+            head_volume = 0.65 * (side_length**2) * head_height_m
+            
+            # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
+            total_volume = shank_volume + head_volume
+            
+            # 4. Calculate Weight = Total volume x Density
+            weight_kg = total_volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'shank_volume_m3': shank_volume,
+                'head_volume_m3': head_volume,
+                'total_volume_m3': total_volume,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'width_across_flats_m': width_across_flats_m,
+                'head_height_m': head_height_m,
+                'side_length_m': side_length,
+                'density': density,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Enhanced Hex Product Formula',
+                'formula_details': {
+                    'shank_volume_formula': 'π × (diameter/2)² × length',
+                    'head_volume_formula': '0.65 × side_length² × head_height',
+                    'side_length_formula': '(width_across_flats / √3) × 2',
+                    'total_volume_formula': 'shank_volume + head_volume',
+                    'weight_formula': 'total_volume × density'
+                }
+            }
+        
+        # For other products, use simple cylinder calculation
+        else:
+            radius = diameter_m / 2
+            volume = math.pi * radius**2 * length_m
+            weight_kg = volume * density
+            
+            return {
+                'weight_kg': weight_kg,
+                'weight_g': weight_kg * 1000,
+                'weight_lb': weight_kg * 2.20462,
+                'volume_m3': volume,
+                'density': density,
+                'diameter_m': diameter_m,
+                'length_m': length_m,
+                'series': series,
+                'original_diameter': f"{diameter_value} {diameter_unit}",
+                'original_length': f"{length} {length_unit}",
+                'calculation_method': 'Standard Cylinder Formula'
+            }
+            
     except Exception as e:
-        st.error(f"Enhanced hex product calculation error: {str(e)}")
+        st.error(f"Calculation error: {str(e)}")
+        import traceback
+        st.error(f"Detailed error: {traceback.format_exc()}")
         return None
 
 # ======================================================
