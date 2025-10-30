@@ -1414,6 +1414,8 @@ def get_safe_size_options(temp_df):
         if len(unique_sizes) > 0:
             sorted_sizes = safe_sort_sizes(unique_sizes)
             size_options.extend(sorted_sizes)
+        else:
+            return ["All"]
     except Exception as e:
         st.warning(f"Size processing warning: {str(e)}")
         try:
@@ -1670,8 +1672,8 @@ def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_h
         shank_volume = math.pi * shank_radius**2 * length_m  # m³
         
         # 2. Calculate Head Volume using the specific formula
-        # Side Length = (Width Across the Flat (Min)/√3) X 2
-        side_length = (width_across_flats_m / math.sqrt(3)) * 2
+        # RECTIFIED: Side Length = Width Across Flats × 1.1547
+        side_length = width_across_flats_m * 1.1547
         
         # Head Volume = 0.65 x (Side Length²) x Head height (Min)
         head_volume = 0.65 * (side_length**2) * head_height_m
@@ -1702,7 +1704,7 @@ def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_h
             'formula_details': {
                 'shank_volume_formula': 'π × (diameter/2)² × length',
                 'head_volume_formula': '0.65 × side_length² × head_height',
-                'side_length_formula': '(width_across_flats / √3) × 2',
+                'side_length_formula': 'width_across_flats × 1.1547',
                 'total_volume_formula': 'shank_volume + head_volume',
                 'weight_formula': 'total_volume × density'
             }
@@ -1955,8 +1957,8 @@ def calculate_weight_enhanced(parameters):
             shank_volume = math.pi * shank_radius**2 * length_m  # m³
             
             # 2. Calculate Head Volume using the specific formula
-            # Side Length = (Width Across the Flat (Min)/√3) X 2
-            side_length = (width_across_flats_m / math.sqrt(3)) * 2
+            # RECTIFIED: Side Length = Width Across Flats × 1.1547
+            side_length = width_across_flats_m * 1.1547
             
             # Head Volume = 0.65 x (Side Length²) x Head height (Min)
             head_volume = 0.65 * (side_length**2) * head_height_m
@@ -1987,7 +1989,7 @@ def calculate_weight_enhanced(parameters):
                 'formula_details': {
                     'shank_volume_formula': 'π × (diameter/2)² × length',
                     'head_volume_formula': '0.65 × side_length² × head_height',
-                    'side_length_formula': '(width_across_flats / √3) × 2',
+                    'side_length_formula': 'width_across_flats × 1.1547',
                     'total_volume_formula': 'shank_volume + head_volume',
                     'weight_formula': 'total_volume × density'
                 }
@@ -2301,7 +2303,7 @@ def show_weight_calculator_enhanced():
     **Enhanced Workflow:** Product Type → Series → Standard → Size → Grade (ISO 4014 only) → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
-    **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas
+    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas with corrected side length calculation
     **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
     """)
     
@@ -2710,9 +2712,9 @@ def show_weight_calculator_enhanced():
                 - Original Length: {result['original_length']}
                 """)
                 
-                # Show ENHANCED hex product specific details
+                # Show RECTIFIED hex product specific details
                 st.markdown(f"""
-                **ENHANCED Hex Product Specific Details:**
+                **RECTIFIED Hex Product Specific Details:**
                 - **Shank Volume:** {result['shank_volume_m3']:.8f} m³
                 - **Head Volume:** {result['head_volume_m3']:.8f} m³
                 - **Total Volume:** {result['total_volume_m3']:.8f} m³
@@ -2720,9 +2722,9 @@ def show_weight_calculator_enhanced():
                 - **Head Height:** {result['head_height_m']:.4f} m ({result['head_height_m'] * 1000:.2f} mm)
                 - **Side Length:** {result['side_length_m']:.4f} m ({result['side_length_m'] * 1000:.2f} mm)
                 
-                **Formulas Used:**
+                **RECTIFIED Formulas Used:**
                 - Shank Volume = π × (diameter/2)² × length
-                - Side Length = (Width Across Flats / √3) × 2
+                - Side Length = Width Across Flats × 1.1547
                 - Head Volume = 0.65 × side_length² × head_height
                 - Total Volume = shank_volume + head_volume
                 - Weight = total_volume × density
@@ -2774,7 +2776,7 @@ def show_batch_calculator_enhanced():
     **Batch processing with the same product standards workflow**
     Upload a CSV/Excel file with columns matching the single calculator inputs.
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
-    **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas
+    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas with corrected side length calculation
     **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
     """)
     
@@ -3854,7 +3856,7 @@ def show_enhanced_home():
             "Carbon steel density calculations",
             "Batch processing capabilities",
             "Automatic inch-to-mm conversion",
-            "ENHANCED hex product formulas with specific volume calculations",
+            "RECTIFIED hex product formulas with specific volume calculations",
             "NEW: ISO 4014 Product Grade selection (A/B)"
         ]
         
@@ -3885,6 +3887,14 @@ def show_help_system():
                - **Blank Diameter**: Manual value input
                - **Pitch Diameter**: Thread specification dropdown
             
+            **RECTIFIED HEX PRODUCT FORMULA:**
+            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use RECTIFIED calculation
+            - **Shank Volume**: π × (diameter/2)² × length
+            - **RECTIFIED: Side Length** = Width Across Flats × 1.1547
+            - **Head Volume**: 0.65 × side_length² × head_height
+            - **Total Volume** = Shank Volume + Head Volume
+            - **Weight** = Total Volume × Density
+            
             **NEW ISO 4014 GRADE SELECTION:**
             - ISO 4014 Hex Bolt has two product grades: A and B
             - Each grade has different dimensional specifications
@@ -3895,14 +3905,6 @@ def show_help_system():
             - Uses pitch diameter from thread standards data
             - Automatic pitch diameter lookup from thread database
             - Support for both inch and metric threaded rods
-            
-            **ENHANCED HEX PRODUCT FORMULA:**
-            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use ENHANCED calculation
-            - **Shank Volume**: π × (diameter/2)² × length
-            - **Head Volume**: 0.65 × side_length² × head_height
-            - **Side Length**: (Width Across Flats / √3) × 2
-            - **Total Volume** = Shank Volume + Head Volume
-            - **Weight** = Total Volume × Density
             
             **UNIT CONVERSION FEATURE:**
             - **Inch Series**: All dimensions automatically converted from inches to mm
@@ -3915,7 +3917,7 @@ def show_help_system():
             - Handle both body diameter and thread pitch diameter scenarios
             - Maintain smooth filtering like Product Database section
             - Automatic unit conversion for accurate calculations
-            - ENHANCED formulas for hex products with specific volume calculation
+            - RECTIFIED formulas for hex products with specific volume calculation
             - NEW: ISO 4014 grade-specific dimension handling
             """)
 
@@ -3982,7 +3984,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, Enhanced Hex Product Formulas, and ISO 4014 Grade Selection</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, RECTIFIED Hex Product Formulas, and ISO 4014 Grade Selection</p>
         </div>
     """, unsafe_allow_html=True)
 
