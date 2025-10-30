@@ -2083,28 +2083,40 @@ def apply_section_c_filters():
     return filtered_data
 
 def show_section_a_results():
-    """Display results for Section A"""
+    """Show results for Section A"""
     if not st.session_state.section_a_results.empty:
         st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section A Results - Dimensional Specifications")
         
+        # Show professional card if requested
+        if st.session_state.show_professional_card and st.session_state.selected_product_details:
+            show_professional_product_card(st.session_state.selected_product_details)
+        
+        # Show data
         st.dataframe(
             st.session_state.section_a_results,
             use_container_width=True,
             height=400
         )
         
-        # Show professional card button
-        if len(st.session_state.section_a_results) == 1:
-            if st.button("Show Professional Specification Card", key="show_card_a"):
-                st.session_state.show_professional_card = True
-                st.session_state.selected_product_details = extract_product_details(st.session_state.section_a_results.iloc[0])
-                st.rerun()
+        # Show export options
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Export Section A Results", key="export_section_a"):
+                enhanced_export_data(st.session_state.section_a_results, "Excel")
+        with col2:
+            if st.button("Show Professional Card", key="show_pro_card_a"):
+                if not st.session_state.section_a_results.empty:
+                    # Extract first row for professional card
+                    first_row = st.session_state.section_a_results.iloc[0].to_dict()
+                    st.session_state.selected_product_details = extract_product_details(first_row)
+                    st.session_state.show_professional_card = True
+                    st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
 
 def show_section_b_results():
-    """Display results for Section B"""
+    """Show results for Section B"""
     if not st.session_state.section_b_results.empty:
         st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section B Results - Thread Specifications")
@@ -2115,10 +2127,13 @@ def show_section_b_results():
             height=400
         )
         
+        if st.button("Export Section B Results", key="export_section_b"):
+            enhanced_export_data(st.session_state.section_b_results, "Excel")
+        
         st.markdown('</div>', unsafe_allow_html=True)
 
 def show_section_c_results():
-    """Display results for Section C"""
+    """Show results for Section C"""
     if not st.session_state.section_c_results.empty:
         st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section C Results - Material Properties")
@@ -2129,10 +2144,12 @@ def show_section_c_results():
             height=400
         )
         
-        # Show detailed properties
-        filters = st.session_state.section_c_filters
-        if filters and filters.get('property_class') != "All":
-            show_mechanical_chemical_details(filters.get('property_class'))
+        # Show detailed properties for selected property class
+        if st.session_state.section_c_filters.get('property_class') and st.session_state.section_c_filters.get('property_class') != "All":
+            show_mechanical_chemical_details(st.session_state.section_c_filters.get('property_class'))
+        
+        if st.button("Export Section C Results", key="export_section_c"):
+            enhanced_export_data(st.session_state.section_c_results, "Excel")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2142,26 +2159,26 @@ def combine_all_results():
     
     # Add section A results
     if not st.session_state.section_a_results.empty:
-        section_a_with_type = st.session_state.section_a_results.copy()
-        section_a_with_type['Section'] = 'A - Dimensional'
-        combined = pd.concat([combined, section_a_with_type], ignore_index=True)
+        section_a = st.session_state.section_a_results.copy()
+        section_a['Section'] = 'A - Dimensional'
+        combined = pd.concat([combined, section_a], ignore_index=True)
     
-    # Add section B results
+    # Add section B results  
     if not st.session_state.section_b_results.empty:
-        section_b_with_type = st.session_state.section_b_results.copy()
-        section_b_with_type['Section'] = 'B - Thread'
-        combined = pd.concat([combined, section_b_with_type], ignore_index=True)
+        section_b = st.session_state.section_b_results.copy()
+        section_b['Section'] = 'B - Thread'
+        combined = pd.concat([combined, section_b], ignore_index=True)
     
     # Add section C results
     if not st.session_state.section_c_results.empty:
-        section_c_with_type = st.session_state.section_c_results.copy()
-        section_c_with_type['Section'] = 'C - Material'
-        combined = pd.concat([combined, section_c_with_type], ignore_index=True)
+        section_c = st.session_state.section_c_results.copy()
+        section_c['Section'] = 'C - Material'
+        combined = pd.concat([combined, section_c], ignore_index=True)
     
     return combined
 
 def show_combined_results():
-    """Display combined results from all sections"""
+    """Show combined results from all sections"""
     if not st.session_state.combined_results.empty:
         st.markdown('<div class="combined-results">', unsafe_allow_html=True)
         st.markdown("### Combined Results - All Sections")
@@ -2169,23 +2186,19 @@ def show_combined_results():
         st.dataframe(
             st.session_state.combined_results,
             use_container_width=True,
-            height=600
+            height=500
         )
         
-        # Export options
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Export to Excel", use_container_width=True):
+            if st.button("Export Combined Results", key="export_combined"):
                 enhanced_export_data(st.session_state.combined_results, "Excel")
         with col2:
-            if st.button("Export to CSV", use_container_width=True):
-                enhanced_export_data(st.session_state.combined_results, "CSV")
+            if st.button("Clear Combined Results", key="clear_combined"):
+                st.session_state.combined_results = pd.DataFrame()
+                st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
-
-# ======================================================
-# WEIGHT CALCULATOR SECTION - COMPLETE WORKFLOW IMPLEMENTATION
-# ======================================================
 
 def show_weight_calculator_enhanced():
     """Enhanced weight calculator with complete product standards workflow"""
@@ -2557,7 +2570,7 @@ def show_weight_calculator_enhanced():
         - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
         """)
     
-    # Display calculation results
+    # Display calculation results - FIXED VERSION
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
@@ -2574,22 +2587,28 @@ def show_weight_calculator_enhanced():
         with col4:
             st.metric("Density", f"{result['density']} kg/m³")
         
-        # Detailed results
+        # Detailed results - FIXED: Handle different volume keys based on calculation method
         with st.expander("Detailed Calculation Parameters"):
-            st.markdown(f"""
-            **Calculation Details:**
-            - **Calculation Method:** {result.get('calculation_method', 'Standard Cylinder Formula')}
-            - Volume: {result['volume_m3']:.8f} m³
-            - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
-            - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
-            - Material Density: {result['density']} kg/m³
-            - Series: {result['series']}
-            - Original Diameter: {result['original_diameter']}
-            - Original Length: {result['original_length']}
-            """)
+            # FIXED: Handle different volume keys based on calculation method
+            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula')
             
-            # Show ENHANCED hex product specific details if available
-            if result.get('calculation_method') == 'Enhanced Hex Product Formula':
+            if calculation_method == 'Enhanced Hex Product Formula':
+                # For hex products with enhanced formula
+                st.markdown(f"""
+                **Calculation Details:**
+                - **Calculation Method:** {calculation_method}
+                - Shank Volume: {result['shank_volume_m3']:.8f} m³
+                - Head Volume: {result['head_volume_m3']:.8f} m³
+                - Total Volume: {result['total_volume_m3']:.8f} m³
+                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
+                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
+                - Material Density: {result['density']} kg/m³
+                - Series: {result['series']}
+                - Original Diameter: {result['original_diameter']}
+                - Original Length: {result['original_length']}
+                """)
+                
+                # Show ENHANCED hex product specific details
                 st.markdown(f"""
                 **ENHANCED Hex Product Specific Details:**
                 - **Shank Volume:** {result['shank_volume_m3']:.8f} m³
@@ -2605,6 +2624,34 @@ def show_weight_calculator_enhanced():
                 - Head Volume = 0.65 × side_length² × head_height
                 - Total Volume = shank_volume + head_volume
                 - Weight = total_volume × density
+                """)
+                
+            elif calculation_method == 'Threaded Rod Cylinder Formula':
+                # For threaded rod
+                st.markdown(f"""
+                **Calculation Details:**
+                - **Calculation Method:** {calculation_method}
+                - Volume: {result['volume_m3']:.8f} m³
+                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
+                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
+                - Material Density: {result['density']} kg/m³
+                - Series: {result['series']}
+                - Original Diameter: {result['original_diameter']}
+                - Original Length: {result['original_length']}
+                """)
+                
+            else:
+                # For standard cylinder calculation
+                st.markdown(f"""
+                **Calculation Details:**
+                - **Calculation Method:** {calculation_method}
+                - Volume: {result['volume_m3']:.8f} m³
+                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
+                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
+                - Material Density: {result['density']} kg/m³
+                - Series: {result['series']}
+                - Original Diameter: {result['original_diameter']}
+                - Original Length: {result['original_length']}
                 """)
             
             # Show unit conversion details for Inch series
