@@ -1868,6 +1868,122 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
+    """Enhanced weight calculation with proper material densities and geometry"""
+    try:
+        # Extract parameters
+        product_type = parameters.get('product_type', 'Hex Bolt')
+        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
+        diameter_value = parameters.get('diameter_value', 0.0)
+        diameter_unit = parameters.get('diameter_unit', 'mm')
+        length = parameters.get('length', 0.0)
+        length_unit = parameters.get('length_unit', 'mm')
+        material = parameters.get('material', 'Carbon Steel')
+        series = parameters.get('series', 'Metric')
+        standard = parameters.get('standard', 'ASME B18.2.1')
+        size = parameters.get('size', 'All')
+        
+        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
+        
+        # Convert length to meters based on unit and series
+        if length_unit == 'ft':
+            length_m = length * 0.3048  # 1 ft = 0.3048 meters
+        elif length_unit == 'inch':
+            length_m = length * 0.0254  # 1 inch = 0.0254 meters
+        elif length_unit == 'mm':
+            length_m = length / 1000  # 1 mm = 0.001 meters
+        else:  # meters
+            length_m = length
+
+        # For Inch series, if no unit specified, assume inches
+        if series == "Inch" and length_unit == 'mm':
+            length_m = length * 0.0254  # Convert from inches to meters
+        
+        # --- FIXED DIAMETER CONVERSION LOGIC ---
+        # For Inch series hex products (except Threaded Rod), if diameter_type is Pitch Diameter, convert inches to meters
+        if (
+            series == "Inch"
+            and diameter_type == "Pitch Diameter"
+            and product_type in hex_products
+            and product_type != "Threaded Rod"
+            and diameter_unit == "inch"
+        ):
+            diameter_m = diameter_value * 0.0254
+        else:
+            # Convert diameter to meters
+            if diameter_unit == 'ft':
+                diameter_m = diameter_value * 0.3048
+            elif diameter_unit == 'inch':
+                diameter_m = diameter_value * 0.0254
+            elif diameter_unit == 'mm':
+                diameter_m = diameter_value / 1000
+            else:  # meters
+                diameter_m = diameter_value
+
+            # For Inch series, if no unit specified, assume inches
+            if series == "Inch" and diameter_unit == 'mm':
+                diameter_m = diameter_value * 0.0254
+
+        # Convert head dimensions to meters
+        if width_across_flats is not None:
+            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
+        else:
+            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+        
+        if head_height is not None:
+            head_height_m = convert_to_meters(head_height, 'mm', series)
+        else:
+            head_height_m = diameter_m * 0.65  # Default ratio if not available
+        
+        # Get material density
+        density = get_material_density(material)  # kg/m³
+        
+        # 1. Calculate Shank Volume (Cylinder Volume)
+        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
+        shank_radius = diameter_m / 2
+        shank_volume = math.pi * shank_radius**2 * length_m  # m³
+        
+        # 2. Calculate Head Volume using the specific formula
+        # Side Length = (Width Across the Flat (Min)/√3) X 2
+        side_length = (width_across_flats_m / math.sqrt(3)) * 2
+        
+        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
+        head_volume = 0.65 * (side_length**2) * head_height_m
+        
+        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
+        total_volume = shank_volume + head_volume
+        
+        # 4. Calculate Weight = Total volume x Density
+        weight_kg = total_volume * density
+        
+        return {
+            'weight_kg': weight_kg,
+            'weight_g': weight_kg * 1000,
+            'weight_lb': weight_kg * 2.20462,
+            'shank_volume_m3': shank_volume,
+            'head_volume_m3': head_volume,
+            'total_volume_m3': total_volume,
+            'diameter_m': diameter_m,
+            'length_m': length_m,
+            'width_across_flats_m': width_across_flats_m,
+            'head_height_m': head_height_m,
+            'side_length_m': side_length,
+            'density': density,
+            'series': series,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}",
+            'calculation_method': 'Enhanced Hex Product Formula',
+            'formula_details': {
+                'shank_volume_formula': 'π × (diameter/2)² × length',
+                'head_volume_formula': '0.65 × side_length² × head_height',
+                'side_length_formula': '(width_across_flats / √3) × 2',
+                'total_volume_formula': 'shank_volume + head_volume',
+                'weight_formula': 'total_volume × density'
+            }
+        }
+        
+    except Exception as e:
+        st.error(f"Enhanced hex product calculation error: {str(e)}")
+        return None
 
 # ======================================================
 # WEIGHT CALCULATION SECTION - COMPLETE WORKFLOW IMPLEMENTATION
