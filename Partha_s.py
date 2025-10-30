@@ -177,6 +177,7 @@ def initialize_session_state():
         "section_a_current_series": "All",
         "section_a_current_standard": "All",
         "section_a_current_size": "All",
+        "section_a_current_grade": "All",  # NEW: Added for ISO 4014 grades
         "section_b_current_standard": "All",
         "section_b_current_size": "All",
         "section_b_current_class": "All",
@@ -191,6 +192,7 @@ def initialize_session_state():
         "weight_calc_series": "Select Series",
         "weight_calc_standard": "Select Standard",
         "weight_calc_size": "Select Size",
+        "weight_calc_grade": "Select Grade",  # NEW: Added for ISO 4014 grades
         "weight_calc_diameter_type": "Blank Diameter",
         "weight_calc_blank_diameter": 10.0,
         "weight_calc_blank_dia_unit": "mm",
@@ -1424,6 +1426,69 @@ def get_safe_size_options(temp_df):
     return size_options
 
 # ======================================================
+# NEW: GRADE HANDLING FUNCTIONS FOR ISO 4014
+# ======================================================
+def get_available_grades_for_standard_product(standard, product):
+    """Get available grades for specific standard and product"""
+    grade_options = ["All"]
+    
+    if standard == "Select Standard" or product == "Select Product":
+        return grade_options
+    
+    # Only ISO 4014 has product grades A and B
+    if standard == "ISO 4014" and product == "Hex Bolt":
+        # Get the appropriate dataframe
+        temp_df = df_iso4014.copy()
+        
+        # Filter by product if specified
+        if product != "All" and 'Product' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        # Get grade options from the data
+        if 'Product Grade' in temp_df.columns:
+            unique_grades = temp_df['Product Grade'].dropna().unique()
+            unique_grades = [str(grade).strip() for grade in unique_grades if str(grade).strip() != '']
+            if len(unique_grades) > 0:
+                grade_options.extend(sorted(unique_grades))
+        else:
+            # Default grades for ISO 4014 Hex Bolt
+            grade_options.extend(["A", "B"])
+    
+    return grade_options
+
+def get_sizes_for_standard_product_grade(standard, product, grade):
+    """Get available sizes for specific standard, product and grade"""
+    size_options = ["Select Size"]
+    
+    if standard == "Select Standard" or product == "Select Product":
+        return size_options
+    
+    # Get the appropriate dataframe based on standard
+    if standard == "ASME B18.2.1":
+        temp_df = df.copy()
+    elif standard == "ISO 4014":
+        temp_df = df_iso4014.copy()
+    elif standard == "DIN-7991":
+        temp_df = df_din7991.copy()
+    elif standard == "ASME B18.3":
+        temp_df = df_asme_b18_3.copy()
+    else:
+        return size_options
+    
+    # Filter by product if specified
+    if product != "All" and 'Product' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product'] == product]
+    
+    # Filter by grade if specified (only for ISO 4014)
+    if standard == "ISO 4014" and grade != "All" and 'Product Grade' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product Grade'] == grade]
+    
+    # Get size options
+    size_options = get_safe_size_options(temp_df)
+    
+    return ["Select Size"] + [size for size in size_options if size != "All"]
+
+# ======================================================
 # UNIT CONVERSION FUNCTIONS - ENHANCED FOR INCH SERIES
 # ======================================================
 def convert_to_mm(value, from_unit, series=None):
@@ -1484,7 +1549,7 @@ def convert_to_meters(value, from_unit, series=None):
 # ENHANCED WEIGHT CALCULATION FUNCTIONS FOR HEX PRODUCTS
 # ======================================================
 
-def get_hex_head_dimensions(standard, product, size):
+def get_hex_head_dimensions(standard, product, size, grade="All"):
     """Get width across flats and head height for hex products from database"""
     try:
         # Get the appropriate dataframe based on standard
@@ -1506,6 +1571,10 @@ def get_hex_head_dimensions(standard, product, size):
         if 'Size' in temp_df.columns and size != "All":
             # Normalize size comparison
             temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        # Filter by grade if specified (only for ISO 4014)
+        if standard == "ISO 4014" and grade != "All" and 'Product Grade' in temp_df.columns:
+            temp_df = temp_df[temp_df['Product Grade'] == grade]
         
         if temp_df.empty:
             return None, None
@@ -1787,9 +1856,10 @@ def calculate_weight_enhanced(parameters):
         series = parameters.get('series', 'Metric')
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
+        grade = parameters.get('grade', 'All')  # NEW: Added grade parameter
         
         # Get hex head dimensions from database
-        width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size)
+        width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size, grade)
         
         # If dimensions not found in database, use default ratios
         if width_across_flats is None:
@@ -1953,7 +2023,7 @@ def calculate_weight_enhanced(parameters):
 # MISSING FUNCTIONS - ADD THESE TO FIX THE ERRORS
 # ======================================================
 
-def get_filtered_dataframe(product, standard):
+def get_filtered_dataframe(product, standard, grade="All"):
     """Get filtered dataframe based on product and standard selection"""
     if standard == "ASME B18.2.1":
         temp_df = df.copy()
@@ -1970,6 +2040,10 @@ def get_filtered_dataframe(product, standard):
     if product != "All" and 'Product' in temp_df.columns:
         temp_df = temp_df[temp_df['Product'] == product]
     
+    # Apply grade filter if specified (only for ISO 4014)
+    if standard == "ISO 4014" and grade != "All" and 'Product Grade' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product Grade'] == grade]
+    
     return temp_df
 
 def apply_section_a_filters():
@@ -1983,6 +2057,7 @@ def apply_section_a_filters():
     series = filters.get('series', 'All')
     standard = filters.get('standard', 'All')
     size = filters.get('size', 'All')
+    grade = filters.get('grade', 'All')  # NEW: Added grade filter
     
     # Get appropriate dataframe
     if standard == "ASME B18.2.1":
@@ -2002,6 +2077,10 @@ def apply_section_a_filters():
     
     if size != "All" and 'Size' in temp_df.columns:
         temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+    
+    # Apply grade filter if specified (only for ISO 4014)
+    if standard == "ISO 4014" and grade != "All" and 'Product Grade' in temp_df.columns:
+        temp_df = temp_df[temp_df['Product Grade'] == grade]
     
     return temp_df
 
@@ -2219,10 +2298,11 @@ def show_weight_calculator_enhanced():
     """, unsafe_allow_html=True)
     
     st.info("""
-    **Enhanced Workflow:** Product Type → Series → Standard → Size → Diameter Type → (Manual Input or Thread Specs)
+    **Enhanced Workflow:** Product Type → Series → Standard → Size → Grade (ISO 4014 only) → Diameter Type → (Manual Input or Thread Specs)
     **NEW:** Threaded Rod support with pitch diameter calculation
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
     **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas
+    **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
     """)
     
     # Initialize session state for form inputs
@@ -2233,7 +2313,7 @@ def show_weight_calculator_enhanced():
     with st.form("weight_calculator_enhanced"):
         st.markdown("### Product Standards Selection")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)  # NEW: Added 5th column for grade
         
         with col1:
             # A. Product Type
@@ -2299,22 +2379,41 @@ def show_weight_calculator_enhanced():
             if selected_size != "Select Size" and selected_size != "Not Required":
                 st.caption(f"Size: {selected_size}")
         
+        with col5:
+            # NEW: E. Grade (only for ISO 4014 Hex Bolt)
+            if selected_standard == "ISO 4014" and selected_product == "Hex Bolt":
+                grade_options = get_available_grades_for_standard_product(selected_standard, selected_product)
+                selected_grade = st.selectbox(
+                    "E. Product Grade",
+                    grade_options,
+                    key="weight_calc_grade_select"
+                )
+                
+                # Show grade info
+                if selected_grade != "All":
+                    st.caption(f"Grade: {selected_grade}")
+                    st.caption("⚠️ Different dimensions for A/B grades")
+            else:
+                st.info("Grade not applicable")
+                selected_grade = "Not Applicable"
+                st.session_state.weight_calc_grade_select = "Not Applicable"
+        
         st.markdown("---")
         st.markdown("### Diameter Specification")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # E. Cylinder Diameter Type
+            # F. Cylinder Diameter Type
             diameter_type_options = ["Blank Diameter", "Pitch Diameter"]
             selected_diameter_type = st.radio(
-                "E. Cylinder Diameter Type",
+                "F. Cylinder Diameter Type",
                 diameter_type_options,
                 key="weight_calc_diameter_type_select"
             )
         
         with col2:
-            # F. Conditional Input based on Diameter Type
+            # G. Conditional Input based on Diameter Type
             if selected_diameter_type == "Blank Diameter":
                 st.markdown("**Blank Diameter Input**")
                 dia_col1, dia_col2 = st.columns(2)
@@ -2476,7 +2575,8 @@ def show_weight_calculator_enhanced():
                 'length_unit': length_unit,
                 'series': selected_series,  # Pass series for unit conversion
                 'standard': selected_standard,
-                'size': selected_size
+                'size': selected_size,
+                'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "All"
             }
             
             # Add diameter parameters based on type
@@ -2520,6 +2620,7 @@ def show_weight_calculator_enhanced():
                     'product': selected_product,
                     'series': selected_series,
                     'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
+                    'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "N/A",
                     'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
                     'length': f"{length} {length_unit}",
                     'material': material,
@@ -2544,6 +2645,7 @@ def show_weight_calculator_enhanced():
             - **Series:** {selected_series}
             - **Standard:** {selected_standard if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
             - **Size:** {selected_size if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Grade:** {selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "Not Applicable"}
             """)
         
         with summary_col2:
@@ -2673,24 +2775,26 @@ def show_batch_calculator_enhanced():
     Upload a CSV/Excel file with columns matching the single calculator inputs.
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
     **ENHANCED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas
+    **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
     """)
     
     # Download template
     st.markdown("### Download Enhanced Batch Template")
     template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws'],
-        'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
-        'Size': ['1/4', '5/16', 'Not Required', '3/8'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 0, 9.525],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A'],
-        'Thread_Class': ['N/A', '2A', '2A', 'N/A'],
-        'Length': [50, 100, 200, 75],
-        'Length_Unit': ['mm', 'mm', 'ft', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel']
+        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt'],
+        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014'],
+        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10'],
+        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A'],  # NEW: Added grade column
+        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
+        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0],
+        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A'],
+        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A'],
+        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A'],
+        'Length': [50, 100, 200, 75, 60],
+        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm'],
+        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel']
     }
     template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
@@ -2883,6 +2987,7 @@ def show_calculation_history():
                 <div class="calculation-card">
                     <strong>{calc.get('product', 'N/A')}</strong> | 
                     Size: {calc.get('size', 'N/A')} | 
+                    Grade: {calc.get('grade', 'N/A')} |
                     Weight: {calc.get('weight_kg', 'N/A')} kg
                     <br><small>{calc.get('timestamp', '')}</small>
                 </div>
@@ -2899,6 +3004,7 @@ def show_professional_product_card(product_details):
     size = product_details.get('Size', '1/4 x 10')
     standard = product_details.get('Standards', 'ASME B18.2.1')
     thread = product_details.get('Thread', '1/4-20-UNC-2A')
+    grade = product_details.get('Product Grade', 'N/A')  # NEW: Added grade
     
     # Get current date and user info
     current_date = datetime.now().strftime('%d/%m/%Y')
@@ -2910,7 +3016,7 @@ def show_professional_product_card(product_details):
         <div class="card-header">
             <div>
                 <h1 class="card-title">{product_name}</h1>
-                <p class="card-subtitle">Size: {size} | Standard: {standard}</p>
+                <p class="card-subtitle">Size: {size} | Standard: {standard} | Grade: {grade}</p>
             </div>
             <div class="card-company">JSC India</div>
         </div>
@@ -3112,6 +3218,7 @@ def extract_product_details(row):
         'Size': row.get('Size', 'N/A'),
         'Standards': row.get('Standards', 'ASME B18.2.1'),
         'Thread': row.get('Thread', '1/4-20-UNC-2A'),
+        'Product Grade': row.get('Product Grade', 'N/A'),  # NEW: Added grade
         
         # Map dimensional specifications - these would come from your actual data columns
         'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
@@ -3139,7 +3246,7 @@ def extract_product_details(row):
     return details
 
 # ======================================================
-# FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE RELATIONSHIP
+# FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE-GRADE RELATIONSHIP
 # ======================================================
 
 def get_available_standards_for_product_series(product, series):
@@ -3170,14 +3277,14 @@ def get_available_standards_for_product_series(product, series):
     
     return available_standards
 
-def get_available_sizes_for_standard_product(standard, product):
+def get_available_sizes_for_standard_product(standard, product, grade="All"):
     """Get available sizes based on selected standard and product"""
     size_options = ["All"]
     
     if standard == "All" or product == "All":
         return size_options
     
-    temp_df = get_filtered_dataframe(product, standard)
+    temp_df = get_filtered_dataframe(product, standard, grade)
     size_options = get_safe_size_options(temp_df)
     
     return size_options
@@ -3230,10 +3337,10 @@ def show_enhanced_product_database():
         st.markdown("""
         <div class="independent-section">
             <h3 class="filter-header">Section A - Dimensional Specifications</h3>
-            <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size</p>
+            <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
         """, unsafe_allow_html=True)
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)  # NEW: Added 5th column for grade
         
         with col1:
             # 1. Product List - Get all unique products from all standards
@@ -3294,6 +3401,27 @@ def show_enhanced_product_database():
             if dimensional_size != "All":
                 st.caption(f"Sizes available: {len(available_sizes)-1}")
         
+        with col5:
+            # NEW: 5. Grade - Only for ISO 4014 Hex Bolt
+            if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt":
+                grade_options = get_available_grades_for_standard_product(dimensional_standard, dimensional_product)
+                dimensional_grade = st.selectbox(
+                    "Product Grade", 
+                    grade_options, 
+                    key="section_a_grade",
+                    index=grade_options.index(st.session_state.section_a_current_grade) if st.session_state.section_a_current_grade in grade_options else 0
+                )
+                st.session_state.section_a_current_grade = dimensional_grade
+                
+                # Show info about available grades
+                if dimensional_grade != "All":
+                    st.caption(f"Grade: {dimensional_grade}")
+                    st.caption("⚠️ Different dimensions for A/B")
+            else:
+                st.info("Grade not applicable")
+                dimensional_grade = "Not Applicable"
+                st.session_state.section_a_current_grade = "All"
+        
         # Debug information
         if st.session_state.debug_mode:
             st.info(f"""
@@ -3302,6 +3430,7 @@ def show_enhanced_product_database():
             - Series: {dimensional_series} 
             - Standards Available: {len(available_standards)-1}
             - Sizes Available: {len(available_sizes)-1}
+            - Grade: {dimensional_grade}
             - Selected Standard: {dimensional_standard}
             - Selected Size: {dimensional_size}
             """)
@@ -3314,7 +3443,8 @@ def show_enhanced_product_database():
                     'product': dimensional_product,
                     'series': dimensional_series,
                     'standard': dimensional_standard,
-                    'size': dimensional_size
+                    'size': dimensional_size,
+                    'grade': dimensional_grade if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt" else "All"
                 }
                 # Apply filters and store results
                 st.session_state.section_a_results = apply_section_a_filters()
@@ -3570,6 +3700,7 @@ def show_enhanced_product_database():
             st.session_state.section_a_current_series = "All"
             st.session_state.section_a_current_standard = "All"
             st.session_state.section_a_current_size = "All"
+            st.session_state.section_a_current_grade = "All"  # NEW: Reset grade
             st.session_state.section_b_current_standard = "All"
             st.session_state.section_b_current_size = "All"
             st.session_state.section_b_current_class = "All"
@@ -3723,7 +3854,8 @@ def show_enhanced_home():
             "Carbon steel density calculations",
             "Batch processing capabilities",
             "Automatic inch-to-mm conversion",
-            "ENHANCED hex product formulas with specific volume calculations"
+            "ENHANCED hex product formulas with specific volume calculations",
+            "NEW: ISO 4014 Product Grade selection (A/B)"
         ]
         
         for feature in features:
@@ -3747,10 +3879,16 @@ def show_help_system():
             2. **B. Series** (Inch/Metric) - Filtered by product type
             3. **C. Standard** - Filtered by product + series (for dimensional data)
             4. **D. Size** - Filtered by standard + product
-            5. **E. Cylinder Diameter Type** - Blank Diameter (Body) or Pitch Diameter (Thread)
-            6. **F. Conditional Input:**
+            5. **E. Product Grade** - Only for ISO 4014 Hex Bolt (A/B grades)
+            6. **F. Cylinder Diameter Type** - Blank Diameter (Body) or Pitch Diameter (Thread)
+            7. **G. Conditional Input:**
                - **Blank Diameter**: Manual value input
                - **Pitch Diameter**: Thread specification dropdown
+            
+            **NEW ISO 4014 GRADE SELECTION:**
+            - ISO 4014 Hex Bolt has two product grades: A and B
+            - Each grade has different dimensional specifications
+            - Grade selection affects weight calculations for ISO 4014 Hex Bolt
             
             **NEW THREADED ROD SUPPORT:**
             - Threaded Rod added to all product lists
@@ -3778,6 +3916,7 @@ def show_help_system():
             - Maintain smooth filtering like Product Database section
             - Automatic unit conversion for accurate calculations
             - ENHANCED formulas for hex products with specific volume calculation
+            - NEW: ISO 4014 grade-specific dimension handling
             """)
 
 # ======================================================
@@ -3843,7 +3982,7 @@ def main():
                 <span class="grade-badge">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion and Enhanced Hex Product Formulas</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, Enhanced Hex Product Formulas, and ISO 4014 Grade Selection</p>
         </div>
     """, unsafe_allow_html=True)
 
