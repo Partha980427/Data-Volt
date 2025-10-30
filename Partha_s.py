@@ -1868,7 +1868,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry"""
+    """Enhanced weight calculation with proper material densities and geometry - FIXED DIAMETER CONVERSION"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1919,38 +1919,28 @@ def calculate_weight_enhanced(parameters):
             length_m = length * 0.0254  # Convert from inches to meters
         
         # --- FIXED DIAMETER CONVERSION LOGIC ---
-        # For Inch series hex products (except Threaded Rod), if diameter_type is Pitch Diameter, convert inches to meters
-        if (
-            series == "Inch"
-            and diameter_type == "Pitch Diameter"
-            and product_type in hex_products
-            and product_type != "Threaded Rod"
-            and diameter_unit == "inch"
-        ):
-            diameter_m = diameter_value * 0.0254
-        else:
-            # Convert diameter to meters
-            if diameter_unit == 'ft':
-                diameter_m = diameter_value * 0.3048
-            elif diameter_unit == 'inch':
-                diameter_m = diameter_value * 0.0254
-            elif diameter_unit == 'mm':
-                diameter_m = diameter_value / 1000
-            else:  # meters
-                diameter_m = diameter_value
+        # Convert diameter to meters - SIMPLIFIED AND CORRECTED
+        if diameter_unit == 'ft':
+            diameter_m = diameter_value * 0.3048
+        elif diameter_unit == 'inch':
+            diameter_m = diameter_value * 0.0254  # ALWAYS convert inches to meters
+        elif diameter_unit == 'mm':
+            diameter_m = diameter_value / 1000
+        else:  # meters
+            diameter_m = diameter_value
 
-            # For Inch series, if no unit specified, assume inches
-            if series == "Inch" and diameter_unit == 'mm':
-                diameter_m = diameter_value * 0.0254
+        # For Inch series, if diameter_unit is 'mm' but series is Inch, assume it's actually inches
+        if series == "Inch" and diameter_unit == 'mm':
+            diameter_m = diameter_value * 0.0254  # Convert from inches to meters
 
         # Convert head dimensions to meters
         if width_across_flats is not None:
-            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
+            width_across_flats_m = width_across_flats / 1000  # Convert mm to meters
         else:
             width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
         
         if head_height is not None:
-            head_height_m = convert_to_meters(head_height, 'mm', series)
+            head_height_m = head_height / 1000  # Convert mm to meters
         else:
             head_height_m = diameter_m * 0.65  # Default ratio if not available
         
