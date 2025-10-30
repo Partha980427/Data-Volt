@@ -1918,20 +1918,27 @@ def calculate_weight_enhanced(parameters):
         if series == "Inch" and length_unit == 'mm':
             length_m = length * 0.0254  # Convert from inches to meters
         
-        # --- FIXED DIAMETER CONVERSION LOGIC ---
-        # Convert diameter to meters - SIMPLIFIED AND CORRECTED
+                # --- CORRECTED DIAMETER CONVERSION LOGIC ---
+        # ALWAYS convert diameter to meters based on the input unit
         if diameter_unit == 'ft':
-            diameter_m = diameter_value * 0.3048
+            diameter_m = diameter_value * 0.3048  # feet to meters
         elif diameter_unit == 'inch':
-            diameter_m = diameter_value * 0.0254  # ALWAYS convert inches to meters
+            diameter_m = diameter_value * 0.0254  # inches to meters
         elif diameter_unit == 'mm':
-            diameter_m = diameter_value / 1000
-        else:  # meters
+            diameter_m = diameter_value / 1000    # mm to meters
+        else:  # meters or unknown
             diameter_m = diameter_value
 
-        # For Inch series, if diameter_unit is 'mm' but series is Inch, assume it's actually inches
-        if series == "Inch" and diameter_unit == 'mm':
-            diameter_m = diameter_value * 0.0254  # Convert from inches to meters
+        # SPECIAL CASE: For Pitch Diameter from thread data in Inch series
+        # Thread data from ASME B1.1 is in inches, so if we have pitch diameter value from thread data
+        # and the series is Inch, we need to ensure it's converted from inches to meters
+        if (diameter_type == "Pitch Diameter" and 
+            series == "Inch" and 
+            'pitch_diameter_value' in st.session_state):
+            
+            # Use the pitch diameter from thread data and convert from inches to meters
+            pitch_diameter_inches = st.session_state.pitch_diameter_value
+            diameter_m = pitch_diameter_inches * 0.0254  # Convert inches to meters
 
         # Convert head dimensions to meters
         if width_across_flats is not None:
