@@ -300,7 +300,7 @@ def load_thread_data_enhanced(standard_name):
         return pd.DataFrame()
 
 def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
-    """Enhanced thread data retrieval with proper filtering"""
+    """Enhanced thread data retrieval with proper filtering - FIXED TYPO"""
     df_thread = load_thread_data_enhanced(standard)
     
     if df_thread.empty:
@@ -313,8 +313,9 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
         result_df = result_df[result_df["Thread"].astype(str).str.strip() == str(thread_size).strip()]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
+        # FIXED: Changed 'ast' to 'astype'
         result_df = result_df[
-            result_df["Class"].ast(str).str.strip().str.upper() == 
+            result_df["Class"].astype(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
         ]
     
