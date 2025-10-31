@@ -368,7 +368,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# PAGE SETUP WITH PROFESSIONAL ENGINEERING STYLING
+# ENHANCED PAGE SETUP WITH JSC GROUP STYLING
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -377,20 +377,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Professional Engineering CSS with Enhanced Card Design
+# JSC Group Professional CSS with Enhanced Card Design
 st.markdown("""
 <style>
     :root {
-        --engineering-blue: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-        --material-red: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-        --grade-purple: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
-        --technical-teal: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
-        --neutral-light: #f8f9fa;
-        --neutral-dark: #343a40;
+        --jsc-primary: #0066b3;
+        --jsc-primary-dark: #003366;
+        --jsc-secondary: #00a0e3;
+        --jsc-accent: #ff6b00;
+        --jsc-light: #f8f9fa;
+        --jsc-dark: #343a40;
+        --jsc-success: #28a745;
+        --jsc-warning: #ffc107;
+        --jsc-danger: #dc3545;
+        --jsc-gradient: linear-gradient(135deg, #0066b3 0%, #003366 100%);
+        --jsc-gradient-light: linear-gradient(135deg, #00a0e3 0%, #0066b3 100%);
     }
     
-    .engineering-header {
-        background: var(--engineering-blue);
+    /* Main background and text */
+    .stApp {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+    
+    /* Headers */
+    .jsc-header {
+        background: var(--jsc-gradient);
         padding: 2.5rem;
         border-radius: 15px;
         color: white;
@@ -398,204 +409,237 @@ st.markdown("""
         margin-bottom: 2rem;
         box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         border: 1px solid rgba(255,255,255,0.1);
+        position: relative;
+        overflow: hidden;
     }
     
-    .spec-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #3498db;
-        transition: all 0.3s ease;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
+    .jsc-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--jsc-accent);
     }
     
-    .spec-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
-    }
-    
-    .material-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #e74c3c;
-        transition: all 0.3s ease;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
-    }
-    
-    .grade-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #8e44ad;
-        transition: all 0.3s ease;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
-    }
-    
-    .technical-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #1abc9c;
-        transition: all 0.3s ease;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
-    }
-    
-    .engineering-badge {
-        background: var(--engineering-blue);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin: 0.2rem;
-        display: inline-block;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .material-badge {
-        background: var(--material-red);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin: 0.2rem;
-        display: inline-block;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .grade-badge {
-        background: var(--grade-purple);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin: 0.2rem;
-        display: inline-block;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .technical-badge {
-        background: var(--technical-teal);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin: 0.2rem;
-        display: inline-block;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .spec-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .spec-item {
-        background: var(--neutral-light);
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 3px solid #3498db;
-    }
-    
-    .spec-label {
-        font-size: 0.8rem;
-        color: #6c757d;
-        font-weight: 600;
-        text-transform: uppercase;
-        margin-bottom: 0.3rem;
-    }
-    
-    .spec-value {
-        font-size: 1.1rem;
-        color: var(--neutral-dark);
+    .jsc-header h1 {
+        font-size: 2.5rem;
         font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    .section-header {
-        border-left: 5px solid #3498db;
-        padding-left: 1rem;
-        margin: 2rem 0 1rem 0;
-        color: #2c3e50;
+    .jsc-header p {
+        font-size: 1.2rem;
+        opacity: 0.95;
+        margin-bottom: 1rem;
+    }
+    
+    /* Cards */
+    .jsc-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .jsc-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--jsc-gradient);
+    }
+    
+    .jsc-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 102, 179, 0.15);
+        border-left-color: var(--jsc-accent);
+    }
+    
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
+        transition: transform 0.3s ease;
+        border: 1px solid #e9ecef;
+        text-align: center;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 102, 179, 0.15);
+    }
+    
+    /* Badges */
+    .jsc-badge {
+        background: var(--jsc-gradient);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
         font-weight: 600;
+        margin: 0.2rem;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .material-header {
-        border-left: 5px solid #e74c3c;
-        padding-left: 1rem;
-        margin: 2rem 0 1rem 0;
-        color: #2c3e50;
-        font-weight: 600;
+    .jsc-badge-accent {
+        background: var(--jsc-accent);
     }
     
-    .grade-header {
-        border-left: 5px solid #8e44ad;
-        padding-left: 1rem;
-        margin: 2rem 0 1rem 0;
-        color: #2c3e50;
-        font-weight: 600;
+    .jsc-badge-secondary {
+        background: var(--jsc-secondary);
     }
     
+    .jsc-badge-success {
+        background: var(--jsc-success);
+    }
+    
+    /* Buttons */
     .stButton>button {
-        background: var(--engineering-blue);
+        background: var(--jsc-gradient);
         color: white;
         border: none;
         padding: 0.7rem 1.5rem;
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 102, 179, 0.2);
     }
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 6px 15px rgba(0, 102, 179, 0.3);
+        background: var(--jsc-primary-dark);
     }
     
-    .data-quality-indicator {
-        padding: 0.8rem;
+    .stButton>button:active {
+        transform: translateY(0);
+    }
+    
+    /* Primary button */
+    .stButton>button[kind="primary"] {
+        background: var(--jsc-gradient);
+        color: white;
+    }
+    
+    .stButton>button[kind="primary"]:hover {
+        background: var(--jsc-primary-dark);
+    }
+    
+    /* Secondary button */
+    .stButton>button[kind="secondary"] {
+        background: white;
+        color: var(--jsc-primary);
+        border: 2px solid var(--jsc-primary);
+    }
+    
+    .stButton>button[kind="secondary"]:hover {
+        background: var(--jsc-primary);
+        color: white;
+    }
+    
+    /* Sidebar */
+    .css-1d391kg, .css-1lcbmhc {
+        background: white;
+        border-right: 1px solid #e9ecef;
+    }
+    
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, white 0%, #f8f9fa 100%);
+    }
+    
+    /* Input fields */
+    .stTextInput>div>div>input, 
+    .stNumberInput>div>div>input,
+    .stSelectbox>div>div>select {
+        border: 2px solid #e9ecef;
         border-radius: 8px;
-        margin: 0.3rem 0;
-        font-size: 0.85rem;
-        border-left: 4px solid;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
     }
     
-    .quality-good {
-        background: #d4edda;
-        color: #155724;
-        border-left-color: #28a745;
+    .stTextInput>div>div>input:focus, 
+    .stNumberInput>div>div>input:focus,
+    .stSelectbox>div>div>select:focus {
+        border-color: var(--jsc-primary);
+        box-shadow: 0 0 0 2px rgba(0, 102, 179, 0.1);
     }
     
-    .quality-warning {
-        background: #fff3cd;
-        color: #856404;
-        border-left-color: #ffc107;
-    }
-    
-    .quality-error {
-        background: #f8d7da;
-        color: #721c24;
-        border-left-color: #dc3545;
-    }
-    
+    /* Dataframes */
     .dataframe {
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
     }
     
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background: var(--jsc-light);
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        font-weight: 600;
+        color: var(--jsc-primary);
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: white;
+        border-radius: 8px 8px 0 0;
+        padding: 1rem 2rem;
+        border: 1px solid #e9ecef;
+        border-bottom: none;
+        font-weight: 600;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: var(--jsc-primary);
+        color: white;
+    }
+    
+    /* Progress bars */
+    .stProgress > div > div > div {
+        background: var(--jsc-gradient);
+    }
+    
+    /* Success, Warning, Error messages */
+    .stAlert {
+        border-radius: 8px;
+        border: 1px solid;
+    }
+    
+    .stAlert [data-testid="stMarkdownContainer"] {
+        font-weight: 500;
+    }
+    
+    /* Section headers */
+    .section-header {
+        border-left: 5px solid var(--jsc-primary);
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
+        color: var(--jsc-primary-dark);
+        font-weight: 600;
+        font-size: 1.4rem;
+    }
+    
+    /* Quick actions grid */
     .quick-action {
         background: white;
         padding: 1.5rem 1rem;
@@ -610,6 +654,18 @@ st.markdown("""
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .quick-action::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--jsc-gradient);
     }
     
     .quick-action:hover {
@@ -617,136 +673,14 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #3498db;
-        transition: transform 0.3s ease;
-        border: 1px solid #e9ecef;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-3px);
-    }
-    
-    .property-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 0.8rem;
-        margin: 1rem 0;
-    }
-    
-    .property-item {
-        background: var(--neutral-light);
-        padding: 0.8rem;
-        border-radius: 6px;
-        text-align: center;
-        border: 1px solid #dee2e6;
-    }
-    
-    .property-value {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #2c3e50;
-    }
-    
-    .property-label {
-        font-size: 0.75rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        margin-top: 0.3rem;
-    }
-
-    .calculation-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #28a745;
-    }
-    .data-table {
-        font-size: 0.8rem;
-        margin: 0.5rem 0;
-    }
-    
-    .filter-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        margin-bottom: 1.5rem;
-        border: 1px solid #e9ecef;
-    }
-    
-    .filter-header {
-        border-left: 4px solid #3498db;
-        padding-left: 1rem;
-        margin-bottom: 1rem;
-        color: #2c3e50;
-        font-weight: 600;
-    }
-    
-    .multi-search-item {
-        background: var(--neutral-light);
-        padding: 0.8rem;
-        border-radius: 8px;
-        margin: 0.3rem 0;
-        border-left: 3px solid #3498db;
-    }
-    
-    .section-toggle {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        margin-bottom: 1rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    
-    .section-toggle:hover {
-        background: #e9ecef;
-    }
-    
-    .section-toggle.active {
-        background: #3498db;
-        color: white;
-        border-color: #3498db;
-    }
-    
-    .independent-section {
-        border: 2px solid #3498db;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-    }
-    
-    .section-results {
-        border: 2px solid #28a745;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
-    }
-    
-    .combined-results {
-        border: 2px solid #8e44ad;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        background: linear-gradient(135deg, #f8f0f8 0%, #ffffff 100%);
-    }
-    
+    /* Professional card for product details */
     .professional-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #3498db;
+        border: 2px solid var(--jsc-primary);
         border-radius: 15px;
         padding: 2rem;
         margin: 2rem 0;
-        box-shadow: 0 10px 30px rgba(52, 152, 219, 0.2);
+        box-shadow: 0 10px 30px rgba(0, 102, 179, 0.2);
         position: relative;
         overflow: hidden;
     }
@@ -758,7 +692,7 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: var(--engineering-blue);
+        background: var(--jsc-gradient);
     }
     
     .card-header {
@@ -773,23 +707,143 @@ st.markdown("""
     .card-title {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #2c3e50;
+        color: var(--jsc-primary-dark);
         margin: 0;
     }
     
     .card-subtitle {
         font-size: 1.2rem;
-        color: #7f8c8d;
+        color: #6c757d;
         margin: 0.5rem 0 0 0;
     }
     
     .card-company {
-        background: var(--engineering-blue);
+        background: var(--jsc-gradient);
         color: white;
         padding: 0.5rem 1rem;
         border-radius: 20px;
         font-weight: 600;
         font-size: 0.9rem;
+    }
+    
+    /* Filter sections */
+    .filter-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e9ecef;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .filter-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--jsc-gradient);
+    }
+    
+    .filter-header {
+        border-left: 4px solid var(--jsc-primary);
+        padding-left: 1rem;
+        margin-bottom: 1rem;
+        color: var(--jsc-primary-dark);
+        font-weight: 600;
+        font-size: 1.2rem;
+    }
+    
+    /* Independent sections */
+    .independent-section {
+        border: 2px solid var(--jsc-primary);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .independent-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--jsc-gradient);
+    }
+    
+    /* Results sections */
+    .section-results {
+        border: 2px solid var(--jsc-success);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
+    }
+    
+    .combined-results {
+        border: 2px solid var(--jsc-secondary);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
+    }
+    
+    /* Data quality indicators */
+    .data-quality-indicator {
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.3rem 0;
+        font-size: 0.85rem;
+        border-left: 4px solid;
+    }
+    
+    .quality-good {
+        background: #d4edda;
+        color: #155724;
+        border-left-color: var(--jsc-success);
+    }
+    
+    .quality-warning {
+        background: #fff3cd;
+        color: #856404;
+        border-left-color: var(--jsc-warning);
+    }
+    
+    .quality-error {
+        background: #f8d7da;
+        color: #721c24;
+        border-left-color: var(--jsc-danger);
+    }
+    
+    /* Calculation cards */
+    .calculation-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border-left: 4px solid var(--jsc-success);
+    }
+    
+    /* Grid layouts */
+    .spec-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .property-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
+        margin: 1rem 0;
     }
     
     .specification-grid {
@@ -799,150 +853,39 @@ st.markdown("""
         margin: 1.5rem 0;
     }
     
-    .spec-group {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border: 1px solid #e9ecef;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    .spec-group-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #3498db;
-    }
-    
-    .spec-row {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        gap: 1rem;
-        align-items: center;
-        padding: 0.8rem 0;
-        border-bottom: 1px solid #f8f9fa;
-    }
-    
-    .spec-row:last-child {
-        border-bottom: none;
-    }
-    
-    .spec-label-min {
-        text-align: right;
-        font-weight: 600;
-        color: #e74c3c;
-        font-size: 0.9rem;
-    }
-    
-    .spec-label-max {
-        text-align: left;
-        font-weight: 600;
-        color: #27ae60;
-        font-size: 0.9rem;
-    }
-    
-    .spec-dimension {
+    /* Footer */
+    .jsc-footer {
         text-align: center;
-        font-weight: 600;
-        color: #2c3e50;
-        font-size: 0.95rem;
-        padding: 0.5rem;
-        background: #f8f9fa;
-        border-radius: 6px;
+        color: #6c757d;
+        padding: 2rem;
+        margin-top: 3rem;
+        border-top: 1px solid #e9ecef;
     }
     
-    .spec-value {
-        padding: 0.5rem;
-        text-align: center;
-        font-weight: 500;
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
-        min-height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .card-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 2px solid #e9ecef;
-        font-size: 0.9rem;
-        color: #7f8c8d;
-    }
-    
-    .card-badge {
-        background: var(--technical-teal);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 15px;
-        font-weight: 600;
-        font-size: 0.8rem;
-    }
-    
-    .card-actions {
-        display: flex;
-        gap: 1rem;
-        margin-top: 1.5rem;
-    }
-    
-    .action-button {
-        background: var(--engineering-blue);
-        color: white;
-        border: none;
-        padding: 0.7rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        display: inline-block;
-    }
-    
-    .action-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-    }
-    
-    .action-button.secondary {
-        background: #6c757d;
-    }
-    
-    .action-button.secondary:hover {
-        background: #5a6268;
-    }
-    
+    /* Responsive design */
     @media (max-width: 768px) {
-        .engineering-header {
+        .jsc-header {
             padding: 1.5rem !important;
         }
-        .spec-grid {
-            grid-template-columns: 1fr;
+        
+        .jsc-header h1 {
+            font-size: 2rem !important;
         }
-        .property-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        
+        .spec-grid,
+        .property-grid,
         .specification-grid {
             grid-template-columns: 1fr;
         }
+        
         .card-header {
             flex-direction: column;
             gap: 1rem;
             text-align: center;
         }
-        .card-footer {
-            flex-direction: column;
-            gap: 1rem;
-            text-align: center;
-        }
-        .card-actions {
-            justify-content: center;
+        
+        .stTabs [data-baseweb="tab"] {
+            padding: 0.8rem 1rem;
         }
     }
 </style>
@@ -2337,16 +2280,14 @@ def show_weight_calculator_enhanced():
     """Enhanced weight calculator with complete product standards workflow"""
     
     st.markdown("""
-    <div class="engineering-header">
-        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            Weight Calculator - ENHANCED WORKFLOW
-        </h1>
-        <p style="margin:0; opacity: 0.9;">Complete product standards integration for accurate weight calculations</p>
-        <div style="margin-top: 0.5rem;">
-            <span class="engineering-badge">Product Standards</span>
-            <span class="technical-badge">Dynamic Filtering</span>
-            <span class="material-badge">Dimensional Data</span>
-            <span class="grade-badge">Thread Specifications</span>
+    <div class="jsc-header">
+        <h1>Weight Calculator - ENHANCED WORKFLOW</h1>
+        <p>Complete product standards integration for accurate weight calculations</p>
+        <div>
+            <span class="jsc-badge">Product Standards</span>
+            <span class="jsc-badge-accent">Dynamic Filtering</span>
+            <span class="jsc-badge-secondary">Dimensional Data</span>
+            <span class="jsc-badge-success">Thread Specifications</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3097,8 +3038,8 @@ def show_professional_product_card(product_details):
         
         <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
-            <div class="spec-group">
-                <div class="spec-group-title">Dimensional Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
                 <div class="spec-row">
@@ -3186,8 +3127,8 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Head Specifications Group -->
-            <div class="spec-group">
-                <div class="spec-group-title">Head Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Head Specifications</div>
                 
                 <!-- Head Height -->
                 <div class="spec-row">
@@ -3227,8 +3168,8 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Additional Specifications Group -->
-            <div class="spec-group">
-                <div class="spec-group-title">Additional Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
                 <div class="spec-row">
@@ -3244,7 +3185,7 @@ def show_professional_product_card(product_details):
                 
                 <!-- Thread Information -->
                 <div class="spec-row">
-                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--engineering-blue); color: white; padding: 0.8rem;">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--jsc-gradient); color: white; padding: 0.8rem;">
                         <strong>Thread: {thread}</strong>
                     </div>
                 </div>
@@ -3256,7 +3197,7 @@ def show_professional_product_card(product_details):
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div class="card-badge">
+            <div class="jsc-badge">
                 Professional Specification
             </div>
         </div>
@@ -3370,16 +3311,14 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="engineering-header">
-        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
-            Product Intelligence Center - Independent Sections
-        </h1>
-        <p style="margin:0; opacity: 0.9;">Each section works completely independently - No dependencies</p>
-        <div style="margin-top: 1rem;">
-            <span class="engineering-badge">Enhanced Calculator</span>
-            <span class="material-badge">Product-Based Workflow</span>
-            <span class="grade-badge">Dynamic Standards</span>
-            <span class="technical-badge">Professional Grade</span>
+    <div class="jsc-header">
+        <h1>Product Intelligence Center - Independent Sections</h1>
+        <p>Each section works completely independently - No dependencies</p>
+        <div>
+            <span class="jsc-badge">Enhanced Calculator</span>
+            <span class="jsc-badge-accent">Product-Based Workflow</span>
+            <span class="jsc-badge-secondary">Dynamic Standards</span>
+            <span class="jsc-badge-success">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3815,14 +3754,14 @@ def show_enhanced_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="engineering-header">
-        <h1 style="margin:0; font-size: 2.5rem;">JSC Industries</h1>
-        <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0 - ENHANCED</p>
-        <div style="margin-top: 1rem;">
-            <span class="engineering-badge">Enhanced Calculator</span>
-            <span class="material-badge">Product-Based Workflow</span>
-            <span class="grade-badge">Dynamic Standards</span>
-            <span class="technical-badge">Professional Grade</span>
+    <div class="jsc-header">
+        <h1>JSC Industries</h1>
+        <p>Professional Fastener Intelligence Platform v4.0 - ENHANCED</p>
+        <div>
+            <span class="jsc-badge">Enhanced Calculator</span>
+            <span class="jsc-badge-accent">Product-Based Workflow</span>
+            <span class="jsc-badge-secondary">Dynamic Standards</span>
+            <span class="jsc-badge-success">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3837,8 +3776,8 @@ def show_enhanced_home():
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">Products</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_products}</h2>
+            <h3 style="color: var(--jsc-primary); margin:0;">Products</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_products}</h2>
             <p style="color: #7f8c8d; margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
@@ -3846,8 +3785,8 @@ def show_enhanced_home():
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">Dimensional Standards</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <h3 style="color: var(--jsc-primary); margin:0;">Dimensional Standards</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
             <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
@@ -3855,8 +3794,8 @@ def show_enhanced_home():
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">Thread Types</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_threads}</h2>
+            <h3 style="color: var(--jsc-primary); margin:0;">Thread Types</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_threads}</h2>
             <p style="color: #7f8c8d; margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
@@ -3864,8 +3803,8 @@ def show_enhanced_home():
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: #3498db; margin:0;">ME&CERT</h3>
-            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_mecert}</h2>
+            <h3 style="color: var(--jsc-primary); margin:0;">ME&CERT</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_mecert}</h2>
             <p style="color: #7f8c8d; margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
@@ -3897,14 +3836,14 @@ def show_enhanced_home():
         st.markdown('<h3 class="section-header">System Status - ENHANCED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "engineering-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "technical-badge"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "material-badge"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "grade-badge"),
-            ("ME&CERT Data", not df_mechem.empty, "engineering-badge"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "technical-badge"),
-            ("Weight Calculations", True, "engineering-badge"),
-            ("Enhanced Calculator", True, "technical-badge"),
+            ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "jsc-badge-accent"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "jsc-badge-secondary"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "jsc-badge-success"),
+            ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-accent"),
+            ("Weight Calculations", True, "jsc-badge-secondary"),
+            ("Enhanced Calculator", True, "jsc-badge-success"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -3933,7 +3872,7 @@ def show_enhanced_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div style="padding: 0.5rem; border-left: 3px solid #3498db; margin: 0.2rem 0; background: var(--neutral-light);">• {feature}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="jsc-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -4048,12 +3987,12 @@ def main():
     
     st.markdown("""
         <hr>
-        <div style='text-align: center; color: gray; padding: 2rem;'>
+        <div class="jsc-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="engineering-badge">ENHANCED Calculator</span>
-                <span class="technical-badge">Improved Workflow</span>
-                <span class="material-badge">Dynamic Standards</span>
-                <span class="grade-badge">Professional Grade</span>
+                <span class="jsc-badge">ENHANCED Calculator</span>
+                <span class="jsc-badge-accent">Improved Workflow</span>
+                <span class="jsc-badge-secondary">Dynamic Standards</span>
+                <span class="jsc-badge-success">Professional Grade</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, RECTIFIED Hex Product Formulas, and ISO 4014 Grade Selection</p>
