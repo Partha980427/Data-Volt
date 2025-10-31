@@ -314,7 +314,7 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
         result_df = result_df[
-            result_df["Class"].ast(str).str.strip().str.upper() == 
+            result_df["Class"].astype(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
         ]
     
@@ -1908,7 +1908,8 @@ def calculate_weight_enhanced(parameters):
         # and the series is Inch, we need to ensure it's converted from inches to meters
         if (diameter_type == "Pitch Diameter" and 
             series == "Inch" and 
-            'pitch_diameter_value' in st.session_state):
+            'pitch_diameter_value' in st.session_state and
+            st.session_state.pitch_diameter_value is not None):
             
             # Use the pitch diameter from thread data and convert from inches to meters
             pitch_diameter_inches = st.session_state.pitch_diameter_value
@@ -2525,7 +2526,7 @@ def show_weight_calculator_enhanced():
                     # Show pitch diameter information for ALL products using Pitch Diameter
                     if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
-                        if pitch_diameter:
+                        if pitch_diameter is not None:
                             # Store the pitch diameter in session state for calculation
                             st.session_state.pitch_diameter_value = pitch_diameter
                             
@@ -2633,7 +2634,7 @@ def show_weight_calculator_enhanced():
                 })
             else:
                 # For pitch diameter, use the pitch diameter value stored in session state
-                if 'pitch_diameter_value' in st.session_state:
+                if 'pitch_diameter_value' in st.session_state and st.session_state.pitch_diameter_value is not None:
                     pitch_diameter = st.session_state.pitch_diameter_value
                     
                     # For Inch series, pitch diameter from ASME B1.1 is in inches
