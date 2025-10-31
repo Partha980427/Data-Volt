@@ -314,7 +314,7 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
         result_df = result_df[
-            result_df["Class"].ast(str).str.strip().str.upper() == 
+            result_df["Class"].astype(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
         ]
     
@@ -367,7 +367,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# JSC GROUP WEBSITE STYLING - MATCHING COMPANY DESIGN
+# PAGE SETUP WITH PROFESSIONAL ENGINEERING STYLING
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -376,65 +376,80 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# JSC Group Professional CSS with Company Branding
+# Professional Engineering CSS with Enhanced Card Design
 st.markdown("""
 <style>
     :root {
-        --jsc-primary: #0056b3;
-        --jsc-primary-dark: #003366;
-        --jsc-accent: #d9534f;
-        --jsc-success: #28a745;
-        --jsc-warning: #ffc107;
-        --jsc-danger: #dc3545;
-        --jsc-light: #f8f9fa;
-        --jsc-dark: #343a40;
-        --jsc-gray: #6c757d;
-        --jsc-white: #ffffff;
+        --engineering-blue: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        --material-red: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        --grade-purple: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+        --technical-teal: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+        --neutral-light: #f8f9fa;
+        --neutral-dark: #343a40;
     }
     
-    .main-header {
-        background: linear-gradient(135deg, var(--jsc-primary-dark) 0%, var(--jsc-primary) 100%);
-        padding: 2rem;
-        border-radius: 0 0 15px 15px;
+    .engineering-header {
+        background: var(--engineering-blue);
+        padding: 2.5rem;
+        border-radius: 15px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        border-bottom: 4px solid var(--jsc-accent);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
     }
     
-    .jsc-card {
-        background: var(--jsc-white);
+    .spec-card {
+        background: white;
         padding: 1.5rem;
-        border-radius: 10px;
+        border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid var(--jsc-primary);
+        border-left: 4px solid #3498db;
         transition: all 0.3s ease;
         margin-bottom: 1rem;
         border: 1px solid #e9ecef;
     }
     
-    .jsc-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-    }
-    
-    .jsc-metric-card {
-        background: linear-gradient(135deg, var(--jsc-white) 0%, #f8f9fa 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-top: 4px solid var(--jsc-primary);
-        text-align: center;
-        transition: transform 0.3s ease;
-    }
-    
-    .jsc-metric-card:hover {
+    .spec-card:hover {
         transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
     }
     
-    .jsc-badge {
-        background: var(--jsc-primary);
+    .material-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #e74c3c;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .grade-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #8e44ad;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .technical-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #1abc9c;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .engineering-badge {
+        background: var(--engineering-blue);
         color: white;
         padding: 0.4rem 1rem;
         border-radius: 20px;
@@ -445,135 +460,59 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .jsc-badge-accent {
-        background: var(--jsc-accent);
-    }
-    
-    .jsc-badge-success {
-        background: var(--jsc-success);
-    }
-    
-    .jsc-badge-warning {
-        background: var(--jsc-warning);
-        color: var(--jsc-dark);
-    }
-    
-    .section-title {
-        border-left: 4px solid var(--jsc-primary);
-        padding-left: 1rem;
-        margin: 2rem 0 1rem 0;
-        color: var(--jsc-primary-dark);
-        font-weight: 600;
-        font-size: 1.4rem;
-    }
-    
-    .stButton>button {
-        background: var(--jsc-primary);
+    .material-badge {
+        background: var(--material-red);
         color: white;
-        border: none;
-        padding: 0.7rem 1.5rem;
-        border-radius: 8px;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
         font-weight: 600;
-        transition: all 0.3s ease;
-        width: 100%;
+        margin: 0.2rem;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .stButton>button:hover {
-        background: var(--jsc-primary-dark);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,86,179,0.3);
+    .grade-badge {
+        background: var(--grade-purple);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin: 0.2rem;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .stButton>button:focus {
-        box-shadow: 0 0 0 2px var(--jsc-accent);
-    }
-    
-    .dataframe {
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #dee2e6;
-    }
-    
-    .quick-action-card {
-        background: var(--jsc-white);
-        padding: 1.5rem 1rem;
-        border-radius: 10px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
-        height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-top: 4px solid var(--jsc-primary);
-    }
-    
-    .quick-action-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-        border-top-color: var(--jsc-accent);
-    }
-    
-    .filter-section {
-        background: var(--jsc-white);
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        margin-bottom: 1.5rem;
-        border: 1px solid #e9ecef;
-        border-left: 4px solid var(--jsc-primary);
-    }
-    
-    .calculation-result {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-        border-left: 4px solid var(--jsc-success);
-    }
-    
-    .professional-spec-card {
-        background: var(--jsc-white);
-        border: 2px solid var(--jsc-primary);
-        border-radius: 12px;
-        padding: 2rem;
-        margin: 2rem 0;
-        box-shadow: 0 8px 25px rgba(0, 86, 179, 0.15);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .professional-spec-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--jsc-primary) 0%, var(--jsc-accent) 100%);
+    .technical-badge {
+        background: var(--technical-teal);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin: 0.2rem;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .spec-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem;
-        margin: 1.5rem 0;
+        margin: 1rem 0;
     }
     
     .spec-item {
-        background: #f8f9fa;
+        background: var(--neutral-light);
         padding: 1rem;
         border-radius: 8px;
-        border-left: 3px solid var(--jsc-primary);
+        border-left: 3px solid #3498db;
     }
     
     .spec-label {
         font-size: 0.8rem;
-        color: var(--jsc-gray);
+        color: #6c757d;
         font-weight: 600;
         text-transform: uppercase;
         margin-bottom: 0.3rem;
@@ -581,17 +520,47 @@ st.markdown("""
     
     .spec-value {
         font-size: 1.1rem;
-        color: var(--jsc-dark);
+        color: var(--neutral-dark);
         font-weight: 700;
     }
     
-    .jsc-footer {
-        background: var(--jsc-primary-dark);
+    .section-header {
+        border-left: 5px solid #3498db;
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    .material-header {
+        border-left: 5px solid #e74c3c;
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    .grade-header {
+        border-left: 5px solid #8e44ad;
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    .stButton>button {
+        background: var(--engineering-blue);
         color: white;
-        padding: 2rem;
-        text-align: center;
-        margin-top: 3rem;
-        border-radius: 15px 15px 0 0;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.2);
     }
     
     .data-quality-indicator {
@@ -605,83 +574,374 @@ st.markdown("""
     .quality-good {
         background: #d4edda;
         color: #155724;
-        border-left-color: var(--jsc-success);
+        border-left-color: #28a745;
     }
     
     .quality-warning {
         background: #fff3cd;
         color: #856404;
-        border-left-color: var(--jsc-warning);
+        border-left-color: #ffc107;
     }
     
     .quality-error {
         background: #f8d7da;
         color: #721c24;
-        border-left-color: var(--jsc-danger);
+        border-left-color: #dc3545;
     }
     
-    /* Sidebar styling */
-    .css-1d391kg, .css-1lcbmhc {
-        background: var(--jsc-light);
-    }
-    
-    .css-1d391kg p, .css-1lcbmhc p {
-        color: var(--jsc-dark);
-        font-weight: 500;
-    }
-    
-    /* Select box styling */
-    .stSelectbox > div > div {
-        border: 1px solid #ced4da;
-        border-radius: 6px;
-    }
-    
-    .stSelectbox > div > div:hover {
-        border-color: var(--jsc-primary);
-    }
-    
-    /* Number input styling */
-    .stNumberInput > div > div > input {
-        border: 1px solid #ced4da;
-        border-radius: 6px;
-    }
-    
-    .stNumberInput > div > div > input:focus {
-        border-color: var(--jsc-primary);
-        box-shadow: 0 0 0 2px rgba(0,86,179,0.2);
-    }
-    
-    /* Radio button styling */
-    .stRadio > div {
-        background: var(--jsc-white);
-        padding: 1rem;
+    .dataframe {
         border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .quick-action {
+        background: white;
+        padding: 1.5rem 1rem;
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .quick-action:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #3498db;
+        transition: transform 0.3s ease;
         border: 1px solid #e9ecef;
     }
     
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        background: var(--jsc-primary);
-        color: white;
+    .metric-card:hover {
+        transform: translateY(-3px);
+    }
+    
+    .property-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
+        margin: 1rem 0;
+    }
+    
+    .property-item {
+        background: var(--neutral-light);
+        padding: 0.8rem;
         border-radius: 6px;
+        text-align: center;
+        border: 1px solid #dee2e6;
+    }
+    
+    .property-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    .property-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-top: 0.3rem;
+    }
+
+    .calculation-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border-left: 4px solid #28a745;
+    }
+    .data-table {
+        font-size: 0.8rem;
+        margin: 0.5rem 0;
+    }
+    
+    .filter-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .filter-header {
+        border-left: 4px solid #3498db;
+        padding-left: 1rem;
+        margin-bottom: 1rem;
+        color: #2c3e50;
         font-weight: 600;
     }
     
-    .streamlit-expanderContent {
-        background: var(--jsc-white);
+    .multi-search-item {
+        background: var(--neutral-light);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.3rem 0;
+        border-left: 3px solid #3498db;
+    }
+    
+    .section-toggle {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .section-toggle:hover {
+        background: #e9ecef;
+    }
+    
+    .section-toggle.active {
+        background: #3498db;
+        color: white;
+        border-color: #3498db;
+    }
+    
+    .independent-section {
+        border: 2px solid #3498db;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    }
+    
+    .section-results {
+        border: 2px solid #28a745;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
+    }
+    
+    .combined-results {
+        border: 2px solid #8e44ad;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f8f0f8 0%, #ffffff 100%);
+    }
+    
+    .professional-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #3498db;
+        border-radius: 15px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 10px 30px rgba(52, 152, 219, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .professional-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--engineering-blue);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .card-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin: 0;
+    }
+    
+    .card-subtitle {
+        font-size: 1.2rem;
+        color: #7f8c8d;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .card-company {
+        background: var(--engineering-blue);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .specification-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .spec-group {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
         border: 1px solid #e9ecef;
-        border-radius: 0 0 6px 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .spec-group-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .spec-row {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.8rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .spec-row:last-child {
+        border-bottom: none;
+    }
+    
+    .spec-label-min {
+        text-align: right;
+        font-weight: 600;
+        color: #e74c3c;
+        font-size: 0.9rem;
+    }
+    
+    .spec-label-max {
+        text-align: left;
+        font-weight: 600;
+        color: #27ae60;
+        font-size: 0.9rem;
+    }
+    
+    .spec-dimension {
+        text-align: center;
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.95rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .spec-value {
+        padding: 0.5rem;
+        text-align: center;
+        font-weight: 500;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 2px solid #e9ecef;
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    .card-badge {
+        background: var(--technical-teal);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 15px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    
+    .card-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+    
+    .action-button {
+        background: var(--engineering-blue);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    }
+    
+    .action-button.secondary {
+        background: #6c757d;
+    }
+    
+    .action-button.secondary:hover {
+        background: #5a6268;
     }
     
     @media (max-width: 768px) {
-        .main-header {
+        .engineering-header {
             padding: 1.5rem !important;
         }
         .spec-grid {
             grid-template-columns: 1fr;
         }
-        .jsc-card {
-            padding: 1rem;
+        .property-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .specification-grid {
+            grid-template-columns: 1fr;
+        }
+        .card-header {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+        .card-footer {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+        .card-actions {
+            justify-content: center;
         }
     }
 </style>
@@ -1648,7 +1908,8 @@ def calculate_weight_enhanced(parameters):
         # and the series is Inch, we need to ensure it's converted from inches to meters
         if (diameter_type == "Pitch Diameter" and 
             series == "Inch" and 
-            'pitch_diameter_value' in st.session_state):
+            'pitch_diameter_value' in st.session_state and
+            st.session_state.pitch_diameter_value is not None):
             
             # Use the pitch diameter from thread data and convert from inches to meters
             pitch_diameter_inches = st.session_state.pitch_diameter_value
@@ -1950,7 +2211,7 @@ def apply_section_c_filters():
 def show_section_a_results():
     """Show results for Section A"""
     if not st.session_state.section_a_results.empty:
-        st.markdown('<div class="jsc-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section A Results - Dimensional Specifications")
         
         # Show professional card if requested
@@ -1983,7 +2244,7 @@ def show_section_a_results():
 def show_section_b_results():
     """Show results for Section B"""
     if not st.session_state.section_b_results.empty:
-        st.markdown('<div class="jsc-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section B Results - Thread Specifications")
         
         st.dataframe(
@@ -2000,7 +2261,7 @@ def show_section_b_results():
 def show_section_c_results():
     """Show results for Section C"""
     if not st.session_state.section_c_results.empty:
-        st.markdown('<div class="jsc-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section C Results - Material Properties")
         
         st.dataframe(
@@ -2045,7 +2306,7 @@ def combine_all_results():
 def show_combined_results():
     """Show combined results from all sections"""
     if not st.session_state.combined_results.empty:
-        st.markdown('<div class="jsc-card">', unsafe_allow_html=True)
+        st.markdown('<div class="combined-results">', unsafe_allow_html=True)
         st.markdown("### Combined Results - All Sections")
         
         st.dataframe(
@@ -2069,16 +2330,16 @@ def show_weight_calculator_enhanced():
     """Enhanced weight calculator with complete product standards workflow"""
     
     st.markdown("""
-    <div class="main-header">
-        <h1 style="margin:0; display: flex; align-items: center; justify-content: center; gap: 1rem;">
-            🔧 Weight Calculator - Professional Grade
+    <div class="engineering-header">
+        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
+            Weight Calculator - ENHANCED WORKFLOW
         </h1>
         <p style="margin:0; opacity: 0.9;">Complete product standards integration for accurate weight calculations</p>
-        <div style="margin-top: 1rem;">
-            <span class="jsc-badge">Product Standards</span>
-            <span class="jsc-badge-accent">Dynamic Filtering</span>
-            <span class="jsc-badge-success">Dimensional Data</span>
-            <span class="jsc-badge-warning">Thread Specifications</span>
+        <div style="margin-top: 0.5rem;">
+            <span class="engineering-badge">Product Standards</span>
+            <span class="technical-badge">Dynamic Filtering</span>
+            <span class="material-badge">Dimensional Data</span>
+            <span class="grade-badge">Thread Specifications</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2265,7 +2526,7 @@ def show_weight_calculator_enhanced():
                     # Show pitch diameter information for ALL products using Pitch Diameter
                     if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
                         pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
-                        if pitch_diameter:
+                        if pitch_diameter is not None:
                             # Store the pitch diameter in session state for calculation
                             st.session_state.pitch_diameter_value = pitch_diameter
                             
@@ -2373,7 +2634,7 @@ def show_weight_calculator_enhanced():
                 })
             else:
                 # For pitch diameter, use the pitch diameter value stored in session state
-                if 'pitch_diameter_value' in st.session_state:
+                if 'pitch_diameter_value' in st.session_state and st.session_state.pitch_diameter_value is not None:
                     pitch_diameter = st.session_state.pitch_diameter_value
                     
                     # For Inch series, pitch diameter from ASME B1.1 is in inches
@@ -2462,7 +2723,6 @@ def show_weight_calculator_enhanced():
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
-        st.markdown('<div class="calculation-result">', unsafe_allow_html=True)
         st.markdown("### Calculation Results")
         
         col1, col2, col3, col4 = st.columns(4)
@@ -2571,8 +2831,6 @@ def show_weight_calculator_enhanced():
                 - Weight calculations performed in metric units (kg/m³)
                 - Final results converted back to desired units
                 """)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 def show_batch_calculator_enhanced():
     """Enhanced batch calculator with same workflow"""
@@ -2793,7 +3051,7 @@ def show_calculation_history():
         for calc in reversed(st.session_state.calculation_history[-5:]):
             with st.container():
                 st.markdown(f"""
-                <div class="jsc-card">
+                <div class="calculation-card">
                     <strong>{calc.get('product', 'N/A')}</strong> | 
                     Size: {calc.get('size', 'N/A')} | 
                     Grade: {calc.get('grade', 'N/A')} |
@@ -2821,63 +3079,185 @@ def show_professional_product_card(product_details):
     
     # Create the professional card HTML
     card_html = f"""
-    <div class="professional-spec-card">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #e9ecef;">
+    <div class="professional-card">
+        <div class="card-header">
             <div>
-                <h1 style="font-size: 1.8rem; font-weight: 700; color: var(--jsc-primary-dark); margin: 0;">{product_name}</h1>
-                <p style="font-size: 1.2rem; color: var(--jsc-gray); margin: 0.5rem 0 0 0;">Size: {size} | Standard: {standard} | Grade: {grade}</p>
+                <h1 class="card-title">{product_name}</h1>
+                <p class="card-subtitle">Size: {size} | Standard: {standard} | Grade: {grade}</p>
             </div>
-            <div style="background: var(--jsc-primary); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
-                JSC India
+            <div class="card-company">JSC India</div>
+        </div>
+        
+        <div class="specification-grid">
+            <!-- Dimensional Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">Dimensional Specifications</div>
+                
+                <!-- Body Diameter -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Body Dia (Min)</div>
+                    <div class="spec-dimension">Body Diameter</div>
+                    <div class="spec-label-max">Body Dia (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Body_Dia_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Body_Dia_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Width Across Flats -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Flats (Min)</div>
+                    <div class="spec-dimension">Width Across Flats</div>
+                    <div class="spec-label-max">Width Across Flats (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Width Across Corners -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Corners (Min)</div>
+                    <div class="spec-dimension">Width Across Corners</div>
+                    <div class="spec-label-max">Width Across Corners (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Head Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Head Height (Min)</div>
+                    <div class="spec-dimension">Head Height</div>
+                    <div class="spec-label-max">Head Height (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Radius of Fillet -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Radius of Fillet (Min)</div>
+                    <div class="spec-dimension">Radius of Fillet</div>
+                    <div class="spec-label-max">Radius of Fillet (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Washer Face Thickness -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Washer Face Thickness (Min)</div>
+                    <div class="spec-dimension">Washer Face Thickness</div>
+                    <div class="spec-label-max">Washer Face Thickness (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Wrenching Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Wrenching Height (Min)</div>
+                    <div class="spec-dimension">Wrenching Height</div>
+                    <div class="spec-label-max">Total Runout (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
+                </div>
+            </div>
+            
+            <!-- Head Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">Head Specifications</div>
+                
+                <!-- Head Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Head Height (Min)</div>
+                    <div class="spec-dimension">Head Height</div>
+                    <div class="spec-label-max">Head Height (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Radius of Fillet -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Radius of Fillet (Min)</div>
+                    <div class="spec-dimension">Radius of Fillet</div>
+                    <div class="spec-label-max">Radius of Fillet (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Washer Face Thickness -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Washer Face Thickness (Min)</div>
+                    <div class="spec-dimension">Washer Face Thickness</div>
+                    <div class="spec-label-max">Washer Face Thickness (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
+                </div>
+            </div>
+            
+            <!-- Additional Specifications Group -->
+            <div class="spec-group">
+                <div class="spec-group-title">Additional Specifications</div>
+                
+                <!-- Wrenching Height -->
+                <div class="spec-row">
+                    <div class="spec-label-min">Wrenching Height (Min)</div>
+                    <div class="spec-dimension">Wrenching Height</div>
+                    <div class="spec-label-max">Total Runout (Max)</div>
+                </div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
+                </div>
+                
+                <!-- Thread Information -->
+                <div class="spec-row">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--engineering-blue); color: white; padding: 0.8rem;">
+                        <strong>Thread: {thread}</strong>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="spec-grid">
-            <!-- Dimensional Specifications -->
-            <div class="spec-item">
-                <div class="spec-label">Body Diameter (Min)</div>
-                <div class="spec-value">{product_details.get('Body_Dia_Min', 'N/A')}</div>
-            </div>
-            <div class="spec-item">
-                <div class="spec-label">Body Diameter (Max)</div>
-                <div class="spec-value">{product_details.get('Body_Dia_Max', 'N/A')}</div>
-            </div>
-            <div class="spec-item">
-                <div class="spec-label">Width Across Flats (Min)</div>
-                <div class="spec-value">{product_details.get('Width_Across_Flats_Min', 'N/A')}</div>
-            </div>
-            <div class="spec-item">
-                <div class="spec-label">Width Across Flats (Max)</div>
-                <div class="spec-value">{product_details.get('Width_Across_Flats_Max', 'N/A')}</div>
-            </div>
-            <div class="spec-item">
-                <div class="spec-label">Head Height (Min)</div>
-                <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
-            </div>
-            <div class="spec-item">
-                <div class="spec-label">Head Height (Max)</div>
-                <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
-            </div>
-        </div>
-        
-        <div style="background: var(--jsc-primary); color: white; padding: 1rem; border-radius: 8px; margin: 1.5rem 0; text-align: center;">
-            <strong>Thread Specification: {thread}</strong>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #e9ecef; font-size: 0.9rem; color: var(--jsc-gray);">
+        <div class="card-footer">
             <div>
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div style="background: var(--jsc-success); color: white; padding: 0.4rem 1rem; border-radius: 15px; font-weight: 600; font-size: 0.8rem;">
+            <div class="card-badge">
                 Professional Specification
             </div>
         </div>
         
-        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-            <button style="background: var(--jsc-primary); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Print Specification</button>
-            <button style="background: var(--jsc-gray); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Email Specification</button>
-            <button style="background: var(--jsc-gray); color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Save as PDF</button>
+        <div class="card-actions">
+            <button class="action-button" onclick="window.print()">Print Specification</button>
+            <button class="action-button secondary">Email Specification</button>
+            <button class="action-button secondary">Save as PDF</button>
         </div>
     </div>
     """
@@ -2914,8 +3294,20 @@ def extract_product_details(row):
         'Width_Across_Flats_Min': row.get('Width_Across_Flats_Min', row.get('W_Across_Flats_Min', 'N/A')),
         'Width_Across_Flats_Max': row.get('Width_Across_Flats_Max', row.get('W_Across_Flats_Max', 'N/A')),
         
+        'Width_Across_Corners_Min': row.get('Width_Across_Corners_Min', row.get('W_Across_Corners_Min', 'N/A')),
+        'Width_Across_Corners_Max': row.get('Width_Across_Corners_Max', row.get('W_Across_Corners_Max', 'N/A')),
+        
         'Head_Height_Min': row.get('Head_Height_Min', 'N/A'),
         'Head_Height_Max': row.get('Head_Height_Max', 'N/A'),
+        
+        'Radius_Fillet_Min': row.get('Radius_Fillet_Min', row.get('Fillet_Radius_Min', 'N/A')),
+        'Radius_Fillet_Max': row.get('Radius_Fillet_Max', row.get('Fillet_Radius_Max', 'N/A')),
+        
+        'Washer_Face_Thickness_Min': row.get('Washer_Face_Thickness_Min', 'N/A'),
+        'Washer_Face_Thickness_Max': row.get('Washer_Face_Thickness_Max', 'N/A'),
+        
+        'Wrenching_Height_Min': row.get('Wrenching_Height_Min', 'N/A'),
+        'Total_Runout_Max': row.get('Total_Runout_Max', 'N/A')
     }
     
     return details
@@ -2971,16 +3363,16 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="main-header">
-        <h1 style="margin:0; display: flex; align-items: center; justify-content: center; gap: 1rem;">
-            🔧 Product Intelligence Center
+    <div class="engineering-header">
+        <h1 style="margin:0; display: flex; align-items: center; gap: 1rem;">
+            Product Intelligence Center - Independent Sections
         </h1>
         <p style="margin:0; opacity: 0.9;">Each section works completely independently - No dependencies</p>
         <div style="margin-top: 1rem;">
-            <span class="jsc-badge">Enhanced Calculator</span>
-            <span class="jsc-badge-accent">Product-Based Workflow</span>
-            <span class="jsc-badge-success">Dynamic Standards</span>
-            <span class="jsc-badge-warning">Professional Grade</span>
+            <span class="engineering-badge">Enhanced Calculator</span>
+            <span class="material-badge">Product-Based Workflow</span>
+            <span class="grade-badge">Dynamic Standards</span>
+            <span class="technical-badge">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2990,7 +3382,7 @@ def show_enhanced_product_database():
         return
     
     # Section toggles
-    st.markdown('<div class="section-title">Section Controls</div>', unsafe_allow_html=True)
+    st.markdown("### Section Controls")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -3009,9 +3401,11 @@ def show_enhanced_product_database():
     
     # SECTION A - DIMENSIONAL SPECIFICATIONS (FIXED RELATIONSHIPS)
     if st.session_state.section_a_view:
-        st.markdown('<div class="filter-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Section A - Dimensional Specifications</div>', unsafe_allow_html=True)
-        st.markdown("<p><strong>Relationship:</strong> Product → Series → Standards → Size → Grade (ISO 4014 only)</p>")
+        st.markdown("""
+        <div class="independent-section">
+            <h3 class="filter-header">Section A - Dimensional Specifications</h3>
+            <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
+        """, unsafe_allow_html=True)
         
         col1, col2, col3, col4, col5 = st.columns(5)  # NEW: Added 5th column for grade
         
@@ -3123,16 +3517,18 @@ def show_enhanced_product_database():
                 st.session_state.section_a_results = apply_section_a_filters()
                 st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section A Results
         show_section_a_results()
     
     # SECTION B - THREAD SPECIFICATIONS (FIXED DATA TYPES)
     if st.session_state.section_b_view:
-        st.markdown('<div class="filter-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Section B - Thread Specifications</div>', unsafe_allow_html=True)
-        st.markdown("<p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>")
+        st.markdown("""
+        <div class="independent-section">
+            <h3 class="filter-header">Section B - Thread Specifications</h3>
+            <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
+        """, unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
         
@@ -3233,16 +3629,18 @@ def show_enhanced_product_database():
                 st.session_state.section_b_results = apply_section_b_filters()
                 st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section B Results
         show_section_b_results()
     
     # SECTION C - MATERIAL PROPERTIES (COMPLETELY INDEPENDENT) - COMPLETELY FIXED VERSION
     if st.session_state.section_c_view:
-        st.markdown('<div class="filter-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Section C - Material Properties</div>', unsafe_allow_html=True)
-        st.markdown("<p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>")
+        st.markdown("""
+        <div class="independent-section">
+            <h3 class="filter-header">Section C - Material Properties</h3>
+            <p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>
+        """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
@@ -3330,14 +3728,14 @@ def show_enhanced_product_database():
                     
                     st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section C Results
         show_section_c_results()
     
     # COMBINE ALL RESULTS SECTION
     st.markdown("---")
-    st.markdown('<div class="section-title">Combine All Sections</div>', unsafe_allow_html=True)
+    st.markdown("### Combine All Sections")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -3350,7 +3748,7 @@ def show_enhanced_product_database():
     
     # Quick actions
     st.markdown("---")
-    st.markdown('<div class="section-title">Quick Actions</div>', unsafe_allow_html=True)
+    st.markdown("### Quick Actions")
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     
@@ -3410,14 +3808,14 @@ def show_enhanced_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="main-header">
+    <div class="engineering-header">
         <h1 style="margin:0; font-size: 2.5rem;">JSC Industries</h1>
-        <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0</p>
+        <p style="margin:0; font-size: 1.2rem; opacity: 0.9;">Professional Fastener Intelligence Platform v4.0 - ENHANCED</p>
         <div style="margin-top: 1rem;">
-            <span class="jsc-badge">Enhanced Calculator</span>
-            <span class="jsc-badge-accent">Product-Based Workflow</span>
-            <span class="jsc-badge-success">Dynamic Standards</span>
-            <span class="jsc-badge-warning">Professional Grade</span>
+            <span class="engineering-badge">Enhanced Calculator</span>
+            <span class="material-badge">Product-Based Workflow</span>
+            <span class="grade-badge">Dynamic Standards</span>
+            <span class="technical-badge">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3431,41 +3829,41 @@ def show_enhanced_home():
     
     with col1:
         st.markdown(f"""
-        <div class="jsc-metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Products</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_products}</h2>
-            <p style="color: var(--jsc-gray); margin:0;">Total Records</p>
+        <div class="metric-card">
+            <h3 style="color: #3498db; margin:0;">Products</h3>
+            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_products}</h2>
+            <p style="color: #7f8c8d; margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
-        <div class="jsc-metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Dimensional Standards</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
-            <p style="color: var(--jsc-gray); margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
+        <div class="metric-card">
+            <h3 style="color: #3498db; margin:0;">Dimensional Standards</h3>
+            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
-        <div class="jsc-metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Thread Types</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_threads}</h2>
-            <p style="color: var(--jsc-gray); margin:0;">Available</p>
+        <div class="metric-card">
+            <h3 style="color: #3498db; margin:0;">Thread Types</h3>
+            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_threads}</h2>
+            <p style="color: #7f8c8d; margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
-        <div class="jsc-metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">ME&CERT</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_mecert}</h2>
-            <p style="color: var(--jsc-gray); margin:0;">Properties</p>
+        <div class="metric-card">
+            <h3 style="color: #3498db; margin:0;">ME&CERT</h3>
+            <h2 style="color: #2c3e50; margin:0.5rem 0;">{total_mecert}</h2>
+            <p style="color: #7f8c8d; margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown('<div class="section-title">Engineering Tools</div>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">Engineering Tools - ENHANCED</h2>', unsafe_allow_html=True)
     
     cols = st.columns(3)
     actions = [
@@ -3489,27 +3887,27 @@ def show_enhanced_home():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<div class="section-title">System Status</div>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">System Status - ENHANCED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "jsc-badge-success"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "jsc-badge-accent"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "jsc-badge-warning"),
-            ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-success"),
-            ("Weight Calculations", True, "jsc-badge"),
-            ("Enhanced Calculator", True, "jsc-badge-success"),
+            ("ASME B18.2.1 Data", not df.empty, "engineering-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "technical-badge"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "material-badge"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "grade-badge"),
+            ("ME&CERT Data", not df_mechem.empty, "engineering-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "technical-badge"),
+            ("Weight Calculations", True, "engineering-badge"),
+            ("Enhanced Calculator", True, "technical-badge"),
         ]
         
         for item_name, status, badge_class in status_items:
             if status:
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="jsc-badge" style="margin: 0.3rem 0; background: var(--jsc-gray);">{item_name} - Limited</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<div class="section-title">Features</div>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">ENHANCED Features</h3>', unsafe_allow_html=True)
         
         features = [
             "Product-based calculator workflow",
@@ -3528,7 +3926,7 @@ def show_enhanced_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div class="jsc-card" style="padding: 0.8rem; margin: 0.3rem 0;">• {feature}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="padding: 0.5rem; border-left: 3px solid #3498db; margin: 0.2rem 0; background: var(--neutral-light);">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -3641,18 +4039,18 @@ def main():
     else:
         show_section(st.session_state.selected_section)
     
-    # Professional Footer
     st.markdown("""
-    <div class="jsc-footer">
-        <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-            <span class="jsc-badge">ENHANCED Calculator</span>
-            <span class="jsc-badge-success">Improved Workflow</span>
-            <span class="jsc-badge-accent">Dynamic Standards</span>
-            <span class="jsc-badge-warning">Professional Grade</span>
+        <hr>
+        <div style='text-align: center; color: gray; padding: 2rem;'>
+            <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
+                <span class="engineering-badge">ENHANCED Calculator</span>
+                <span class="technical-badge">Improved Workflow</span>
+                <span class="material-badge">Dynamic Standards</span>
+                <span class="grade-badge">Professional Grade</span>
+            </div>
+            <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, RECTIFIED Hex Product Formulas, and ISO 4014 Grade Selection</p>
         </div>
-        <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-        <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, RECTIFIED Hex Product Formulas, and ISO 4014 Grade Selection</p>
-    </div>
     """, unsafe_allow_html=True)
 
 # Run the application
