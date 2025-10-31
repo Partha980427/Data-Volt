@@ -1435,10 +1435,10 @@ def get_sizes_for_standard_product_grade(standard, product, grade):
     return ["Select Size"] + [size for size in size_options if size != "All"]
 
 # ======================================================
-# UNIT CONVERSION FUNCTIONS - ENHANCED FOR INCH SERIES
+# RECTIFIED UNIT CONVERSION FUNCTIONS - WORK IN MM ONLY
 # ======================================================
 def convert_to_mm(value, from_unit, series=None):
-    """Convert any unit to millimeters - ENHANCED with series detection"""
+    """Convert any unit to millimeters - RECTIFIED: No meter conversion"""
     try:
         if pd.isna(value):
             return 0.0
@@ -1449,7 +1449,7 @@ def convert_to_mm(value, from_unit, series=None):
         if series == "Inch":
             return value * 25.4
         
-        # Standard unit conversion
+        # Standard unit conversion to mm only
         if from_unit == 'mm':
             return value
         elif from_unit == 'inch':
@@ -1464,35 +1464,8 @@ def convert_to_mm(value, from_unit, series=None):
         st.warning(f"Unit conversion error: {str(e)}")
         return value
 
-def convert_to_meters(value, from_unit, series=None):
-    """Convert any unit to meters - ENHANCED with series detection"""
-    try:
-        if pd.isna(value):
-            return 0.0
-        
-        value = float(value)
-        
-        # If series is specified as "Inch", assume the value is in inches and convert to meters
-        if series == "Inch":
-            return value * 0.0254
-        
-        # Standard unit conversion
-        if from_unit == 'mm':
-            return value / 1000
-        elif from_unit == 'inch':
-            return value * 0.0254
-        elif from_unit == 'ft':
-            return value * 0.3048
-        elif from_unit == 'meter':
-            return value
-        else:
-            return value / 1000  # Assume mm if unknown unit
-    except Exception as e:
-        st.warning(f"Unit conversion error: {str(e)}")
-        return value / 1000
-
 # ======================================================
-# ENHANCED WEIGHT CALCULATION FUNCTIONS FOR HEX PRODUCTS
+# ENHANCED WEIGHT CALCULATION FUNCTIONS FOR HEX PRODUCTS - RECTIFIED
 # ======================================================
 
 def get_hex_head_dimensions(standard, product, size, grade="All"):
@@ -1564,8 +1537,8 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
         st.warning(f"Error getting hex head dimensions: {str(e)}")
         return None, None
 
-def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_height):
-    """ENHANCED: Calculate weight for hex products using the specific formula provided"""
+def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height):
+    """RECTIFIED: Calculate weight for hex products using MM only - no meter conversion"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1577,85 +1550,74 @@ def calculate_hex_product_weight_enhanced(parameters, width_across_flats, head_h
         material = parameters.get('material', 'Carbon Steel')
         series = parameters.get('series', 'Metric')
         
-        # Convert all dimensions to meters for calculation
-        if diameter_unit == 'mm':
-            diameter_m = convert_to_meters(diameter_value, 'mm', series)
-        elif diameter_unit == 'inch':
-            diameter_m = convert_to_meters(diameter_value, 'inch', series)
-        elif diameter_unit == 'ft':
-            diameter_m = convert_to_meters(diameter_value, 'ft', series)
-        else:  # meters
-            diameter_m = convert_to_meters(diameter_value, 'meter', series)
+        # RECTIFIED: Convert all dimensions to mm only (no meter conversion)
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit, series)
+        length_mm = convert_to_mm(length, length_unit, series)
         
-        if length_unit == 'mm':
-            length_m = convert_to_meters(length, 'mm', series)
-        elif length_unit == 'inch':
-            length_m = convert_to_meters(length, 'inch', series)
-        elif length_unit == 'ft':
-            length_m = convert_to_meters(length, 'ft', series)
-        else:  # meters
-            length_m = convert_to_meters(length, 'meter', series)
-        
-        # Convert head dimensions to meters
+        # Convert head dimensions to mm (they should already be in mm from database)
         if width_across_flats is not None:
-            width_across_flats_m = convert_to_meters(width_across_flats, 'mm', series)
+            width_across_flats_mm = width_across_flats
         else:
-            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+            width_across_flats_mm = diameter_mm * 1.5  # Default ratio if not available
         
         if head_height is not None:
-            head_height_m = convert_to_meters(head_height, 'mm', series)
+            head_height_mm = head_height
         else:
-            head_height_m = diameter_m * 0.65  # Default ratio if not available
+            head_height_mm = diameter_mm * 0.65  # Default ratio if not available
         
-        # Get material density
-        density = get_material_density(material)  # kg/m³
+        # Get material density in g/cm³ (0.00785 for carbon steel = 7.85 g/cm³)
+        density_g_cm3 = get_material_density_rectified(material)
         
-        # 1. Calculate Shank Volume (Cylinder Volume)
-        # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-        shank_radius = diameter_m / 2
-        shank_volume = math.pi * shank_radius**2 * length_m  # m³
+        # RECTIFIED: Calculate volumes in mm³
+        # 1. Calculate Shank Volume (Cylinder Volume) in mm³
+        shank_radius_mm = diameter_mm / 2
+        shank_volume_mm3 = math.pi * shank_radius_mm**2 * length_mm
         
-        # 2. Calculate Head Volume using the specific formula
-        # RECTIFIED: Side Length = Width Across Flats × 1.1547
-        side_length = width_across_flats_m * 1.1547
+        # 2. Calculate Head Volume using the specific formula in mm³
+        side_length_mm = width_across_flats_mm * 1.1547
+        head_volume_mm3 = 0.65 * (side_length_mm**2) * head_height_mm
         
-        # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-        head_volume = 0.65 * (side_length**2) * head_height_m
+        # 3. Total Volume in mm³
+        total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
         
-        # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-        total_volume = shank_volume + head_volume
+        # RECTIFIED: Convert mm³ to cm³ for weight calculation
+        total_volume_cm3 = total_volume_mm3 / 1000
         
-        # 4. Calculate Weight = Total volume x Density
-        weight_kg = total_volume * density
+        # Calculate Weight in grams and kg
+        weight_g = total_volume_cm3 * density_g_cm3
+        weight_kg = weight_g / 1000
+        weight_lb = weight_kg * 2.20462
         
         return {
             'weight_kg': weight_kg,
-            'weight_g': weight_kg * 1000,
-            'weight_lb': weight_kg * 2.20462,
-            'shank_volume_m3': shank_volume,
-            'head_volume_m3': head_volume,
-            'total_volume_m3': total_volume,
-            'diameter_m': diameter_m,
-            'length_m': length_m,
-            'width_across_flats_m': width_across_flats_m,
-            'head_height_m': head_height_m,
-            'side_length_m': side_length,
-            'density': density,
+            'weight_g': weight_g,
+            'weight_lb': weight_lb,
+            'shank_volume_mm3': shank_volume_mm3,
+            'head_volume_mm3': head_volume_mm3,
+            'total_volume_mm3': total_volume_mm3,
+            'total_volume_cm3': total_volume_cm3,
+            'diameter_mm': diameter_mm,
+            'length_mm': length_mm,
+            'width_across_flats_mm': width_across_flats_mm,
+            'head_height_mm': head_height_mm,
+            'side_length_mm': side_length_mm,
+            'density_g_cm3': density_g_cm3,
             'series': series,
             'original_diameter': f"{diameter_value} {diameter_unit}",
             'original_length': f"{length} {length_unit}",
-            'calculation_method': 'Enhanced Hex Product Formula',
+            'calculation_method': 'Rectified Hex Product Formula (MM only)',
             'formula_details': {
-                'shank_volume_formula': 'π × (diameter/2)² × length',
-                'head_volume_formula': '0.65 × side_length² × head_height',
-                'side_length_formula': 'width_across_flats × 1.1547',
-                'total_volume_formula': 'shank_volume + head_volume',
-                'weight_formula': 'total_volume × density'
+                'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
+                'head_volume_formula': '0.65 × side_length² × head_height (mm³)',
+                'side_length_formula': 'width_across_flats × 1.1547 (mm)',
+                'total_volume_formula': 'shank_volume + head_volume (mm³)',
+                'volume_conversion': 'mm³ to cm³: divide by 1000',
+                'weight_formula': 'total_volume_cm³ × density_g/cm³'
             }
         }
         
     except Exception as e:
-        st.error(f"Enhanced hex product calculation error: {str(e)}")
+        st.error(f"Rectified hex product calculation error: {str(e)}")
         return None
 
 # ======================================================
@@ -1748,6 +1710,23 @@ def get_material_density(material):
     }
     return density_map.get(material, 7850)  # Default to carbon steel
 
+def get_material_density_rectified(material):
+    """RECTIFIED: Get density for different materials in g/cm³"""
+    density_map = {
+        "Carbon Steel": 7.85,
+        "Stainless Steel": 8.00,
+        "Alloy Steel": 7.85,
+        "Brass": 8.50,
+        "Aluminum": 2.70,
+        "Copper": 8.96,
+        "Titanium": 4.50,
+        "Bronze": 8.80,
+        "Inconel": 8.20,
+        "Monel": 8.80,
+        "Nickel": 8.90
+    }
+    return density_map.get(material, 7.85)  # Default to carbon steel
+
 def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
     """Get pitch diameter from thread data for threaded rod calculation - ENHANCED FOR THREADED ROD"""
     try:
@@ -1788,8 +1767,8 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         st.warning(f"Could not retrieve pitch diameter: {str(e)}")
         return None
 
-def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - FIXED DIMENSION DISPLAY"""
+def calculate_weight_rectified(parameters):
+    """RECTIFIED: Enhanced weight calculation using MM only - no meter conversion"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1807,7 +1786,7 @@ def calculate_weight_enhanced(parameters):
         # Get hex head dimensions from database
         width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size, grade)
         
-        # Store original dimensions for display - FIXED: Store both original and converted values
+        # Store original dimensions for display
         original_width_across_flats = width_across_flats
         original_head_height = head_height
         original_width_unit = "inch" if series == "Inch" else "mm"
@@ -1834,179 +1813,169 @@ def calculate_weight_enhanced(parameters):
         
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
-        # Convert length to meters based on unit and series
-        if length_unit == 'ft':
-            length_m = length * 0.3048  # 1 ft = 0.3048 meters
-        elif length_unit == 'inch':
-            length_m = length * 0.0254  # 1 inch = 0.0254 meters
-        elif length_unit == 'mm':
-            length_m = length / 1000  # 1 mm = 0.001 meters
-        else:  # meters
-            length_m = length
-
-        # Convert diameter to meters based on the input unit
-        if diameter_unit == 'ft':
-            diameter_m = diameter_value * 0.3048  # feet to meters
-        elif diameter_unit == 'inch':
-            diameter_m = diameter_value * 0.0254  # inches to meters
-        elif diameter_unit == 'mm':
-            diameter_m = diameter_value / 1000    # mm to meters
-        else:  # meters or unknown
-            diameter_m = diameter_value
-
+        # RECTIFIED: Convert all dimensions to mm only
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit, series)
+        length_mm = convert_to_mm(length, length_unit, series)
+        
+        # Convert head dimensions to mm (they should already be in mm from database)
+        if width_across_flats is not None:
+            width_across_flats_mm = width_across_flats
+        else:
+            width_across_flats_mm = diameter_mm * 1.5
+        
+        if head_height is not None:
+            head_height_mm = head_height
+        else:
+            head_height_mm = diameter_mm * 0.65
+        
         # SPECIAL CASE: For Pitch Diameter from thread data in Inch series
         if (diameter_type == "Pitch Diameter" and 
             series == "Inch" and 
             'pitch_diameter_value' in st.session_state and
             st.session_state.pitch_diameter_value is not None):
             
-            # Use the pitch diameter from thread data and convert from inches to meters
+            # Use the pitch diameter from thread data and convert from inches to mm
             pitch_diameter_inches = st.session_state.pitch_diameter_value
-            diameter_m = pitch_diameter_inches * 0.0254  # Convert inches to meters
+            diameter_mm = pitch_diameter_inches * 25.4  # Convert inches to mm
 
-        # Convert head dimensions to meters
-        if width_across_flats is not None:
-            width_across_flats_m = width_across_flats / 1000  # Convert mm to meters
-        else:
-            width_across_flats_m = diameter_m * 1.5  # Default ratio if not available
+        # Get material density in g/cm³
+        density_g_cm3 = get_material_density_rectified(material)
         
-        if head_height is not None:
-            head_height_m = head_height / 1000  # Convert mm to meters
-        else:
-            head_height_m = diameter_m * 0.65  # Default ratio if not available
-        
-        # Get material density
-        density = get_material_density(material)  # kg/m³
-        
-        # For Threaded Rod, use simple cylinder volume calculation
+        # For Threaded Rod, use simple cylinder volume calculation in mm³
         if product_type == "Threaded Rod":
-            # Simple cylinder volume for threaded rod
-            radius = diameter_m / 2
-            volume = math.pi * radius**2 * length_m
-            weight_kg = volume * density
+            # Simple cylinder volume for threaded rod in mm³
+            radius_mm = diameter_mm / 2
+            volume_mm3 = math.pi * radius_mm**2 * length_mm
+            
+            # Convert mm³ to cm³ for weight calculation
+            volume_cm3 = volume_mm3 / 1000
+            weight_g = volume_cm3 * density_g_cm3
+            weight_kg = weight_g / 1000
+            weight_lb = weight_kg * 2.20462
             
             return {
                 'weight_kg': weight_kg,
-                'weight_g': weight_kg * 1000,
-                'weight_lb': weight_kg * 2.20462,
-                'volume_m3': volume,
-                'density': density,
-                'diameter_m': diameter_m,
-                'length_m': length_m,
+                'weight_g': weight_g,
+                'weight_lb': weight_lb,
+                'volume_mm3': volume_mm3,
+                'volume_cm3': volume_cm3,
+                'density_g_cm3': density_g_cm3,
+                'diameter_mm': diameter_mm,
+                'length_mm': length_mm,
                 'series': series,
                 'original_diameter': f"{diameter_value} {diameter_unit}",
                 'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Threaded Rod Cylinder Formula',
+                'calculation_method': 'Threaded Rod Cylinder Formula (MM only)',
                 'dimensions_used': {
-                    'diameter_input': f"{diameter_value} {diameter_unit}",
-                    'diameter_calculation_m': diameter_m,
-                    'diameter_calculation_mm': diameter_m * 1000,
-                    'length_input': f"{length} {length_unit}",
-                    'length_calculation_m': length_m,
-                    'length_calculation_mm': length_m * 1000,
-                    'radius_m': radius,
-                    'volume_m3': volume,
-                    'density_kg_m3': density
+                    'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
+                    'diameter_calculation_mm': f"{diameter_mm:.4f}",
+                    'length_input': f"{length:.4f} {length_unit}",
+                    'length_calculation_mm': f"{length_mm:.4f}",
+                    'radius_mm': f"{radius_mm:.4f}",
+                    'volume_mm3': f"{volume_mm3:.4f}",
+                    'volume_cm3': f"{volume_cm3:.4f}",
+                    'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
             }
         
-        # For hex products, use enhanced hex product formula
+        # For hex products, use rectified hex product formula in mm³
         elif product_type in hex_products:
-            # 1. Calculate Shank Volume (Cylinder Volume)
-            # Formula: Pi x (Body Diameter or Pitch Diameter/2)² x Length
-            shank_radius = diameter_m / 2
-            shank_volume = math.pi * shank_radius**2 * length_m  # m³
+            # 1. Calculate Shank Volume (Cylinder Volume) in mm³
+            shank_radius_mm = diameter_mm / 2
+            shank_volume_mm3 = math.pi * shank_radius_mm**2 * length_mm
             
-            # 2. Calculate Head Volume using the specific formula
-            # RECTIFIED: Side Length = Width Across Flats × 1.1547
-            side_length = width_across_flats_m * 1.1547
+            # 2. Calculate Head Volume using the specific formula in mm³
+            side_length_mm = width_across_flats_mm * 1.1547
+            head_volume_mm3 = 0.65 * (side_length_mm**2) * head_height_mm
             
-            # Head Volume = 0.65 x (Side Length²) x Head height (Min)
-            head_volume = 0.65 * (side_length**2) * head_height_m
+            # 3. Total Volume in mm³
+            total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
             
-            # 3. Total Volume = Cylinder Volume or Shank Volume + Head Volume
-            total_volume = shank_volume + head_volume
+            # 4. Convert mm³ to cm³ for weight calculation
+            total_volume_cm3 = total_volume_mm3 / 1000
             
-            # 4. Calculate Weight = Total volume x Density
-            weight_kg = total_volume * density
+            # 5. Calculate Weight
+            weight_g = total_volume_cm3 * density_g_cm3
+            weight_kg = weight_g / 1000
+            weight_lb = weight_kg * 2.20462
             
             return {
                 'weight_kg': weight_kg,
-                'weight_g': weight_kg * 1000,
-                'weight_lb': weight_kg * 2.20462,
-                'shank_volume_m3': shank_volume,
-                'head_volume_m3': head_volume,
-                'total_volume_m3': total_volume,
-                'diameter_m': diameter_m,
-                'length_m': length_m,
-                'width_across_flats_m': width_across_flats_m,
-                'head_height_m': head_height_m,
-                'side_length_m': side_length,
-                'density': density,
+                'weight_g': weight_g,
+                'weight_lb': weight_lb,
+                'shank_volume_mm3': shank_volume_mm3,
+                'head_volume_mm3': head_volume_mm3,
+                'total_volume_mm3': total_volume_mm3,
+                'total_volume_cm3': total_volume_cm3,
+                'diameter_mm': diameter_mm,
+                'length_mm': length_mm,
+                'width_across_flats_mm': width_across_flats_mm,
+                'head_height_mm': head_height_mm,
+                'side_length_mm': side_length_mm,
+                'density_g_cm3': density_g_cm3,
                 'series': series,
-                'original_diameter': f"{diameter_value} {diameter_unit}",
-                'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Enhanced Hex Product Formula',
+                'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
+                'original_length': f"{length:.4f} {length_unit}",
+                'calculation_method': 'Rectified Hex Product Formula (MM only)',
                 'formula_details': {
-                    'shank_volume_formula': 'π × (diameter/2)² × length',
-                    'head_volume_formula': '0.65 × side_length² × head_height',
-                    'side_length_formula': 'width_across_flats × 1.1547',
-                    'total_volume_formula': 'shank_volume + head_volume',
-                    'weight_formula': 'total_volume × density'
+                    'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
+                    'head_volume_formula': '0.65 × side_length² × head_height (mm³)',
+                    'side_length_formula': 'width_across_flats × 1.1547 (mm)',
+                    'total_volume_formula': 'shank_volume + head_volume (mm³)',
+                    'volume_conversion': 'mm³ to cm³: divide by 1000',
+                    'weight_formula': 'total_volume_cm³ × density_g/cm³'
                 },
                 'dimensions_used': {
-                    'diameter_input': f"{diameter_value} {diameter_unit}",
-                    'diameter_calculation_m': diameter_m,
-                    'diameter_calculation_mm': diameter_m * 1000,
-                    'length_input': f"{length} {length_unit}",
-                    'length_calculation_m': length_m,
-                    'length_calculation_mm': length_m * 1000,
-                    # FIXED: Show original inch values for inch series
-                    'width_across_flats_input': f"{original_width_across_flats:.3f} {original_width_unit}",
-                    'width_across_flats_calculation_m': width_across_flats_m,
-                    'width_across_flats_calculation_mm': width_across_flats_m * 1000,
-                    'head_height_input': f"{original_head_height:.3f} {original_head_unit}",
-                    'head_height_calculation_m': head_height_m,
-                    'head_height_calculation_mm': head_height_m * 1000,
-                    'side_length_calculation_m': side_length,
-                    'side_length_calculation_mm': side_length * 1000,
-                    'shank_radius_m': shank_radius,
-                    'shank_volume_m3': shank_volume,
-                    'head_volume_m3': head_volume,
-                    'total_volume_m3': total_volume,
-                    'density_kg_m3': density,
+                    'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
+                    'diameter_calculation_mm': f"{diameter_mm:.4f}",
+                    'length_input': f"{length:.4f} {length_unit}",
+                    'length_calculation_mm': f"{length_mm:.4f}",
+                    'width_across_flats_input': f"{original_width_across_flats:.4f} {original_width_unit}",
+                    'width_across_flats_calculation_mm': f"{width_across_flats_mm:.4f}",
+                    'head_height_input': f"{original_head_height:.4f} {original_head_unit}",
+                    'head_height_calculation_mm': f"{head_height_mm:.4f}",
+                    'side_length_calculation_mm': f"{side_length_mm:.4f}",
+                    'shank_radius_mm': f"{shank_radius_mm:.4f}",
+                    'shank_volume_mm3': f"{shank_volume_mm3:.4f}",
+                    'head_volume_mm3': f"{head_volume_mm3:.4f}",
+                    'total_volume_mm3': f"{total_volume_mm3:.4f}",
+                    'total_volume_cm3': f"{total_volume_cm3:.4f}",
+                    'density_g_cm3': f"{density_g_cm3:.4f}",
                     'unit_conversion_applied': series == "Inch"
                 }
             }
         
-        # For other products, use simple cylinder calculation
+        # For other products, use simple cylinder calculation in mm³
         else:
-            radius = diameter_m / 2
-            volume = math.pi * radius**2 * length_m
-            weight_kg = volume * density
+            radius_mm = diameter_mm / 2
+            volume_mm3 = math.pi * radius_mm**2 * length_mm
+            volume_cm3 = volume_mm3 / 1000
+            weight_g = volume_cm3 * density_g_cm3
+            weight_kg = weight_g / 1000
+            weight_lb = weight_kg * 2.20462
             
             return {
                 'weight_kg': weight_kg,
-                'weight_g': weight_kg * 1000,
-                'weight_lb': weight_kg * 2.20462,
-                'volume_m3': volume,
-                'density': density,
-                'diameter_m': diameter_m,
-                'length_m': length_m,
+                'weight_g': weight_g,
+                'weight_lb': weight_lb,
+                'volume_mm3': volume_mm3,
+                'volume_cm3': volume_cm3,
+                'density_g_cm3': density_g_cm3,
+                'diameter_mm': diameter_mm,
+                'length_mm': length_mm,
                 'series': series,
-                'original_diameter': f"{diameter_value} {diameter_unit}",
-                'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Standard Cylinder Formula',
+                'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
+                'original_length': f"{length:.4f} {length_unit}",
+                'calculation_method': 'Standard Cylinder Formula (MM only)',
                 'dimensions_used': {
-                    'diameter_input': f"{diameter_value} {diameter_unit}",
-                    'diameter_calculation_m': diameter_m,
-                    'diameter_calculation_mm': diameter_m * 1000,
-                    'length_input': f"{length} {length_unit}",
-                    'length_calculation_m': length_m,
-                    'length_calculation_mm': length_m * 1000,
-                    'radius_m': radius,
-                    'volume_m3': volume,
-                    'density_kg_m3': density
+                    'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
+                    'diameter_calculation_mm': f"{diameter_mm:.4f}",
+                    'length_input': f"{length:.4f} {length_unit}",
+                    'length_calculation_mm': f"{length_mm:.4f}",
+                    'radius_mm': f"{radius_mm:.4f}",
+                    'volume_mm3': f"{volume_mm3:.4f}",
+                    'volume_cm3': f"{volume_cm3:.4f}",
+                    'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
             }
             
@@ -2276,28 +2245,28 @@ def show_combined_results():
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-def show_weight_calculator_enhanced():
-    """Enhanced weight calculator with complete product standards workflow"""
+def show_weight_calculator_rectified():
+    """RECTIFIED weight calculator with MM-only calculations"""
     
     st.markdown("""
     <div class="jsc-header">
-        <h1>Weight Calculator - ENHANCED WORKFLOW</h1>
-        <p>Complete product standards integration for accurate weight calculations</p>
+        <h1>Weight Calculator - RECTIFIED WORKFLOW</h1>
+        <p>MM-only calculations with 0.0000 precision formatting</p>
         <div>
-            <span class="jsc-badge">Product Standards</span>
-            <span class="jsc-badge-accent">Dynamic Filtering</span>
-            <span class="jsc-badge-secondary">Dimensional Data</span>
-            <span class="jsc-badge-success">Thread Specifications</span>
+            <span class="jsc-badge">RECTIFIED</span>
+            <span class="jsc-badge-accent">MM-Only</span>
+            <span class="jsc-badge-secondary">0.0000 Format</span>
+            <span class="jsc-badge-success">No Meter Conversion</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
-    **Enhanced Workflow:** Product Type → Series → Standard → Size → Grade (ISO 4014 only) → Diameter Type → (Manual Input or Thread Specs)
-    **NEW:** Threaded Rod support with pitch diameter calculation
+    **RECTIFIED WORKFLOW:** All calculations now use millimeters only - no meter conversion
+    **PRECISION:** All dimensions and results displayed in 0.0000 format
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
-    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation for Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws using specific volume formulas with corrected side length calculation
-    **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
+    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
+    **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
     """)
     
     # Initialize session state for form inputs
@@ -2305,10 +2274,10 @@ def show_weight_calculator_enhanced():
         st.session_state.weight_form_submitted = False
     
     # Main input form with enhanced workflow
-    with st.form("weight_calculator_enhanced"):
+    with st.form("weight_calculator_rectified"):
         st.markdown("### Product Standards Selection")
         
-        col1, col2, col3, col4, col5 = st.columns(5)  # NEW: Added 5th column for grade
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             # A. Product Type
@@ -2375,7 +2344,7 @@ def show_weight_calculator_enhanced():
                 st.caption(f"Size: {selected_size}")
         
         with col5:
-            # NEW: E. Grade (only for ISO 4014 Hex Bolt)
+            # E. Grade (only for ISO 4014 Hex Bolt)
             if selected_standard == "ISO 4014" and selected_product == "Hex Bolt":
                 grade_options = get_available_grades_for_standard_product(selected_standard, selected_product)
                 selected_grade = st.selectbox(
@@ -2418,6 +2387,7 @@ def show_weight_calculator_enhanced():
                         min_value=0.1,
                         value=10.0,
                         step=0.1,
+                        format="%.4f",
                         key="weight_calc_blank_diameter_input"
                     )
                 with dia_col2:
@@ -2427,9 +2397,9 @@ def show_weight_calculator_enhanced():
                         key="weight_calc_blank_dia_unit_select"
                     )
                 
-                st.caption(f"Blank Diameter: {blank_diameter} {blank_dia_unit}")
+                st.caption(f"Blank Diameter: {blank_diameter:.4f} {blank_dia_unit}")
                 if selected_series == "Inch" and blank_dia_unit == "inch":
-                    st.caption(f"→ {blank_diameter * 25.4:.2f} mm (converted)")
+                    st.caption(f"→ {blank_diameter * 25.4:.4f} mm (converted)")
             
             else:  # Pitch Diameter
                 st.markdown("**Thread Specification**")
@@ -2483,11 +2453,11 @@ def show_weight_calculator_enhanced():
                                 # For Inch series, pitch diameter from ASME B1.1 is in inches
                                 pitch_diameter_mm = pitch_diameter * 25.4
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
-                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} in will be converted to meters")
+                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} in will be converted to mm")
                             else:
                                 # For Metric series, pitch diameter is already in mm
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
-                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} mm will be converted to meters")
+                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} mm will be used directly")
                         else:
                             st.warning("Pitch diameter not found in thread data")
         
@@ -2497,7 +2467,7 @@ def show_weight_calculator_enhanced():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # Length - UPDATED WITH FT UNIT
+            # Length - UPDATED WITH FT UNIT AND 0.0000 FORMAT
             length_col1, length_col2 = st.columns(2)
             with length_col1:
                 length = st.number_input(
@@ -2505,6 +2475,7 @@ def show_weight_calculator_enhanced():
                     min_value=0.1,
                     value=50.0,
                     step=0.1,
+                    format="%.4f",
                     key="weight_calc_length_input"
                 )
             with length_col2:
@@ -2516,7 +2487,7 @@ def show_weight_calculator_enhanced():
             
             # Show length conversion for Inch series
             if selected_series == "Inch" and length_unit == "inch":
-                st.caption(f"→ {length * 25.4:.2f} mm (converted)")
+                st.caption(f"→ {length * 25.4:.4f} mm (converted)")
         
         with col2:
             # Material - UPDATED WITH MORE MATERIALS
@@ -2528,9 +2499,9 @@ def show_weight_calculator_enhanced():
                 key="weight_calc_material_select"
             )
             
-            # Show material density
-            density = get_material_density(material)
-            st.caption(f"Density: {density} kg/m³")
+            # Show material density in g/cm³
+            density = get_material_density_rectified(material)
+            st.caption(f"Density: {density:.4f} g/cm³")
         
         with col3:
             # Calculate button space
@@ -2603,8 +2574,8 @@ def show_weight_calculator_enhanced():
                     st.error("Pitch diameter not available for calculation")
                     return
             
-            # Perform calculation
-            result = calculate_weight_enhanced(calculation_params)
+            # Perform calculation using RECTIFIED function
+            result = calculate_weight_rectified(calculation_params)
             
             if result:
                 st.session_state.weight_calc_result = result
@@ -2616,8 +2587,8 @@ def show_weight_calculator_enhanced():
                     'series': selected_series,
                     'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
                     'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "N/A",
-                    'diameter': f"{blank_diameter if selected_diameter_type == 'Blank Diameter' else thread_size} {blank_dia_unit if selected_diameter_type == 'Blank Diameter' else 'mm'}",
-                    'length': f"{length} {length_unit}",
+                    'diameter': f"{blank_diameter:.4f} {blank_dia_unit}" if selected_diameter_type == 'Blank Diameter' else f"{thread_size} mm",
+                    'length': f"{length:.4f} {length_unit}",
                     'material': material,
                     'weight_kg': result['weight_kg'],
                     'weight_lb': result['weight_lb'],
@@ -2648,7 +2619,7 @@ def show_weight_calculator_enhanced():
                 st.markdown(f"""
                 **Diameter Specification:**
                 - **Type:** {selected_diameter_type}
-                - **Value:** {blank_diameter} {blank_dia_unit}
+                - **Value:** {blank_diameter:.4f} {blank_dia_unit}
                 """)
             else:
                 st.markdown(f"""
@@ -2661,13 +2632,13 @@ def show_weight_calculator_enhanced():
         
         st.markdown(f"""
         **Additional Parameters:**
-        - **Length:** {length} {length_unit}
+        - **Length:** {length:.4f} {length_unit}
         - **Material:** {material}
-        - **Material Density:** {get_material_density(material)} kg/m³
+        - **Material Density:** {get_material_density_rectified(material):.4f} g/cm³
         - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
         """)
     
-    # Display calculation results - FIXED DIMENSION UNIT DISPLAY
+    # Display calculation results - RECTIFIED WITH 0.0000 FORMAT
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
@@ -2678,24 +2649,24 @@ def show_weight_calculator_enhanced():
         with col1:
             st.metric("Weight (kg)", f"{result['weight_kg']:.4f}")
         with col2:
-            st.metric("Weight (grams)", f"{result['weight_g']:.2f}")
+            st.metric("Weight (grams)", f"{result['weight_g']:.4f}")
         with col3:
             st.metric("Weight (pounds)", f"{result['weight_lb']:.4f}")
         with col4:
-            st.metric("Density", f"{result['density']} kg/m³")
+            st.metric("Density", f"{result['density_g_cm3']:.4f} g/cm³")
         
-        # FIXED: Enhanced detailed results with CORRECT UNIT DISPLAY
-        with st.expander("📐 Detailed Calculation Parameters - ALL DIMENSIONS USED"):
-            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula')
+        # RECTIFIED: Enhanced detailed results with 0.0000 FORMAT
+        with st.expander("📐 Detailed Calculation Parameters - RECTIFIED (MM Only)"):
+            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula (MM only)')
             
             # Show calculation method
             st.markdown(f"**Calculation Method:** `{calculation_method}`")
             
-            # Show ALL dimensions used in calculation
+            # Show ALL dimensions used in calculation with 0.0000 format
             if 'dimensions_used' in result:
                 dimensions = result['dimensions_used']
                 
-                st.markdown("### 📏 Dimensions Used in Calculation")
+                st.markdown("### 📏 Dimensions Used in Calculation (0.0000 format)")
                 
                 # Create columns for better layout
                 dim_col1, dim_col2 = st.columns(2)
@@ -2707,66 +2678,62 @@ def show_weight_calculator_enhanced():
                             st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value}`")
                 
                 with dim_col2:
-                    st.markdown("#### Calculated Values (Meters)")
+                    st.markdown("#### Calculated Values (Millimeters)")
                     for key, value in dimensions.items():
-                        if 'calculation' in key.lower() and 'm' in key and 'mm' not in key:
-                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value:.6f} m`")
+                        if 'calculation' in key.lower() and 'mm' in key:
+                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value} mm`")
                 
-                # Show millimeter conversions
-                st.markdown("#### Converted Values (Millimeters)")
-                mm_col1, mm_col2 = st.columns(2)
-                with mm_col1:
-                    for key, value in dimensions.items():
-                        if 'calculation_mm' in key:
-                            st.markdown(f"- **{key.replace('_calculation_mm', '').replace('_', ' ').title()}:** `{value:.2f} mm`")
+                # Show volume calculations
+                st.markdown("#### Volume Calculations")
+                vol_col1, vol_col2 = st.columns(2)
+                with vol_col1:
+                    if 'shank_volume_mm3' in dimensions:
+                        st.markdown(f"- **Shank Volume:** `{dimensions['shank_volume_mm3']} mm³`")
+                    if 'head_volume_mm3' in dimensions:
+                        st.markdown(f"- **Head Volume:** `{dimensions['head_volume_mm3']} mm³`")
+                    if 'total_volume_mm3' in dimensions:
+                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_mm3']} mm³`")
                 
-                with mm_col2:
-                    # Show key calculation parameters
-                    st.markdown("#### Key Parameters")
-                    if 'radius_m' in dimensions:
-                        st.markdown(f"- **Radius:** `{dimensions['radius_m']:.6f} m`")
-                    if 'volume_m3' in dimensions:
-                        st.markdown(f"- **Volume:** `{dimensions['volume_m3']:.8f} m³`")
-                    elif 'total_volume_m3' in dimensions:
-                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_m3']:.8f} m³`")
-                        if 'shank_volume_m3' in dimensions:
-                            st.markdown(f"- **Shank Volume:** `{dimensions['shank_volume_m3']:.8f} m³`")
-                        if 'head_volume_m3' in dimensions:
-                            st.markdown(f"- **Head Volume:** `{dimensions['head_volume_m3']:.8f} m³`")
-                    st.markdown(f"- **Density:** `{dimensions['density_kg_m3']} kg/m³`")
+                with vol_col2:
+                    if 'total_volume_cm3' in dimensions:
+                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_cm3']} cm³`")
+                    if 'volume_cm3' in dimensions:
+                        st.markdown(f"- **Volume:** `{dimensions['volume_cm3']} cm³`")
+                    st.markdown(f"- **Density:** `{dimensions['density_g_cm3']} g/cm³`")
                 
                 # Show unit conversion info if applicable
                 if dimensions.get('unit_conversion_applied', False):
                     st.info("**Unit Conversion Applied:** Inch dimensions were automatically converted to millimeters for calculation")
             
             # Show formula details for hex products
-            if calculation_method == 'Enhanced Hex Product Formula' and 'formula_details' in result:
-                st.markdown("### 🧮 Formula Details")
+            if 'Rectified Hex Product Formula' in calculation_method and 'formula_details' in result:
+                st.markdown("### 🧮 RECTIFIED Formula Details (MM Only)")
                 formulas = result['formula_details']
                 for formula_name, formula in formulas.items():
                     st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
             
             # Show RECTIFIED hex product specific details
-            if calculation_method == 'Enhanced Hex Product Formula':
+            if 'Rectified Hex Product Formula' in calculation_method:
                 st.markdown("### 🔧 RECTIFIED Hex Product Specific Details")
                 st.markdown(f"""
                 **Shank Volume Calculation:**
                 - Formula: π × (diameter/2)² × length
-                - Result: `{result['shank_volume_m3']:.8f} m³`
+                - Result: `{result['shank_volume_mm3']:.4f} mm³`
                 
                 **Head Volume Calculation:**
                 - Side Length Formula: Width Across Flats × 1.1547
-                - Side Length: `{result['side_length_m']:.6f} m` ({result['side_length_m'] * 1000:.2f} mm)
+                - Side Length: `{result['side_length_mm']:.4f} mm`
                 - Head Volume Formula: 0.65 × side_length² × head_height
-                - Result: `{result['head_volume_m3']:.8f} m³`
+                - Result: `{result['head_volume_mm3']:.4f} mm³`
                 
                 **Total Volume:**
                 - Formula: shank_volume + head_volume
-                - Result: `{result['total_volume_m3']:.8f} m³`
+                - Result: `{result['total_volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['total_volume_cm3']:.4f} cm³`
                 
                 **Weight Calculation:**
-                - Formula: total_volume × density
-                - Result: `{result['weight_kg']:.4f} kg`
+                - Formula: total_volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
                 """)
             
             # Show unit conversion details for Inch series
@@ -2776,31 +2743,30 @@ def show_weight_calculator_enhanced():
                 **Automatic Unit Conversion Applied:**
                 - All inch dimensions automatically converted to mm for calculation
                 - Conversion factor: 1 inch = 25.4 mm
-                - Weight calculations performed in metric units (kg/m³)
-                - Final results converted back to desired units
+                - Weight calculations performed using mm³ volumes and g/cm³ density
+                - Final results converted to desired units
                 """)
 
-def show_batch_calculator_enhanced():
-    """Enhanced batch calculator with same workflow"""
+def show_batch_calculator_rectified():
+    """RECTIFIED batch calculator with MM-only calculations"""
     
-    st.markdown("### Batch Weight Calculator - ENHANCED WORKFLOW")
+    st.markdown("### Batch Weight Calculator - RECTIFIED WORKFLOW")
     
     st.info("""
-    **Batch processing with the same product standards workflow**
-    Upload a CSV/Excel file with columns matching the single calculator inputs.
+    **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with 0.0000 precision
     **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
-    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation for hex products using specific volume formulas with corrected side length calculation
-    **NEW:** ISO 4014 Product Grade selection (A/B) for different dimensions
+    **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
+    **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
     """)
     
     # Download template
-    st.markdown("### Download Enhanced Batch Template")
+    st.markdown("### Download RECTIFIED Batch Template")
     template_data = {
         'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt'],
         'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric'],
         'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014'],
         'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10'],
-        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A'],  # NEW: Added grade column
+        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A'],
         'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
         'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0],
         'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
@@ -2814,16 +2780,16 @@ def show_batch_calculator_enhanced():
     template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
     st.download_button(
-        label="Download Enhanced Batch Template (CSV)",
+        label="Download RECTIFIED Batch Template (CSV)",
         data=csv_template,
-        file_name="enhanced_batch_weight_template.csv",
+        file_name="rectified_batch_weight_template.csv",
         mime="text/csv",
         use_container_width=True
     )
     
     uploaded_file = st.file_uploader("Upload CSV/Excel file for batch processing", 
                                    type=["csv", "xlsx"],
-                                   key="batch_upload_enhanced")
+                                   key="batch_upload_rectified")
     
     if uploaded_file:
         try:
@@ -2843,30 +2809,30 @@ def show_batch_calculator_enhanced():
             if missing_cols:
                 st.error(f"Missing required columns: {missing_cols}")
             else:
-                if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_enhanced"):
-                    st.info("Batch processing with enhanced workflow ready for implementation")
+                if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_rectified"):
+                    st.info("RECTIFIED batch processing with MM-only calculations ready for implementation")
                     st.write(f"Records to process: {len(batch_df)}")
                     
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
 
 # ======================================================
-# ENHANCED CALCULATIONS PAGE - UPDATED WITH NEW WORKFLOW
+# RECTIFIED CALCULATIONS PAGE - MM-ONLY CALCULATIONS
 # ======================================================
-def show_enhanced_calculations():
-    """Enhanced calculations page with complete product standards workflow"""
+def show_rectified_calculations():
+    """Rectified calculations page with MM-only workflow"""
     
     tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
     with tab1:
-        show_weight_calculator_enhanced()
+        show_weight_calculator_rectified()
     
     with tab2:
-        show_batch_calculator_enhanced()
+        show_batch_calculator_rectified()
     
     with tab3:
-        st.markdown("### Calculation Analytics - ENHANCED")
-        st.info("Analytics dashboard will show calculation history and trends after weight calculations are implemented.")
+        st.markdown("### Calculation Analytics - RECTIFIED")
+        st.info("Analytics dashboard will show calculation history and trends after weight calculations are performed.")
         
         if 'calculation_history' in st.session_state and st.session_state.calculation_history:
             st.write("Calculation history will be displayed here")
@@ -3003,7 +2969,7 @@ def show_calculation_history():
                     <strong>{calc.get('product', 'N/A')}</strong> | 
                     Size: {calc.get('size', 'N/A')} | 
                     Grade: {calc.get('grade', 'N/A')} |
-                    Weight: {calc.get('weight_kg', 'N/A')} kg
+                    Weight: {calc.get('weight_kg', 'N/A'):.4f} kg
                     <br><small>{calc.get('timestamp', '')}</small>
                 </div>
                 """, unsafe_allow_html=True)
@@ -3019,7 +2985,7 @@ def show_professional_product_card(product_details):
     size = product_details.get('Size', '1/4 x 10')
     standard = product_details.get('Standards', 'ASME B18.2.1')
     thread = product_details.get('Thread', '1/4-20-UNC-2A')
-    grade = product_details.get('Product Grade', 'N/A')  # NEW: Added grade
+    grade = product_details.get('Product Grade', 'N/A')
     
     # Get current date and user info
     current_date = datetime.now().strftime('%d/%m/%Y')
@@ -3233,7 +3199,7 @@ def extract_product_details(row):
         'Size': row.get('Size', 'N/A'),
         'Standards': row.get('Standards', 'ASME B18.2.1'),
         'Thread': row.get('Thread', '1/4-20-UNC-2A'),
-        'Product Grade': row.get('Product Grade', 'N/A'),  # NEW: Added grade
+        'Product Grade': row.get('Product Grade', 'N/A'),
         
         # Map dimensional specifications - these would come from your actual data columns
         'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
@@ -3353,7 +3319,7 @@ def show_enhanced_product_database():
             <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
         """, unsafe_allow_html=True)
         
-        col1, col2, col3, col4, col5 = st.columns(5)  # NEW: Added 5th column for grade
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             # 1. Product List - Get all unique products from all standards
@@ -3415,7 +3381,7 @@ def show_enhanced_product_database():
                 st.caption(f"Sizes available: {len(available_sizes)-1}")
         
         with col5:
-            # NEW: 5. Grade - Only for ISO 4014 Hex Bolt
+            # 5. Grade - Only for ISO 4014 Hex Bolt
             if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt":
                 grade_options = get_available_grades_for_standard_product(dimensional_standard, dimensional_product)
                 dimensional_grade = st.selectbox(
@@ -3713,7 +3679,7 @@ def show_enhanced_product_database():
             st.session_state.section_a_current_series = "All"
             st.session_state.section_a_current_standard = "All"
             st.session_state.section_a_current_size = "All"
-            st.session_state.section_a_current_grade = "All"  # NEW: Reset grade
+            st.session_state.section_a_current_grade = "All"
             st.session_state.section_b_current_standard = "All"
             st.session_state.section_b_current_size = "All"
             st.session_state.section_b_current_class = "All"
@@ -3748,20 +3714,20 @@ def show_enhanced_product_database():
             st.rerun()
 
 # ======================================================
-# ENHANCED HOME DASHBOARD
+# RECTIFIED HOME DASHBOARD
 # ======================================================
-def show_enhanced_home():
+def show_rectified_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
     <div class="jsc-header">
         <h1>JSC Industries</h1>
-        <p>Professional Fastener Intelligence Platform v4.0 - ENHANCED</p>
+        <p>Professional Fastener Intelligence Platform v4.0 - RECTIFIED</p>
         <div>
-            <span class="jsc-badge">Enhanced Calculator</span>
-            <span class="jsc-badge-accent">Product-Based Workflow</span>
-            <span class="jsc-badge-secondary">Dynamic Standards</span>
-            <span class="jsc-badge-success">Professional Grade</span>
+            <span class="jsc-badge">RECTIFIED Calculator</span>
+            <span class="jsc-badge-accent">MM-Only Calculations</span>
+            <span class="jsc-badge-secondary">0.0000 Precision</span>
+            <span class="jsc-badge-success">No Meter Conversion</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3809,12 +3775,12 @@ def show_enhanced_home():
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown('<h2 class="section-header">Engineering Tools - ENHANCED</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
     
     cols = st.columns(3)
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
-        ("Engineering Calculator", "ENHANCED weight calculations with improved workflow", "calculator"),
+        ("Engineering Calculator", "RECTIFIED weight calculations with MM-only workflow", "calculator"),
         ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("Export Reports", "Generate professional engineering reports", "export")
@@ -3833,7 +3799,7 @@ def show_enhanced_home():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<h3 class="section-header">System Status - ENHANCED</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">System Status - RECTIFIED</h3>', unsafe_allow_html=True)
         
         status_items = [
             ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
@@ -3843,7 +3809,7 @@ def show_enhanced_home():
             ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
             ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-accent"),
             ("Weight Calculations", True, "jsc-badge-secondary"),
-            ("Enhanced Calculator", True, "jsc-badge-success"),
+            ("RECTIFIED Calculator", True, "jsc-badge-success"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -3853,22 +3819,22 @@ def show_enhanced_home():
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<h3 class="section-header">ENHANCED Features</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "Product-based calculator workflow",
-            "Dynamic dimensional standards", 
-            "Automatic size selection",
-            "Flexible diameter input options",
-            "Threaded rod and stud support",
+            "MM-only weight calculations",
+            "0.0000 precision formatting", 
+            "No meter conversion required",
+            "Direct mm³ volume calculations",
+            "g/cm³ density for direct weight calculation",
+            "Automatic inch-to-mm conversion",
+            "Rectified hex product formulas",
+            "Professional reporting",
+            "Carbon steel density: 7.85 g/cm³",
+            "Batch processing capabilities",
             "Database-connected calculations",
             "Enhanced user interface",
-            "Professional reporting",
-            "Carbon steel density calculations",
-            "Batch processing capabilities",
-            "Automatic inch-to-mm conversion",
-            "RECTIFIED hex product formulas with specific volume calculations",
-            "NEW: ISO 4014 Product Grade selection (A/B)"
+            "ISO 4014 Product Grade selection"
         ]
         
         for feature in features:
@@ -3883,53 +3849,37 @@ def show_help_system():
     """Show contextual help system"""
     with st.sidebar:
         st.markdown("---")
-        with st.expander("ENHANCED Weight Calculator Guide"):
+        with st.expander("RECTIFIED Weight Calculator Guide"):
             st.markdown("""
-            **ENHANCED WEIGHT CALCULATOR WORKFLOW:**
+            **RECTIFIED WEIGHT CALCULATOR WORKFLOW:**
             
-            **Complete Input Sequence:**
-            1. **A. Product Type** - Select from standards database
-            2. **B. Series** (Inch/Metric) - Filtered by product type
-            3. **C. Standard** - Filtered by product + series (for dimensional data)
-            4. **D. Size** - Filtered by standard + product
-            5. **E. Product Grade** - Only for ISO 4014 Hex Bolt (A/B grades)
-            6. **F. Cylinder Diameter Type** - Blank Diameter (Body) or Pitch Diameter (Thread)
-            7. **G. Conditional Input:**
-               - **Blank Diameter**: Manual value input
-               - **Pitch Diameter**: Thread specification dropdown
+            **MM-ONLY CALCULATIONS:**
+            - All calculations now use millimeters only
+            - No meter conversion required
+            - Volumes calculated in mm³
+            - Density in g/cm³ for direct weight calculation
+            - All results displayed in 0.0000 format
             
-            **RECTIFIED HEX PRODUCT FORMULA:**
-            - **Hex Bolt, Heavy Hex Bolt, Hex Cap Screws, Heavy Hex Screws** use RECTIFIED calculation
-            - **Shank Volume**: π × (diameter/2)² × length
-            - **RECTIFIED: Side Length** = Width Across Flats × 1.1547
-            - **Head Volume**: 0.65 × side_length² × head_height
-            - **Total Volume** = Shank Volume + Head Volume
-            - **Weight** = Total Volume × Density
+            **RECTIFIED FORMULAS:**
+            - **Volume Calculation:** π × (diameter/2)² × length (mm³)
+            - **Volume Conversion:** mm³ to cm³ = divide by 1000
+            - **Weight Calculation:** volume_cm³ × density_g/cm³
             
-            **NEW ISO 4014 GRADE SELECTION:**
-            - ISO 4014 Hex Bolt has two product grades: A and B
-            - Each grade has different dimensional specifications
-            - Grade selection affects weight calculations for ISO 4014 Hex Bolt
+            **DENSITY VALUES (g/cm³):**
+            - Carbon Steel: 7.85
+            - Stainless Steel: 8.00
+            - Alloy Steel: 7.85
+            - Brass: 8.50
+            - Aluminum: 2.70
+            - Copper: 8.96
+            - Titanium: 4.50
             
-            **NEW THREADED ROD SUPPORT:**
-            - Threaded Rod added to all product lists
-            - Uses pitch diameter from thread standards data
-            - Automatic pitch diameter lookup from thread database
-            - Support for both inch and metric threaded rods
+            **UNIT CONVERSION:**
+            - 1 inch = 25.4 mm
+            - 1 foot = 304.8 mm
+            - 1 meter = 1000 mm
             
-            **UNIT CONVERSION FEATURE:**
-            - **Inch Series**: All dimensions automatically converted from inches to mm
-            - **ASME B1.1**: Pitch diameter data in inches converted to mm
-            - **Weight calculations**: Always performed in metric units (kg/m³)
-            - **Display**: Shows both original and converted values
-            
-            **Purpose:**
-            - Get accurate dimensional data from standards for weight calculations
-            - Handle both body diameter and thread pitch diameter scenarios
-            - Maintain smooth filtering like Product Database section
-            - Automatic unit conversion for accurate calculations
-            - RECTIFIED formulas for hex products with specific volume calculation
-            - NEW: ISO 4014 grade-specific dimension handling
+            **PRECISION:** All dimensions and results use 0.0000 format
             """)
 
 # ======================================================
@@ -3939,7 +3889,7 @@ def show_section(title):
     if title == "Product Database":
         show_enhanced_product_database()
     elif title == "Calculations":
-        show_enhanced_calculations()
+        show_rectified_calculations()
     else:
         st.info(f"Section {title} is coming soon!")
     
@@ -3981,7 +3931,7 @@ def main():
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
     
     if st.session_state.selected_section is None:
-        show_enhanced_home()
+        show_rectified_home()
     else:
         show_section(st.session_state.selected_section)
     
@@ -3989,13 +3939,13 @@ def main():
         <hr>
         <div class="jsc-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="jsc-badge">ENHANCED Calculator</span>
-                <span class="jsc-badge-accent">Improved Workflow</span>
-                <span class="jsc-badge-secondary">Dynamic Standards</span>
-                <span class="jsc-badge-success">Professional Grade</span>
+                <span class="jsc-badge">RECTIFIED Calculator</span>
+                <span class="jsc-badge-accent">MM-Only Calculations</span>
+                <span class="jsc-badge-secondary">0.0000 Precision</span>
+                <span class="jsc-badge-success">No Meter Conversion</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - ENHANCED Weight Calculator with Automatic Unit Conversion, RECTIFIED Hex Product Formulas, and ISO 4014 Grade Selection</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculator with MM-only calculations and 0.0000 precision formatting</p>
         </div>
     """, unsafe_allow_html=True)
 
