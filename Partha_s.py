@@ -314,7 +314,7 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
         result_df = result_df[
-            result_df["Class"].astype(str).str.strip().str.upper() == 
+            result_df["Class"].ast(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
         ]
     
@@ -1845,7 +1845,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_enhanced(parameters):
-    """Enhanced weight calculation with proper material densities and geometry - FIXED DIAMETER CONVERSION"""
+    """Enhanced weight calculation with proper material densities and geometry - FIXED DIMENSION DISPLAY"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1858,10 +1858,16 @@ def calculate_weight_enhanced(parameters):
         series = parameters.get('series', 'Metric')
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
-        grade = parameters.get('grade', 'All')  # NEW: Added grade parameter
+        grade = parameters.get('grade', 'All')
         
         # Get hex head dimensions from database
         width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size, grade)
+        
+        # Store original dimensions for display - FIXED: Store both original and converted values
+        original_width_across_flats = width_across_flats
+        original_head_height = head_height
+        original_width_unit = "inch" if series == "Inch" else "mm"
+        original_head_unit = "inch" if series == "Inch" else "mm"
         
         # If dimensions not found in database, use default ratios
         if width_across_flats is None:
@@ -1871,6 +1877,7 @@ def calculate_weight_enhanced(parameters):
             else:
                 diameter_mm = diameter_value
             width_across_flats = diameter_mm * 1.5  # Default ratio
+            original_width_across_flats = width_across_flats / 25.4 if series == "Inch" else width_across_flats
         
         if head_height is None:
             # Estimate head height based on diameter
@@ -1879,6 +1886,7 @@ def calculate_weight_enhanced(parameters):
             else:
                 diameter_mm = diameter_value
             head_height = diameter_mm * 0.65  # Default ratio
+            original_head_height = head_height / 25.4 if series == "Inch" else head_height
         
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
@@ -1892,8 +1900,7 @@ def calculate_weight_enhanced(parameters):
         else:  # meters
             length_m = length
 
-        # --- CORRECTED DIAMETER CONVERSION LOGIC ---
-        # ALWAYS convert diameter to meters based on the input unit
+        # Convert diameter to meters based on the input unit
         if diameter_unit == 'ft':
             diameter_m = diameter_value * 0.3048  # feet to meters
         elif diameter_unit == 'inch':
@@ -1904,8 +1911,6 @@ def calculate_weight_enhanced(parameters):
             diameter_m = diameter_value
 
         # SPECIAL CASE: For Pitch Diameter from thread data in Inch series
-        # Thread data from ASME B1.1 is in inches, so if we have pitch diameter value from thread data
-        # and the series is Inch, we need to ensure it's converted from inches to meters
         if (diameter_type == "Pitch Diameter" and 
             series == "Inch" and 
             'pitch_diameter_value' in st.session_state and
@@ -2012,10 +2017,11 @@ def calculate_weight_enhanced(parameters):
                     'length_input': f"{length} {length_unit}",
                     'length_calculation_m': length_m,
                     'length_calculation_mm': length_m * 1000,
-                    'width_across_flats_input': f"{width_across_flats} mm",
+                    # FIXED: Show original inch values for inch series
+                    'width_across_flats_input': f"{original_width_across_flats:.3f} {original_width_unit}",
                     'width_across_flats_calculation_m': width_across_flats_m,
                     'width_across_flats_calculation_mm': width_across_flats_m * 1000,
-                    'head_height_input': f"{head_height} mm",
+                    'head_height_input': f"{original_head_height:.3f} {original_head_unit}",
                     'head_height_calculation_m': head_height_m,
                     'head_height_calculation_mm': head_height_m * 1000,
                     'side_length_calculation_m': side_length,
@@ -2719,7 +2725,7 @@ def show_weight_calculator_enhanced():
         - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
         """)
     
-    # Display calculation results - ENHANCED WITH DETAILED DIMENSIONS
+    # Display calculation results - FIXED DIMENSION UNIT DISPLAY
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
@@ -2736,7 +2742,7 @@ def show_weight_calculator_enhanced():
         with col4:
             st.metric("Density", f"{result['density']} kg/m³")
         
-        # ENHANCED: Detailed results with ALL dimensions used
+        # FIXED: Enhanced detailed results with CORRECT UNIT DISPLAY
         with st.expander("📐 Detailed Calculation Parameters - ALL DIMENSIONS USED"):
             calculation_method = result.get('calculation_method', 'Standard Cylinder Formula')
             
