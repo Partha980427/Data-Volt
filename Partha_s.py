@@ -314,7 +314,7 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
         result_df = result_df[
-            result_df["Class"].astype(str).str.strip().str.upper() == 
+            result_df["Class"].ast(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
         ]
     
@@ -1946,7 +1946,18 @@ def calculate_weight_enhanced(parameters):
                 'series': series,
                 'original_diameter': f"{diameter_value} {diameter_unit}",
                 'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Threaded Rod Cylinder Formula'
+                'calculation_method': 'Threaded Rod Cylinder Formula',
+                'dimensions_used': {
+                    'diameter_input': f"{diameter_value} {diameter_unit}",
+                    'diameter_calculation_m': diameter_m,
+                    'diameter_calculation_mm': diameter_m * 1000,
+                    'length_input': f"{length} {length_unit}",
+                    'length_calculation_m': length_m,
+                    'length_calculation_mm': length_m * 1000,
+                    'radius_m': radius,
+                    'volume_m3': volume,
+                    'density_kg_m3': density
+                }
             }
         
         # For hex products, use enhanced hex product formula
@@ -1992,6 +2003,28 @@ def calculate_weight_enhanced(parameters):
                     'side_length_formula': 'width_across_flats × 1.1547',
                     'total_volume_formula': 'shank_volume + head_volume',
                     'weight_formula': 'total_volume × density'
+                },
+                'dimensions_used': {
+                    'diameter_input': f"{diameter_value} {diameter_unit}",
+                    'diameter_calculation_m': diameter_m,
+                    'diameter_calculation_mm': diameter_m * 1000,
+                    'length_input': f"{length} {length_unit}",
+                    'length_calculation_m': length_m,
+                    'length_calculation_mm': length_m * 1000,
+                    'width_across_flats_input': f"{width_across_flats} mm",
+                    'width_across_flats_calculation_m': width_across_flats_m,
+                    'width_across_flats_calculation_mm': width_across_flats_m * 1000,
+                    'head_height_input': f"{head_height} mm",
+                    'head_height_calculation_m': head_height_m,
+                    'head_height_calculation_mm': head_height_m * 1000,
+                    'side_length_calculation_m': side_length,
+                    'side_length_calculation_mm': side_length * 1000,
+                    'shank_radius_m': shank_radius,
+                    'shank_volume_m3': shank_volume,
+                    'head_volume_m3': head_volume,
+                    'total_volume_m3': total_volume,
+                    'density_kg_m3': density,
+                    'unit_conversion_applied': series == "Inch"
                 }
             }
         
@@ -2012,7 +2045,18 @@ def calculate_weight_enhanced(parameters):
                 'series': series,
                 'original_diameter': f"{diameter_value} {diameter_unit}",
                 'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Standard Cylinder Formula'
+                'calculation_method': 'Standard Cylinder Formula',
+                'dimensions_used': {
+                    'diameter_input': f"{diameter_value} {diameter_unit}",
+                    'diameter_calculation_m': diameter_m,
+                    'diameter_calculation_mm': diameter_m * 1000,
+                    'length_input': f"{length} {length_unit}",
+                    'length_calculation_m': length_m,
+                    'length_calculation_mm': length_m * 1000,
+                    'radius_m': radius,
+                    'volume_m3': volume,
+                    'density_kg_m3': density
+                }
             }
             
     except Exception as e:
@@ -2674,7 +2718,7 @@ def show_weight_calculator_enhanced():
         - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
         """)
     
-    # Display calculation results - FIXED VERSION
+    # Display calculation results - ENHANCED WITH DETAILED DIMENSIONS
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
@@ -2691,80 +2735,100 @@ def show_weight_calculator_enhanced():
         with col4:
             st.metric("Density", f"{result['density']} kg/m³")
         
-        # Detailed results - FIXED: Handle different volume keys based on calculation method
-        with st.expander("Detailed Calculation Parameters"):
-            # FIXED: Handle different volume keys based on calculation method
+        # ENHANCED: Detailed results with ALL dimensions used
+        with st.expander("📐 Detailed Calculation Parameters - ALL DIMENSIONS USED"):
             calculation_method = result.get('calculation_method', 'Standard Cylinder Formula')
             
+            # Show calculation method
+            st.markdown(f"**Calculation Method:** `{calculation_method}`")
+            
+            # Show ALL dimensions used in calculation
+            if 'dimensions_used' in result:
+                dimensions = result['dimensions_used']
+                
+                st.markdown("### 📏 Dimensions Used in Calculation")
+                
+                # Create columns for better layout
+                dim_col1, dim_col2 = st.columns(2)
+                
+                with dim_col1:
+                    st.markdown("#### Input Values")
+                    for key, value in dimensions.items():
+                        if 'input' in key.lower():
+                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value}`")
+                
+                with dim_col2:
+                    st.markdown("#### Calculated Values (Meters)")
+                    for key, value in dimensions.items():
+                        if 'calculation' in key.lower() and 'm' in key and 'mm' not in key:
+                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value:.6f} m`")
+                
+                # Show millimeter conversions
+                st.markdown("#### Converted Values (Millimeters)")
+                mm_col1, mm_col2 = st.columns(2)
+                with mm_col1:
+                    for key, value in dimensions.items():
+                        if 'calculation_mm' in key:
+                            st.markdown(f"- **{key.replace('_calculation_mm', '').replace('_', ' ').title()}:** `{value:.2f} mm`")
+                
+                with mm_col2:
+                    # Show key calculation parameters
+                    st.markdown("#### Key Parameters")
+                    if 'radius_m' in dimensions:
+                        st.markdown(f"- **Radius:** `{dimensions['radius_m']:.6f} m`")
+                    if 'volume_m3' in dimensions:
+                        st.markdown(f"- **Volume:** `{dimensions['volume_m3']:.8f} m³`")
+                    elif 'total_volume_m3' in dimensions:
+                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_m3']:.8f} m³`")
+                        if 'shank_volume_m3' in dimensions:
+                            st.markdown(f"- **Shank Volume:** `{dimensions['shank_volume_m3']:.8f} m³`")
+                        if 'head_volume_m3' in dimensions:
+                            st.markdown(f"- **Head Volume:** `{dimensions['head_volume_m3']:.8f} m³`")
+                    st.markdown(f"- **Density:** `{dimensions['density_kg_m3']} kg/m³`")
+                
+                # Show unit conversion info if applicable
+                if dimensions.get('unit_conversion_applied', False):
+                    st.info("**Unit Conversion Applied:** Inch dimensions were automatically converted to millimeters for calculation")
+            
+            # Show formula details for hex products
+            if calculation_method == 'Enhanced Hex Product Formula' and 'formula_details' in result:
+                st.markdown("### 🧮 Formula Details")
+                formulas = result['formula_details']
+                for formula_name, formula in formulas.items():
+                    st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
+            
+            # Show RECTIFIED hex product specific details
             if calculation_method == 'Enhanced Hex Product Formula':
-                # For hex products with enhanced formula
+                st.markdown("### 🔧 RECTIFIED Hex Product Specific Details")
                 st.markdown(f"""
-                **Calculation Details:**
-                - **Calculation Method:** {calculation_method}
-                - Shank Volume: {result['shank_volume_m3']:.8f} m³
-                - Head Volume: {result['head_volume_m3']:.8f} m³
-                - Total Volume: {result['total_volume_m3']:.8f} m³
-                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
-                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
-                - Material Density: {result['density']} kg/m³
-                - Series: {result['series']}
-                - Original Diameter: {result['original_diameter']}
-                - Original Length: {result['original_length']}
-                """)
+                **Shank Volume Calculation:**
+                - Formula: π × (diameter/2)² × length
+                - Result: `{result['shank_volume_m3']:.8f} m³`
                 
-                # Show RECTIFIED hex product specific details
-                st.markdown(f"""
-                **RECTIFIED Hex Product Specific Details:**
-                - **Shank Volume:** {result['shank_volume_m3']:.8f} m³
-                - **Head Volume:** {result['head_volume_m3']:.8f} m³
-                - **Total Volume:** {result['total_volume_m3']:.8f} m³
-                - **Width Across Flats:** {result['width_across_flats_m']:.4f} m ({result['width_across_flats_m'] * 1000:.2f} mm)
-                - **Head Height:** {result['head_height_m']:.4f} m ({result['head_height_m'] * 1000:.2f} mm)
-                - **Side Length:** {result['side_length_m']:.4f} m ({result['side_length_m'] * 1000:.2f} mm)
+                **Head Volume Calculation:**
+                - Side Length Formula: Width Across Flats × 1.1547
+                - Side Length: `{result['side_length_m']:.6f} m` ({result['side_length_m'] * 1000:.2f} mm)
+                - Head Volume Formula: 0.65 × side_length² × head_height
+                - Result: `{result['head_volume_m3']:.8f} m³`
                 
-                **RECTIFIED Formulas Used:**
-                - Shank Volume = π × (diameter/2)² × length
-                - Side Length = Width Across Flats × 1.1547
-                - Head Volume = 0.65 × side_length² × head_height
-                - Total Volume = shank_volume + head_volume
-                - Weight = total_volume × density
-                """)
+                **Total Volume:**
+                - Formula: shank_volume + head_volume
+                - Result: `{result['total_volume_m3']:.8f} m³`
                 
-            elif calculation_method == 'Threaded Rod Cylinder Formula':
-                # For threaded rod
-                st.markdown(f"""
-                **Calculation Details:**
-                - **Calculation Method:** {calculation_method}
-                - Volume: {result['volume_m3']:.8f} m³
-                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
-                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
-                - Material Density: {result['density']} kg/m³
-                - Series: {result['series']}
-                - Original Diameter: {result['original_diameter']}
-                - Original Length: {result['original_length']}
-                """)
-                
-            else:
-                # For standard cylinder calculation
-                st.markdown(f"""
-                **Calculation Details:**
-                - **Calculation Method:** {calculation_method}
-                - Volume: {result['volume_m3']:.8f} m³
-                - Diameter: {result['diameter_m']:.4f} m ({result['diameter_m'] * 1000:.2f} mm)
-                - Length: {result['length_m']:.4f} m ({result['length_m'] * 1000:.2f} mm)
-                - Material Density: {result['density']} kg/m³
-                - Series: {result['series']}
-                - Original Diameter: {result['original_diameter']}
-                - Original Length: {result['original_length']}
+                **Weight Calculation:**
+                - Formula: total_volume × density
+                - Result: `{result['weight_kg']:.4f} kg`
                 """)
             
             # Show unit conversion details for Inch series
             if result['series'] == "Inch":
+                st.markdown("### 🔄 Unit Conversion Details (Inch Series)")
                 st.markdown("""
-                **Unit Conversion (Inch Series):**
+                **Automatic Unit Conversion Applied:**
                 - All inch dimensions automatically converted to mm for calculation
                 - Conversion factor: 1 inch = 25.4 mm
                 - Weight calculations performed in metric units (kg/m³)
+                - Final results converted back to desired units
                 """)
 
 def show_batch_calculator_enhanced():
