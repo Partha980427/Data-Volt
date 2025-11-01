@@ -205,7 +205,18 @@ def initialize_session_state():
         "weight_calc_result": None,
         "weight_calculation_performed": False,
         "pitch_diameter_value": None,
-        "weight_form_submitted": False
+        "weight_form_submitted": False,
+        # Batch weight calculator session states
+        "batch_weight_product": "Select Product",
+        "batch_weight_series": "Select Series", 
+        "batch_weight_standard": "Select Standard",
+        "batch_weight_grade": "Select Grade",
+        "batch_weight_diameter_type": "Blank Diameter",
+        "batch_weight_thread_standard": "Select Thread Standard",
+        "batch_weight_material": "Carbon Steel",
+        "batch_uploaded_file": None,
+        "batch_processed_results": None,
+        "batch_preview_ready": False
     }
     
     for key, value in defaults.items():
@@ -2837,6 +2848,378 @@ def show_weight_calculator_rectified():
                 - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
                 """)
 
+# ======================================================
+# NEW: ENHANCED BATCH WEIGHT CALCULATOR - COMPLETE IMPLEMENTATION
+# ======================================================
+
+def show_batch_weight_calculator_rectified():
+    """RECTIFIED batch weight calculator with proper unit tracking and Excel processing"""
+    
+    st.markdown("""
+    <div class="jsc-header">
+        <h1>Batch Weight Calculator - RECTIFIED WORKFLOW</h1>
+        <p>Process 1000+ products simultaneously using the same principles as single calculator</p>
+        <div>
+            <span class="jsc-badge">BATCH PROCESSING</span>
+            <span class="jsc-badge-accent">EXCEL UPLOAD</span>
+            <span class="jsc-badge-secondary">AUTO CALCULATION</span>
+            <span class="jsc-badge-success">DOWNLOAD RESULTS</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.info("""
+    **BATCH WORKFLOW:** Upload Excel with Product Code, Size, Length, and optional Body Diameter
+    **SAME PRINCIPLES:** Uses identical calculation formulas as single weight calculator
+    **FLEXIBLE INPUT:** Works with both Blank Diameter and Pitch Diameter specifications
+    **MASS PROCESSING:** Calculate weights for thousands of products in one go
+    **PREVIEW & DOWNLOAD:** Review results before downloading updated Excel file
+    """)
+    
+    # Batch Calculator Configuration
+    st.markdown("### Batch Configuration")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        # A. Product Type
+        product_options = get_available_products()
+        batch_product = st.selectbox(
+            "A. Product Type",
+            product_options,
+            key="batch_weight_product",
+            index=product_options.index(st.session_state.batch_weight_product) if st.session_state.batch_weight_product in product_options else 0
+        )
+        st.session_state.batch_weight_product = batch_product
+    
+    with col2:
+        # B. Series
+        series_options = get_series_for_product(batch_product)
+        batch_series = st.selectbox(
+            "B. Series",
+            series_options,
+            key="batch_weight_series",
+            index=series_options.index(st.session_state.batch_weight_series) if st.session_state.batch_weight_series in series_options else 0
+        )
+        st.session_state.batch_weight_series = batch_series
+    
+    with col3:
+        # C. Standard
+        if batch_product == "Threaded Rod":
+            st.info("Standard not required")
+            batch_standard = "Not Required"
+            st.session_state.batch_weight_standard = "Not Required"
+        else:
+            standard_options = get_standards_for_product_series(batch_product, batch_series)
+            batch_standard = st.selectbox(
+                "C. Standard",
+                standard_options,
+                key="batch_weight_standard",
+                index=standard_options.index(st.session_state.batch_weight_standard) if st.session_state.batch_weight_standard in standard_options else 0
+            )
+            st.session_state.batch_weight_standard = batch_standard
+    
+    with col4:
+        # D. Grade (only for ISO 4014 Hex Bolt)
+        if batch_standard == "ISO 4014" and batch_product == "Hex Bolt":
+            grade_options = get_available_grades_for_standard_product(batch_standard, batch_product)
+            batch_grade = st.selectbox(
+                "D. Product Grade",
+                grade_options,
+                key="batch_weight_grade",
+                index=grade_options.index(st.session_state.batch_weight_grade) if st.session_state.batch_weight_grade in grade_options else 0
+            )
+            st.session_state.batch_weight_grade = batch_grade
+        else:
+            st.info("Grade not applicable")
+            batch_grade = "Not Applicable"
+            st.session_state.batch_weight_grade = "Not Applicable"
+    
+    st.markdown("### Diameter Specification")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # E. Diameter Type
+        diameter_type_options = ["Blank Diameter", "Pitch Diameter"]
+        batch_diameter_type = st.radio(
+            "E. Diameter Type",
+            diameter_type_options,
+            key="batch_weight_diameter_type",
+            index=diameter_type_options.index(st.session_state.batch_weight_diameter_type) if st.session_state.batch_weight_diameter_type in diameter_type_options else 0
+        )
+        st.session_state.batch_weight_diameter_type = batch_diameter_type
+    
+    with col2:
+        # Thread Specification (only for Pitch Diameter)
+        if batch_diameter_type == "Pitch Diameter":
+            thread_std_options = get_thread_standards_for_series(batch_series)
+            if batch_series == "Select Series":
+                thread_std_options = ["Select Thread Standard"]
+            
+            batch_thread_standard = st.selectbox(
+                "Thread Standard",
+                thread_std_options,
+                key="batch_weight_thread_standard",
+                index=thread_std_options.index(st.session_state.batch_weight_thread_standard) if st.session_state.batch_weight_thread_standard in thread_std_options else 0
+            )
+            st.session_state.batch_weight_thread_standard = batch_thread_standard
+            
+            if batch_thread_standard != "Select Thread Standard":
+                st.caption(f"Using {batch_thread_standard} for pitch diameter lookup")
+        else:
+            batch_thread_standard = "Not Required"
+            st.session_state.batch_weight_thread_standard = "Not Required"
+            st.info("Body Diameter will be read from Excel column")
+    
+    # Material Selection
+    st.markdown("### Material Specification")
+    
+    material_options = ["Carbon Steel", "Stainless Steel", "Alloy Steel", "Brass", "Aluminum", 
+                       "Copper", "Titanium", "Bronze", "Inconel", "Monel", "Nickel"]
+    batch_material = st.selectbox(
+        "Material",
+        material_options,
+        key="batch_weight_material",
+        index=material_options.index(st.session_state.batch_weight_material) if st.session_state.batch_weight_material in material_options else 0
+    )
+    st.session_state.batch_weight_material = batch_material
+    
+    st.caption(f"Material Density: {get_material_density_rectified(batch_material):.4f} g/cm³")
+    
+    # Excel Upload Section
+    st.markdown("### Excel Upload")
+    
+    st.info("""
+    **Required Columns:**
+    - **Product Code**: Unique identifier for each product
+    - **Size**: Product size (e.g., M10, 1/4, 5/16)
+    - **Length**: Product length in mm
+    
+    **Optional Column (for Blank Diameter):**
+    - **Body Diameter**: Required only if using Blank Diameter type
+    """)
+    
+    uploaded_file = st.file_uploader(
+        "Upload Excel File with Product Data", 
+        type=["xlsx", "xls"],
+        key="batch_upload"
+    )
+    
+    if uploaded_file:
+        st.session_state.batch_uploaded_file = uploaded_file
+        st.success(f"File uploaded successfully: {uploaded_file.name}")
+        
+        try:
+            # Read the uploaded file
+            if uploaded_file.name.endswith('.xlsx'):
+                batch_df = pd.read_excel(uploaded_file)
+            else:
+                batch_df = pd.read_excel(uploaded_file)
+            
+            # Display preview
+            st.markdown("#### Uploaded Data Preview")
+            st.dataframe(batch_df.head(10), use_container_width=True)
+            st.write(f"Total records: {len(batch_df)}")
+            
+            # Validate required columns
+            required_cols = ['Product Code', 'Size', 'Length']
+            if batch_diameter_type == "Blank Diameter":
+                required_cols.append('Body Diameter')
+            
+            missing_cols = [col for col in required_cols if col not in batch_df.columns]
+            
+            if missing_cols:
+                st.error(f"Missing required columns: {missing_cols}")
+                st.info("Please ensure your Excel file has the required columns")
+            else:
+                st.success("All required columns present!")
+                
+                # Calculate Button
+                if st.button("Calculate Batch Weights", use_container_width=True, type="primary", key="calculate_batch"):
+                    with st.spinner("Calculating weights for all products..."):
+                        processed_df = process_batch_calculations(
+                            batch_df, 
+                            batch_product,
+                            batch_series,
+                            batch_standard,
+                            batch_grade,
+                            batch_diameter_type,
+                            batch_thread_standard,
+                            batch_material
+                        )
+                        
+                        if processed_df is not None:
+                            st.session_state.batch_processed_results = processed_df
+                            st.session_state.batch_preview_ready = True
+                            st.success(f"Successfully calculated weights for {len(processed_df)} products!")
+    
+        except Exception as e:
+            st.error(f"Error reading Excel file: {str(e)}")
+    
+    # Preview Section
+    if st.session_state.batch_preview_ready and st.session_state.batch_processed_results is not None:
+        st.markdown("### Calculation Results Preview")
+        
+        results_df = st.session_state.batch_processed_results
+        
+        # Show summary statistics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Products", len(results_df))
+        with col2:
+            st.metric("Total Weight (kg)", f"{results_df['Weight_kg'].sum():.2f}")
+        with col3:
+            st.metric("Average Weight (kg)", f"{results_df['Weight_kg'].mean():.2f}")
+        with col4:
+            st.metric("Material", batch_material)
+        
+        # Show data preview
+        st.dataframe(results_df, use_container_width=True, height=400)
+        
+        # Download Section
+        st.markdown("### Download Results")
+        
+        # Generate downloadable Excel file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"batch_weight_results_{timestamp}.xlsx"
+        
+        # Convert dataframe to Excel for download
+        excel_buffer = export_batch_to_excel(results_df)
+        
+        st.download_button(
+            label="Download Excel with Calculated Weights",
+            data=excel_buffer,
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="download_batch_results"
+        )
+        
+        st.success("Ready to download! Click the button above to get your Excel file with calculated weights.")
+
+def process_batch_calculations(batch_df, product, series, standard, grade, diameter_type, thread_standard, material):
+    """Process batch calculations for all products in the uploaded Excel"""
+    try:
+        results = []
+        
+        # Progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for index, row in batch_df.iterrows():
+            # Update progress
+            progress = (index + 1) / len(batch_df)
+            progress_bar.progress(progress)
+            status_text.text(f"Processing {index + 1} of {len(batch_df)}: {row['Product Code']}")
+            
+            # Prepare calculation parameters
+            calculation_params = {
+                'product_type': product,
+                'diameter_type': diameter_type,
+                'material': material,
+                'standard': standard,
+                'size': row['Size'],
+                'grade': grade if standard == "ISO 4014" and product == "Hex Bolt" else "All"
+            }
+            
+            # Handle diameter based on type
+            if diameter_type == "Blank Diameter":
+                # Use Body Diameter from Excel
+                calculation_params.update({
+                    'diameter_value': row['Body Diameter'],
+                    'diameter_unit': 'mm'  # Assume mm for batch processing
+                })
+            else:
+                # Pitch Diameter - lookup from thread data
+                if thread_standard != "Select Thread Standard" and thread_standard != "Not Required":
+                    pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, row['Size'], "2A")
+                    if pitch_diameter is not None:
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'inch' if series == "Inch" else 'mm'
+                        })
+                    else:
+                        st.warning(f"Could not find pitch diameter for {row['Size']} in {thread_standard}")
+                        continue
+            
+            # Handle length
+            calculation_params.update({
+                'length': row['Length'],
+                'length_unit': 'mm'  # Assume mm for batch processing
+            })
+            
+            # Perform calculation
+            result = calculate_weight_rectified(calculation_params)
+            
+            if result:
+                # Create result row
+                result_row = {
+                    'Product_Code': row['Product Code'],
+                    'Size': row['Size'],
+                    'Length_mm': row['Length'],
+                    'Weight_kg': result['weight_kg'],
+                    'Weight_g': result['weight_g'],
+                    'Weight_lb': result['weight_lb'],
+                    'Calculation_Method': result['calculation_method'],
+                    'Material': material,
+                    'Diameter_Type': diameter_type
+                }
+                
+                # Add diameter information based on type
+                if diameter_type == "Blank Diameter":
+                    result_row['Body_Diameter_mm'] = row['Body Diameter']
+                else:
+                    result_row['Pitch_Diameter'] = calculation_params.get('diameter_value', 'N/A')
+                    result_row['Thread_Standard'] = thread_standard
+                
+                results.append(result_row)
+            else:
+                st.warning(f"Failed to calculate weight for {row['Product Code']}")
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        if results:
+            return pd.DataFrame(results)
+        else:
+            st.error("No calculations were successful")
+            return None
+            
+    except Exception as e:
+        st.error(f"Error in batch processing: {str(e)}")
+        return None
+
+def export_batch_to_excel(df):
+    """Export batch results to Excel format"""
+    try:
+        # Create Excel file in memory
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Weight_Results', index=False)
+            
+            # Auto-adjust column widths
+            worksheet = writer.sheets['Weight_Results']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        output.seek(0)
+        return output.getvalue()
+    
+    except Exception as e:
+        st.error(f"Error creating Excel file: {str(e)}")
+        return None
+
 def show_batch_calculator_rectified():
     """RECTIFIED batch calculator with proper unit tracking"""
     
@@ -2850,62 +3233,8 @@ def show_batch_calculator_rectified():
     **FIXED:** Proper unit labeling for database dimensions
     """)
     
-    # Download template
-    st.markdown("### Download RECTIFIED Batch Template")
-    template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt'],
-        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014'],
-        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10'],
-        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A'],
-        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A'],
-        'Length': [50, 100, 200, 75, 60],
-        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel']
-    }
-    template_df = pd.DataFrame(template_data)
-    csv_template = template_df.to_csv(index=False)
-    st.download_button(
-        label="Download RECTIFIED Batch Template (CSV)",
-        data=csv_template,
-        file_name="rectified_batch_weight_template.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-    
-    uploaded_file = st.file_uploader("Upload CSV/Excel file for batch processing", 
-                                   type=["csv", "xlsx"],
-                                   key="batch_upload_rectified")
-    
-    if uploaded_file:
-        try:
-            if uploaded_file.name.endswith('.xlsx'):
-                batch_df = pd.read_excel(uploaded_file)
-            else:
-                batch_df = pd.read_csv(uploaded_file)
-            
-            st.success("File uploaded successfully!")
-            st.write("Preview of uploaded data:")
-            st.dataframe(batch_df.head())
-            
-            # Validate required columns
-            required_cols = ['Product_Type', 'Series', 'Diameter_Type', 'Length']
-            missing_cols = [col for col in required_cols if col not in batch_df.columns]
-            
-            if missing_cols:
-                st.error(f"Missing required columns: {missing_cols}")
-            else:
-                if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_rectified"):
-                    st.info("RECTIFIED batch processing with proper unit tracking ready for implementation")
-                    st.write(f"Records to process: {len(batch_df)}")
-                    
-        except Exception as e:
-            st.error(f"Error reading file: {str(e)}")
+    # Use the new enhanced batch calculator
+    show_batch_weight_calculator_rectified()
 
 # ======================================================
 # RECTIFIED CALCULATIONS PAGE - PROPER UNIT TRACKING
