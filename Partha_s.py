@@ -377,7 +377,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# JSC Group Professional CSS with Enhanced Card Design
+# JSC Group Professional CSS with Enhanced Card Design - COMPLETED
 st.markdown("""
 <style>
     :root {
@@ -673,7 +673,7 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     
-    /* Professional card for product details */
+    /* Professional card for product details - COMPLETED */
     .professional-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 2px solid var(--jsc-primary);
@@ -724,6 +724,90 @@ st.markdown("""
         border-radius: 20px;
         font-weight: 600;
         font-size: 0.9rem;
+    }
+    
+    /* Specification rows for professional card */
+    .spec-row {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1rem;
+        align-items: center;
+        margin: 0.8rem 0;
+        padding: 0.5rem;
+        border-radius: 6px;
+        background: #f8f9fa;
+    }
+    
+    .spec-label-min, .spec-label-max {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-align: center;
+        font-weight: 500;
+    }
+    
+    .spec-dimension {
+        font-weight: 600;
+        color: var(--jsc-primary-dark);
+        text-align: center;
+        padding: 0.3rem 1rem;
+        background: white;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .spec-value {
+        font-weight: 600;
+        color: var(--jsc-primary);
+        text-align: center;
+        padding: 0.3rem;
+        background: white;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .card-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        justify-content: center;
+    }
+    
+    .action-button {
+        background: var(--jsc-gradient);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .action-button:hover {
+        background: var(--jsc-primary-dark);
+        transform: translateY(-2px);
+    }
+    
+    .action-button.secondary {
+        background: white;
+        color: var(--jsc-primary);
+        border: 2px solid var(--jsc-primary);
+    }
+    
+    .action-button.secondary:hover {
+        background: var(--jsc-primary);
+        color: white;
     }
     
     /* Filter sections */
@@ -886,6 +970,15 @@ st.markdown("""
         
         .stTabs [data-baseweb="tab"] {
             padding: 0.8rem 1rem;
+        }
+        
+        .spec-row {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+        
+        .card-actions {
+            flex-direction: column;
         }
     }
 </style>
@@ -1971,7 +2064,7 @@ def calculate_weight_rectified(parameters):
         return None
 
 # ======================================================
-# MISSING FUNCTIONS - ADD THESE TO FIX THE ERRORS
+# MISSING FUNCTIONS IMPLEMENTATION - COMPLETED
 # ======================================================
 
 def get_filtered_dataframe(product, standard, grade="All"):
@@ -2956,7 +3049,7 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# NEW: PROFESSIONAL PRODUCT CARD DISPLAY
+# COMPLETED: PROFESSIONAL PRODUCT CARD DISPLAY
 # ======================================================
 def show_professional_product_card(product_details):
     """Display a beautiful professional product specification card"""
