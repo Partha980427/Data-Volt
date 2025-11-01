@@ -1435,29 +1435,25 @@ def get_sizes_for_standard_product_grade(standard, product, grade):
     return ["Select Size"] + [size for size in size_options if size != "All"]
 
 # ======================================================
-# RECTIFIED UNIT CONVERSION FUNCTIONS - WORK IN MM ONLY
+# RECTIFIED UNIT CONVERSION FUNCTIONS - FIXED VERSION
 # ======================================================
-def convert_to_mm(value, from_unit, series=None):
-    """Convert any unit to millimeters - RECTIFIED: No meter conversion"""
+def convert_to_mm(value, from_unit):
+    """Convert any unit to millimeters - FIXED: No unnecessary conversion"""
     try:
         if pd.isna(value):
             return 0.0
         
         value = float(value)
         
-        # If series is specified as "Inch", assume the value is in inches and convert to mm
-        if series == "Inch":
-            return value * 25.4
-        
-        # Standard unit conversion to mm only
+        # Only convert if the unit is NOT mm
         if from_unit == 'mm':
-            return value
+            return value  # Already in mm, no conversion needed
         elif from_unit == 'inch':
-            return value * 25.4
+            return value * 25.4  # Convert inches to mm
         elif from_unit == 'ft':
-            return value * 304.8
+            return value * 304.8  # Convert feet to mm
         elif from_unit == 'meter':
-            return value * 1000
+            return value * 1000  # Convert meters to mm
         else:
             return value  # Assume mm if unknown unit
     except Exception as e:
@@ -1538,7 +1534,7 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
         return None, None
 
 def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height):
-    """RECTIFIED: Calculate weight for hex products using MM only - no meter conversion"""
+    """RECTIFIED: Calculate weight for hex products using MM only - no unnecessary conversion"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1548,11 +1544,10 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
         length = parameters.get('length', 0.0)
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
-        series = parameters.get('series', 'Metric')
         
-        # RECTIFIED: Convert all dimensions to mm only (no meter conversion)
-        diameter_mm = convert_to_mm(diameter_value, diameter_unit, series)
-        length_mm = convert_to_mm(length, length_unit, series)
+        # RECTIFIED: Convert dimensions to mm only if needed
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit)
+        length_mm = convert_to_mm(length, length_unit)
         
         # Convert head dimensions to mm (they should already be in mm from database)
         if width_across_flats is not None:
@@ -1602,7 +1597,6 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
             'head_height_mm': head_height_mm,
             'side_length_mm': side_length_mm,
             'density_g_cm3': density_g_cm3,
-            'series': series,
             'original_diameter': f"{diameter_value} {diameter_unit}",
             'original_length': f"{length} {length_unit}",
             'calculation_method': 'Rectified Hex Product Formula (MM only)',
@@ -1768,7 +1762,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_rectified(parameters):
-    """RECTIFIED: Enhanced weight calculation using MM only - no meter conversion"""
+    """RECTIFIED: Enhanced weight calculation using MM only - no unnecessary conversion"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1778,7 +1772,6 @@ def calculate_weight_rectified(parameters):
         length = parameters.get('length', 0.0)
         length_unit = parameters.get('length_unit', 'mm')
         material = parameters.get('material', 'Carbon Steel')
-        series = parameters.get('series', 'Metric')
         standard = parameters.get('standard', 'ASME B18.2.1')
         size = parameters.get('size', 'All')
         grade = parameters.get('grade', 'All')
@@ -1789,33 +1782,25 @@ def calculate_weight_rectified(parameters):
         # Store original dimensions for display
         original_width_across_flats = width_across_flats
         original_head_height = head_height
-        original_width_unit = "inch" if series == "Inch" else "mm"
-        original_head_unit = "inch" if series == "Inch" else "mm"
         
         # If dimensions not found in database, use default ratios
         if width_across_flats is None:
             # Estimate width across flats based on diameter
-            if diameter_unit == 'inch':
-                diameter_mm = diameter_value * 25.4
-            else:
-                diameter_mm = diameter_value
-            width_across_flats = diameter_mm * 1.5  # Default ratio
-            original_width_across_flats = width_across_flats / 25.4 if series == "Inch" else width_across_flats
+            diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+            width_across_flats = diameter_mm_temp * 1.5  # Default ratio
+            original_width_across_flats = width_across_flats
         
         if head_height is None:
             # Estimate head height based on diameter
-            if diameter_unit == 'inch':
-                diameter_mm = diameter_value * 25.4
-            else:
-                diameter_mm = diameter_value
-            head_height = diameter_mm * 0.65  # Default ratio
-            original_head_height = head_height / 25.4 if series == "Inch" else head_height
+            diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+            head_height = diameter_mm_temp * 0.65  # Default ratio
+            original_head_height = head_height
         
         hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
         
-        # RECTIFIED: Convert all dimensions to mm only
-        diameter_mm = convert_to_mm(diameter_value, diameter_unit, series)
-        length_mm = convert_to_mm(length, length_unit, series)
+        # RECTIFIED: Convert dimensions to mm only if needed
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit)
+        length_mm = convert_to_mm(length, length_unit)
         
         # Convert head dimensions to mm (they should already be in mm from database)
         if width_across_flats is not None:
@@ -1830,13 +1815,16 @@ def calculate_weight_rectified(parameters):
         
         # SPECIAL CASE: For Pitch Diameter from thread data in Inch series
         if (diameter_type == "Pitch Diameter" and 
-            series == "Inch" and 
             'pitch_diameter_value' in st.session_state and
             st.session_state.pitch_diameter_value is not None):
             
-            # Use the pitch diameter from thread data and convert from inches to mm
-            pitch_diameter_inches = st.session_state.pitch_diameter_value
-            diameter_mm = pitch_diameter_inches * 25.4  # Convert inches to mm
+            # Use the pitch diameter from thread data and convert from inches to mm if needed
+            pitch_diameter = st.session_state.pitch_diameter_value
+            # Thread data for ASME B1.1 is in inches, so convert to mm
+            if diameter_unit == 'inch':
+                diameter_mm = pitch_diameter * 25.4
+            else:
+                diameter_mm = pitch_diameter
 
         # Get material density in g/cm³
         density_g_cm3 = get_material_density_rectified(material)
@@ -1862,7 +1850,6 @@ def calculate_weight_rectified(parameters):
                 'density_g_cm3': density_g_cm3,
                 'diameter_mm': diameter_mm,
                 'length_mm': length_mm,
-                'series': series,
                 'original_diameter': f"{diameter_value} {diameter_unit}",
                 'original_length': f"{length} {length_unit}",
                 'calculation_method': 'Threaded Rod Cylinder Formula (MM only)',
@@ -1913,7 +1900,6 @@ def calculate_weight_rectified(parameters):
                 'head_height_mm': head_height_mm,
                 'side_length_mm': side_length_mm,
                 'density_g_cm3': density_g_cm3,
-                'series': series,
                 'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
                 'original_length': f"{length:.4f} {length_unit}",
                 'calculation_method': 'Rectified Hex Product Formula (MM only)',
@@ -1930,9 +1916,9 @@ def calculate_weight_rectified(parameters):
                     'diameter_calculation_mm': f"{diameter_mm:.4f}",
                     'length_input': f"{length:.4f} {length_unit}",
                     'length_calculation_mm': f"{length_mm:.4f}",
-                    'width_across_flats_input': f"{original_width_across_flats:.4f} {original_width_unit}",
+                    'width_across_flats_input': f"{original_width_across_flats:.4f} mm",
                     'width_across_flats_calculation_mm': f"{width_across_flats_mm:.4f}",
-                    'head_height_input': f"{original_head_height:.4f} {original_head_unit}",
+                    'head_height_input': f"{original_head_height:.4f} mm",
                     'head_height_calculation_mm': f"{head_height_mm:.4f}",
                     'side_length_calculation_mm': f"{side_length_mm:.4f}",
                     'shank_radius_mm': f"{shank_radius_mm:.4f}",
@@ -1941,7 +1927,7 @@ def calculate_weight_rectified(parameters):
                     'total_volume_mm3': f"{total_volume_mm3:.4f}",
                     'total_volume_cm3': f"{total_volume_cm3:.4f}",
                     'density_g_cm3': f"{density_g_cm3:.4f}",
-                    'unit_conversion_applied': series == "Inch"
+                    'unit_conversion_applied': diameter_unit != 'mm' or length_unit != 'mm'
                 }
             }
         
@@ -1963,7 +1949,6 @@ def calculate_weight_rectified(parameters):
                 'density_g_cm3': density_g_cm3,
                 'diameter_mm': diameter_mm,
                 'length_mm': length_mm,
-                'series': series,
                 'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
                 'original_length': f"{length:.4f} {length_unit}",
                 'calculation_method': 'Standard Cylinder Formula (MM only)',
@@ -2256,17 +2241,18 @@ def show_weight_calculator_rectified():
             <span class="jsc-badge">RECTIFIED</span>
             <span class="jsc-badge-accent">MM-Only</span>
             <span class="jsc-badge-secondary">0.0000 Format</span>
-            <span class="jsc-badge-success">No Meter Conversion</span>
+            <span class="jsc-badge-success">No Unnecessary Conversion</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
-    **RECTIFIED WORKFLOW:** All calculations now use millimeters only - no meter conversion
+    **RECTIFIED WORKFLOW:** All calculations now use millimeters only - no unnecessary conversion
     **PRECISION:** All dimensions and results displayed in 0.0000 format
-    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm for calculations
+    **UNIT CONVERSION:** Only convert when needed (inch/ft/meter → mm)
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
+    **FIXED:** mm values are no longer unnecessarily converted
     """)
     
     # Initialize session state for form inputs
@@ -2305,7 +2291,7 @@ def show_weight_calculator_rectified():
             if selected_series != "Select Series":
                 st.caption(f"Series: {selected_series}")
                 if selected_series == "Inch":
-                    st.caption("⚠️ Dimensions will be converted from inches to mm")
+                    st.caption("⚠️ Inch dimensions will be converted to mm")
         
         with col3:
             # C. Standard (based on Product + Series) - DISABLED FOR THREADED ROD
@@ -2398,8 +2384,10 @@ def show_weight_calculator_rectified():
                     )
                 
                 st.caption(f"Blank Diameter: {blank_diameter:.4f} {blank_dia_unit}")
-                if selected_series == "Inch" and blank_dia_unit == "inch":
-                    st.caption(f"→ {blank_diameter * 25.4:.4f} mm (converted)")
+                if blank_dia_unit != "mm":
+                    st.caption(f"→ {convert_to_mm(blank_diameter, blank_dia_unit):.4f} mm (converted)")
+                else:
+                    st.caption("✓ Already in mm - no conversion needed")
             
             else:  # Pitch Diameter
                 st.markdown("**Thread Specification**")
@@ -2457,7 +2445,7 @@ def show_weight_calculator_rectified():
                             else:
                                 # For Metric series, pitch diameter is already in mm
                                 st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
-                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} mm will be used directly")
+                                st.info(f"✓ For calculation: {pitch_diameter:.4f} mm will be used directly")
                         else:
                             st.warning("Pitch diameter not found in thread data")
         
@@ -2485,9 +2473,11 @@ def show_weight_calculator_rectified():
                     key="weight_calc_length_unit_select"
                 )
             
-            # Show length conversion for Inch series
-            if selected_series == "Inch" and length_unit == "inch":
-                st.caption(f"→ {length * 25.4:.4f} mm (converted)")
+            # Show length conversion info
+            if length_unit != "mm":
+                st.caption(f"→ {convert_to_mm(length, length_unit):.4f} mm (converted)")
+            else:
+                st.caption("✓ Already in mm - no conversion needed")
         
         with col2:
             # Material - UPDATED WITH MORE MATERIALS
@@ -2539,7 +2529,6 @@ def show_weight_calculator_rectified():
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'series': selected_series,  # Pass series for unit conversion
                 'standard': selected_standard,
                 'size': selected_size,
                 'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "All"
@@ -2556,7 +2545,7 @@ def show_weight_calculator_rectified():
                 if 'pitch_diameter_value' in st.session_state and st.session_state.pitch_diameter_value is not None:
                     pitch_diameter = st.session_state.pitch_diameter_value
                     
-                    # For Inch series, pitch diameter from ASME B1.1 is in inches
+                    # Determine unit based on thread standard
                     if selected_series == "Inch":
                         calculation_params.update({
                             'diameter_value': pitch_diameter,
@@ -2635,7 +2624,7 @@ def show_weight_calculator_rectified():
         - **Length:** {length:.4f} {length_unit}
         - **Material:** {material}
         - **Material Density:** {get_material_density_rectified(material):.4f} g/cm³
-        - **Series Unit Handling:** {'Inch → mm conversion' if selected_series == 'Inch' else 'Metric (mm)'}
+        - **Unit Handling:** {'Conversion to mm' if (selected_diameter_type == 'Blank Diameter' and blank_dia_unit != 'mm') or length_unit != 'mm' else 'All in mm - no conversion needed'}
         """)
     
     # Display calculation results - RECTIFIED WITH 0.0000 FORMAT
@@ -2703,7 +2692,9 @@ def show_weight_calculator_rectified():
                 
                 # Show unit conversion info if applicable
                 if dimensions.get('unit_conversion_applied', False):
-                    st.info("**Unit Conversion Applied:** Inch dimensions were automatically converted to millimeters for calculation")
+                    st.info("**Unit Conversion Applied:** Non-mm dimensions were automatically converted to millimeters for calculation")
+                else:
+                    st.success("**No Unit Conversion Needed:** All dimensions were already in millimeters")
             
             # Show formula details for hex products
             if 'Rectified Hex Product Formula' in calculation_method and 'formula_details' in result:
@@ -2735,17 +2726,6 @@ def show_weight_calculator_rectified():
                 - Formula: total_volume_cm³ × density_g/cm³
                 - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
                 """)
-            
-            # Show unit conversion details for Inch series
-            if result['series'] == "Inch":
-                st.markdown("### 🔄 Unit Conversion Details (Inch Series)")
-                st.markdown("""
-                **Automatic Unit Conversion Applied:**
-                - All inch dimensions automatically converted to mm for calculation
-                - Conversion factor: 1 inch = 25.4 mm
-                - Weight calculations performed using mm³ volumes and g/cm³ density
-                - Final results converted to desired units
-                """)
 
 def show_batch_calculator_rectified():
     """RECTIFIED batch calculator with MM-only calculations"""
@@ -2754,9 +2734,10 @@ def show_batch_calculator_rectified():
     
     st.info("""
     **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with 0.0000 precision
-    **UNIT CONVERSION:** Inch series dimensions automatically converted to mm
+    **UNIT CONVERSION:** Only convert when needed (non-mm units to mm)
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
+    **FIXED:** mm values are no longer unnecessarily converted
     """)
     
     # Download template
@@ -3727,7 +3708,7 @@ def show_rectified_home():
             <span class="jsc-badge">RECTIFIED Calculator</span>
             <span class="jsc-badge-accent">MM-Only Calculations</span>
             <span class="jsc-badge-secondary">0.0000 Precision</span>
-            <span class="jsc-badge-success">No Meter Conversion</span>
+            <span class="jsc-badge-success">No Unnecessary Conversion</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3824,10 +3805,10 @@ def show_rectified_home():
         features = [
             "MM-only weight calculations",
             "0.0000 precision formatting", 
-            "No meter conversion required",
+            "No unnecessary conversion",
             "Direct mm³ volume calculations",
             "g/cm³ density for direct weight calculation",
-            "Automatic inch-to-mm conversion",
+            "Only convert non-mm units to mm",
             "Rectified hex product formulas",
             "Professional reporting",
             "Carbon steel density: 7.85 g/cm³",
@@ -3855,7 +3836,8 @@ def show_help_system():
             
             **MM-ONLY CALCULATIONS:**
             - All calculations now use millimeters only
-            - No meter conversion required
+            - No unnecessary conversion - mm values stay as mm
+            - Only convert inch/ft/meter units to mm
             - Volumes calculated in mm³
             - Density in g/cm³ for direct weight calculation
             - All results displayed in 0.0000 format
@@ -3878,6 +3860,7 @@ def show_help_system():
             - 1 inch = 25.4 mm
             - 1 foot = 304.8 mm
             - 1 meter = 1000 mm
+            - **FIXED:** mm values are no longer unnecessarily converted
             
             **PRECISION:** All dimensions and results use 0.0000 format
             """)
@@ -3942,7 +3925,7 @@ def main():
                 <span class="jsc-badge">RECTIFIED Calculator</span>
                 <span class="jsc-badge-accent">MM-Only Calculations</span>
                 <span class="jsc-badge-secondary">0.0000 Precision</span>
-                <span class="jsc-badge-success">No Meter Conversion</span>
+                <span class="jsc-badge-success">No Unnecessary Conversion</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculator with MM-only calculations and 0.0000 precision formatting</p>
