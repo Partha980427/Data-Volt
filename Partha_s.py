@@ -1558,19 +1558,23 @@ def convert_to_mm(value, from_unit):
 # ======================================================
 
 def get_hex_head_dimensions(standard, product, size, grade="All"):
-    """Get width across flats and head height for hex products from database"""
+    """RECTIFIED: Get width across flats and head height for hex products from database with proper unit tracking"""
     try:
         # Get the appropriate dataframe based on standard
         if standard == "ASME B18.2.1":
             temp_df = df.copy()
+            original_unit = "inch"  # ASME B18.2.1 data is in inches
         elif standard == "ISO 4014":
             temp_df = df_iso4014.copy()
+            original_unit = "mm"  # ISO 4014 data is in mm
         elif standard == "DIN-7991":
             temp_df = df_din7991.copy()
+            original_unit = "mm"  # DIN-7991 data is in mm
         elif standard == "ASME B18.3":
             temp_df = df_asme_b18_3.copy()
+            original_unit = "inch"  # ASME B18.3 data is in inches
         else:
-            return None, None
+            return None, None, "unknown"
         
         # Filter by product and size
         if 'Product' in temp_df.columns and product != "All":
@@ -1585,7 +1589,7 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
             temp_df = temp_df[temp_df['Product Grade'] == grade]
         
         if temp_df.empty:
-            return None, None
+            return None, None, original_unit
         
         # Look for width across flats column
         width_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['width', 'across', 'flats', 'w_'])]
@@ -1620,14 +1624,14 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
             if pd.notna(head_height):
                 head_height = float(head_height)
         
-        return width_across_flats, head_height
+        return width_across_flats, head_height, original_unit
         
     except Exception as e:
         st.warning(f"Error getting hex head dimensions: {str(e)}")
-        return None, None
+        return None, None, "unknown"
 
-def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height):
-    """RECTIFIED: Calculate weight for hex products using MM only - no unnecessary conversion"""
+def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit):
+    """RECTIFIED: Calculate weight for hex products using MM only with proper unit tracking"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1644,12 +1648,12 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
         
         # Convert head dimensions to mm (they should already be in mm from database)
         if width_across_flats is not None:
-            width_across_flats_mm = width_across_flats
+            width_across_flats_mm = convert_to_mm(width_across_flats, original_unit)
         else:
             width_across_flats_mm = diameter_mm * 1.5  # Default ratio if not available
         
         if head_height is not None:
-            head_height_mm = head_height
+            head_height_mm = convert_to_mm(head_height, original_unit)
         else:
             head_height_mm = diameter_mm * 0.65  # Default ratio if not available
         
@@ -1692,6 +1696,8 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
             'density_g_cm3': density_g_cm3,
             'original_diameter': f"{diameter_value} {diameter_unit}",
             'original_length': f"{length} {length_unit}",
+            'original_width_across_flats': f"{width_across_flats} {original_unit}" if width_across_flats else "N/A",
+            'original_head_height': f"{head_height} {original_unit}" if head_height else "N/A",
             'calculation_method': 'Rectified Hex Product Formula (MM only)',
             'formula_details': {
                 'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
@@ -1855,7 +1861,7 @@ def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_cla
         return None
 
 def calculate_weight_rectified(parameters):
-    """RECTIFIED: Enhanced weight calculation using MM only - no unnecessary conversion"""
+    """RECTIFIED: Enhanced weight calculation using MM only with proper unit tracking"""
     try:
         # Extract parameters
         product_type = parameters.get('product_type', 'Hex Bolt')
@@ -1869,8 +1875,8 @@ def calculate_weight_rectified(parameters):
         size = parameters.get('size', 'All')
         grade = parameters.get('grade', 'All')
         
-        # Get hex head dimensions from database
-        width_across_flats, head_height = get_hex_head_dimensions(standard, product_type, size, grade)
+        # Get hex head dimensions from database WITH ORIGINAL UNIT
+        width_across_flats, head_height, original_unit = get_hex_head_dimensions(standard, product_type, size, grade)
         
         # Store original dimensions for display
         original_width_across_flats = width_across_flats
@@ -1882,6 +1888,7 @@ def calculate_weight_rectified(parameters):
             diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
             width_across_flats = diameter_mm_temp * 1.5  # Default ratio
             original_width_across_flats = width_across_flats
+            original_unit = "mm"  # Default to mm for estimated values
         
         if head_height is None:
             # Estimate head height based on diameter
@@ -1897,12 +1904,12 @@ def calculate_weight_rectified(parameters):
         
         # Convert head dimensions to mm (they should already be in mm from database)
         if width_across_flats is not None:
-            width_across_flats_mm = width_across_flats
+            width_across_flats_mm = convert_to_mm(width_across_flats, original_unit)
         else:
             width_across_flats_mm = diameter_mm * 1.5
         
         if head_height is not None:
-            head_height_mm = head_height
+            head_height_mm = convert_to_mm(head_height, original_unit)
         else:
             head_height_mm = diameter_mm * 0.65
         
@@ -1995,6 +2002,8 @@ def calculate_weight_rectified(parameters):
                 'density_g_cm3': density_g_cm3,
                 'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
                 'original_length': f"{length:.4f} {length_unit}",
+                'original_width_across_flats': f"{original_width_across_flats:.4f} {original_unit}" if original_width_across_flats else "N/A",
+                'original_head_height': f"{original_head_height:.4f} {original_unit}" if original_head_height else "N/A",
                 'calculation_method': 'Rectified Hex Product Formula (MM only)',
                 'formula_details': {
                     'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
@@ -2009,9 +2018,9 @@ def calculate_weight_rectified(parameters):
                     'diameter_calculation_mm': f"{diameter_mm:.4f}",
                     'length_input': f"{length:.4f} {length_unit}",
                     'length_calculation_mm': f"{length_mm:.4f}",
-                    'width_across_flats_input': f"{original_width_across_flats:.4f} mm",
+                    'width_across_flats_input': f"{original_width_across_flats:.4f} {original_unit}",
                     'width_across_flats_calculation_mm': f"{width_across_flats_mm:.4f}",
-                    'head_height_input': f"{original_head_height:.4f} mm",
+                    'head_height_input': f"{original_head_height:.4f} {original_unit}",
                     'head_height_calculation_mm': f"{head_height_mm:.4f}",
                     'side_length_calculation_mm': f"{side_length_mm:.4f}",
                     'shank_radius_mm': f"{shank_radius_mm:.4f}",
@@ -2020,7 +2029,7 @@ def calculate_weight_rectified(parameters):
                     'total_volume_mm3': f"{total_volume_mm3:.4f}",
                     'total_volume_cm3': f"{total_volume_cm3:.4f}",
                     'density_g_cm3': f"{density_g_cm3:.4f}",
-                    'unit_conversion_applied': diameter_unit != 'mm' or length_unit != 'mm'
+                    'unit_conversion_applied': diameter_unit != 'mm' or length_unit != 'mm' or original_unit != 'mm'
                 }
             }
         
@@ -2324,28 +2333,28 @@ def show_combined_results():
         st.markdown('</div>', unsafe_allow_html=True)
 
 def show_weight_calculator_rectified():
-    """RECTIFIED weight calculator with MM-only calculations"""
+    """RECTIFIED weight calculator with proper unit tracking"""
     
     st.markdown("""
     <div class="jsc-header">
         <h1>Weight Calculator - RECTIFIED WORKFLOW</h1>
-        <p>MM-only calculations with 0.0000 precision formatting</p>
+        <p>MM-only calculations with proper unit tracking and 0.0000 precision formatting</p>
         <div>
             <span class="jsc-badge">RECTIFIED</span>
             <span class="jsc-badge-accent">MM-Only</span>
             <span class="jsc-badge-secondary">0.0000 Format</span>
-            <span class="jsc-badge-success">No Unnecessary Conversion</span>
+            <span class="jsc-badge-success">Proper Unit Tracking</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
-    **RECTIFIED WORKFLOW:** All calculations now use millimeters only - no unnecessary conversion
+    **RECTIFIED WORKFLOW:** All calculations now use millimeters only with proper unit tracking
     **PRECISION:** All dimensions and results displayed in 0.0000 format
-    **UNIT CONVERSION:** Only convert when needed (inch/ft/meter → mm)
+    **UNIT CONVERSION:** Only convert when needed (inch/ft/meter → mm) with proper unit labels
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
-    **FIXED:** mm values are no longer unnecessarily converted
+    **FIXED:** Proper unit labeling for database dimensions (Inch series shows inches, Metric shows mm)
     """)
     
     # Initialize session state for form inputs
@@ -2720,7 +2729,7 @@ def show_weight_calculator_rectified():
         - **Unit Handling:** {'Conversion to mm' if (selected_diameter_type == 'Blank Diameter' and blank_dia_unit != 'mm') or length_unit != 'mm' else 'All in mm - no conversion needed'}
         """)
     
-    # Display calculation results - RECTIFIED WITH 0.0000 FORMAT
+    # Display calculation results - RECTIFIED WITH PROPER UNIT LABELING
     if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
         result = st.session_state.weight_calc_result
         
@@ -2737,18 +2746,18 @@ def show_weight_calculator_rectified():
         with col4:
             st.metric("Density", f"{result['density_g_cm3']:.4f} g/cm³")
         
-        # RECTIFIED: Enhanced detailed results with 0.0000 FORMAT
-        with st.expander("📐 Detailed Calculation Parameters - RECTIFIED (MM Only)"):
+        # RECTIFIED: Enhanced detailed results with PROPER UNIT LABELING
+        with st.expander("📐 Detailed Calculation Parameters - RECTIFIED (Proper Unit Tracking)"):
             calculation_method = result.get('calculation_method', 'Standard Cylinder Formula (MM only)')
             
             # Show calculation method
             st.markdown(f"**Calculation Method:** `{calculation_method}`")
             
-            # Show ALL dimensions used in calculation with 0.0000 format
+            # Show ALL dimensions used in calculation with PROPER UNIT LABELS
             if 'dimensions_used' in result:
                 dimensions = result['dimensions_used']
                 
-                st.markdown("### 📏 Dimensions Used in Calculation (0.0000 format)")
+                st.markdown("### 📏 Dimensions Used in Calculation (With Proper Unit Labels)")
                 
                 # Create columns for better layout
                 dim_col1, dim_col2 = st.columns(2)
@@ -2796,9 +2805,17 @@ def show_weight_calculator_rectified():
                 for formula_name, formula in formulas.items():
                     st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
             
-            # Show RECTIFIED hex product specific details
+            # Show RECTIFIED hex product specific details with PROPER UNIT LABELS
             if 'Rectified Hex Product Formula' in calculation_method:
                 st.markdown("### 🔧 RECTIFIED Hex Product Specific Details")
+                
+                # Show original database dimensions with proper units
+                if 'original_width_across_flats' in result and result['original_width_across_flats'] != "N/A":
+                    st.markdown(f"**Database Dimensions:**")
+                    st.markdown(f"- **Width Across Flats (from database):** `{result['original_width_across_flats']}`")
+                    if 'original_head_height' in result and result['original_head_height'] != "N/A":
+                        st.markdown(f"- **Head Height (from database):** `{result['original_head_height']}`")
+                
                 st.markdown(f"""
                 **Shank Volume Calculation:**
                 - Formula: π × (diameter/2)² × length
@@ -2821,16 +2838,16 @@ def show_weight_calculator_rectified():
                 """)
 
 def show_batch_calculator_rectified():
-    """RECTIFIED batch calculator with MM-only calculations"""
+    """RECTIFIED batch calculator with proper unit tracking"""
     
     st.markdown("### Batch Weight Calculator - RECTIFIED WORKFLOW")
     
     st.info("""
-    **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with 0.0000 precision
-    **UNIT CONVERSION:** Only convert when needed (non-mm units to mm)
+    **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with proper unit tracking
+    **UNIT CONVERSION:** Only convert when needed (non-mm units to mm) with proper unit labels
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
-    **FIXED:** mm values are no longer unnecessarily converted
+    **FIXED:** Proper unit labeling for database dimensions
     """)
     
     # Download template
@@ -2884,17 +2901,17 @@ def show_batch_calculator_rectified():
                 st.error(f"Missing required columns: {missing_cols}")
             else:
                 if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_rectified"):
-                    st.info("RECTIFIED batch processing with MM-only calculations ready for implementation")
+                    st.info("RECTIFIED batch processing with proper unit tracking ready for implementation")
                     st.write(f"Records to process: {len(batch_df)}")
                     
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
 
 # ======================================================
-# RECTIFIED CALCULATIONS PAGE - MM-ONLY CALCULATIONS
+# RECTIFIED CALCULATIONS PAGE - PROPER UNIT TRACKING
 # ======================================================
 def show_rectified_calculations():
-    """Rectified calculations page with MM-only workflow"""
+    """Rectified calculations page with proper unit tracking"""
     
     tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
@@ -3799,7 +3816,7 @@ def show_rectified_home():
         <p>Professional Fastener Intelligence Platform v4.0 - RECTIFIED</p>
         <div>
             <span class="jsc-badge">RECTIFIED Calculator</span>
-            <span class="jsc-badge-accent">MM-Only Calculations</span>
+            <span class="jsc-badge-accent">Proper Unit Tracking</span>
             <span class="jsc-badge-secondary">0.0000 Precision</span>
             <span class="jsc-badge-success">No Unnecessary Conversion</span>
         </div>
@@ -3854,7 +3871,7 @@ def show_rectified_home():
     cols = st.columns(3)
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
-        ("Engineering Calculator", "RECTIFIED weight calculations with MM-only workflow", "calculator"),
+        ("Engineering Calculator", "RECTIFIED weight calculations with proper unit tracking", "calculator"),
         ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("Export Reports", "Generate professional engineering reports", "export")
@@ -3896,7 +3913,7 @@ def show_rectified_home():
         st.markdown('<h3 class="section-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "MM-only weight calculations",
+            "Proper unit tracking for database dimensions",
             "0.0000 precision formatting", 
             "No unnecessary conversion",
             "Direct mm³ volume calculations",
@@ -3927,13 +3944,12 @@ def show_help_system():
             st.markdown("""
             **RECTIFIED WEIGHT CALCULATOR WORKFLOW:**
             
-            **MM-ONLY CALCULATIONS:**
-            - All calculations now use millimeters only
-            - No unnecessary conversion - mm values stay as mm
-            - Only convert inch/ft/meter units to mm
-            - Volumes calculated in mm³
-            - Density in g/cm³ for direct weight calculation
-            - All results displayed in 0.0000 format
+            **PROPER UNIT TRACKING:**
+            - Inch series products: Database dimensions shown in inches
+            - Metric series products: Database dimensions shown in mm
+            - User inputs: Can be in any unit (mm, inch, ft, meter)
+            - All calculations: Converted to mm internally
+            - Display: Shows original units AND converted mm values
             
             **RECTIFIED FORMULAS:**
             - **Volume Calculation:** π × (diameter/2)² × length (mm³)
@@ -3953,7 +3969,7 @@ def show_help_system():
             - 1 inch = 25.4 mm
             - 1 foot = 304.8 mm
             - 1 meter = 1000 mm
-            - **FIXED:** mm values are no longer unnecessarily converted
+            - **FIXED:** Proper unit labeling for database dimensions
             
             **PRECISION:** All dimensions and results use 0.0000 format
             """)
@@ -4016,12 +4032,12 @@ def main():
         <div class="jsc-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
                 <span class="jsc-badge">RECTIFIED Calculator</span>
-                <span class="jsc-badge-accent">MM-Only Calculations</span>
+                <span class="jsc-badge-accent">Proper Unit Tracking</span>
                 <span class="jsc-badge-secondary">0.0000 Precision</span>
                 <span class="jsc-badge-success">No Unnecessary Conversion</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculator with MM-only calculations and 0.0000 precision formatting</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculator with proper unit tracking and 0.0000 precision formatting</p>
         </div>
     """, unsafe_allow_html=True)
 
