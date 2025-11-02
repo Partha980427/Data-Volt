@@ -368,7 +368,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# ENHANCED CORPORATE UI WITH JSC GROUP STYLING
+# ENHANCED PAGE SETUP WITH JSC GROUP STYLING
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -377,45 +377,43 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# JSC Group Professional Corporate CSS - ENHANCED
+# JSC Group Professional CSS with Enhanced Card Design - COMPLETED
 st.markdown("""
 <style>
     :root {
-        --jsc-primary: #1e3a8a;
-        --jsc-primary-dark: #1e40af;
-        --jsc-secondary: #dc2626;
-        --jsc-accent: #f59e0b;
-        --jsc-light: #f8fafc;
-        --jsc-dark: #1e293b;
-        --jsc-success: #059669;
-        --jsc-warning: #d97706;
-        --jsc-danger: #dc2626;
-        --jsc-gradient: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
-        --jsc-gradient-light: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-        --jsc-gradient-accent: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        --jsc-primary: #0066b3;
+        --jsc-primary-dark: #003366;
+        --jsc-secondary: #00a0e3;
+        --jsc-accent: #ff6b00;
+        --jsc-light: #f8f9fa;
+        --jsc-dark: #343a40;
+        --jsc-success: #28a745;
+        --jsc-warning: #ffc107;
+        --jsc-danger: #dc3545;
+        --jsc-gradient: linear-gradient(135deg, #0066b3 0%, #003366 100%);
+        --jsc-gradient-light: linear-gradient(135deg, #00a0e3 0%, #0066b3 100%);
     }
     
     /* Main background and text */
     .stApp {
-        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     }
     
-    /* JSC Corporate Header */
-    .jsc-corporate-header {
+    /* Headers */
+    .jsc-header {
         background: var(--jsc-gradient);
-        padding: 2rem 0;
-        border-radius: 0 0 20px 20px;
+        padding: 2.5rem;
+        border-radius: 15px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 10px 30px rgba(30, 58, 138, 0.3);
-        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
         position: relative;
         overflow: hidden;
     }
     
-    .jsc-corporate-header::before {
+    .jsc-header::before {
         content: '';
         position: absolute;
         top: 0;
@@ -425,106 +423,34 @@ st.markdown("""
         background: var(--jsc-accent);
     }
     
-    .jsc-corporate-header h1 {
-        font-size: 2.8rem;
-        font-weight: 800;
+    .jsc-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
         margin-bottom: 0.5rem;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        letter-spacing: -0.5px;
     }
     
-    .jsc-corporate-header p {
-        font-size: 1.3rem;
+    .jsc-header p {
+        font-size: 1.2rem;
         opacity: 0.95;
         margin-bottom: 1rem;
-        font-weight: 400;
     }
     
-    .jsc-corporate-subtitle {
-        font-size: 1.1rem;
-        opacity: 0.85;
-        max-width: 800px;
-        margin: 0 auto;
-        line-height: 1.6;
-    }
-    
-    /* Corporate Cards */
-    .corporate-card {
-        background: white;
-        padding: 2rem;
-        border-radius: 16px;
-        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.1);
-        border: 1px solid #e2e8f0;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        margin-bottom: 1.5rem;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .corporate-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 4px;
-        background: var(--jsc-gradient);
-    }
-    
-    .corporate-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 40px rgba(30, 58, 138, 0.15);
-        border-color: #3b82f6;
-    }
-    
-    .corporate-card-header {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #f1f5f9;
-    }
-    
-    .corporate-card-icon {
-        width: 50px;
-        height: 50px;
-        background: var(--jsc-gradient);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 1rem;
-        color: white;
-        font-size: 1.5rem;
-    }
-    
-    .corporate-card-title {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: var(--jsc-primary-dark);
-        margin: 0;
-    }
-    
-    .corporate-card-subtitle {
-        font-size: 1rem;
-        color: #64748b;
-        margin: 0.25rem 0 0 0;
-    }
-    
-    /* Metric Cards */
-    .corporate-metric {
+    /* Cards */
+    .jsc-card {
         background: white;
         padding: 1.5rem;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.08);
-        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
         transition: all 0.3s ease;
-        text-align: center;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
         position: relative;
         overflow: hidden;
     }
     
-    .corporate-metric::before {
+    .jsc-card::before {
         content: '';
         position: absolute;
         top: 0;
@@ -534,52 +460,51 @@ st.markdown("""
         background: var(--jsc-gradient);
     }
     
-    .corporate-metric:hover {
+    .jsc-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 12px 25px rgba(30, 58, 138, 0.15);
+        box-shadow: 0 8px 25px rgba(0, 102, 179, 0.15);
+        border-left-color: var(--jsc-accent);
     }
     
-    .metric-value {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: var(--jsc-primary-dark);
-        margin: 0.5rem 0;
-        line-height: 1;
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
+        transition: transform 0.3s ease;
+        border: 1px solid #e9ecef;
+        text-align: center;
     }
     
-    .metric-label {
-        font-size: 0.9rem;
-        color: #64748b;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 102, 179, 0.15);
     }
     
     /* Badges */
-    .corporate-badge {
+    .jsc-badge {
         background: var(--jsc-gradient);
         color: white;
-        padding: 0.5rem 1.2rem;
-        border-radius: 25px;
-        font-size: 0.8rem;
-        font-weight: 700;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
         margin: 0.2rem;
         display: inline-block;
-        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.2);
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .corporate-badge-accent {
-        background: var(--jsc-gradient-accent);
+    .jsc-badge-accent {
+        background: var(--jsc-accent);
     }
     
-    .corporate-badge-success {
-        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    .jsc-badge-secondary {
+        background: var(--jsc-secondary);
     }
     
-    .corporate-badge-warning {
-        background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    .jsc-badge-success {
+        background: var(--jsc-success);
     }
     
     /* Buttons */
@@ -587,17 +512,16 @@ st.markdown("""
         background: var(--jsc-gradient);
         color: white;
         border: none;
-        padding: 0.8rem 1.8rem;
-        border-radius: 10px;
-        font-weight: 700;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
-        letter-spacing: 0.5px;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 102, 179, 0.2);
     }
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(30, 58, 138, 0.3);
+        box-shadow: 0 6px 15px rgba(0, 102, 179, 0.3);
         background: var(--jsc-primary-dark);
     }
     
@@ -625,79 +549,69 @@ st.markdown("""
     .stButton>button[kind="secondary"]:hover {
         background: var(--jsc-primary);
         color: white;
-        transform: translateY(-2px);
     }
     
     /* Sidebar */
     .css-1d391kg, .css-1lcbmhc {
         background: white;
-        border-right: 1px solid #e2e8f0;
+        border-right: 1px solid #e9ecef;
     }
     
     .sidebar .sidebar-content {
-        background: linear-gradient(180deg, white 0%, #f8fafc 100%);
+        background: linear-gradient(180deg, white 0%, #f8f9fa 100%);
     }
     
     /* Input fields */
     .stTextInput>div>div>input, 
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select {
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 0.7rem 1rem;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
         transition: all 0.3s ease;
-        font-size: 0.95rem;
     }
     
     .stTextInput>div>div>input:focus, 
     .stNumberInput>div>div>input:focus,
     .stSelectbox>div>div>select:focus {
         border-color: var(--jsc-primary);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        box-shadow: 0 0 0 2px rgba(0, 102, 179, 0.1);
     }
     
     /* Dataframes */
     .dataframe {
-        border-radius: 12px;
+        border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
     }
     
     /* Expanders */
     .streamlit-expanderHeader {
         background: var(--jsc-light);
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-        font-weight: 700;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        font-weight: 600;
         color: var(--jsc-primary);
-        padding: 1rem;
     }
     
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 1rem;
-        background: white;
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        gap: 2rem;
     }
     
     .stTabs [data-baseweb="tab"] {
         background: white;
-        border-radius: 8px;
+        border-radius: 8px 8px 0 0;
         padding: 1rem 2rem;
-        border: 2px solid #e2e8f0;
-        font-weight: 700;
-        transition: all 0.3s ease;
+        border: 1px solid #e9ecef;
+        border-bottom: none;
+        font-weight: 600;
     }
     
     .stTabs [aria-selected="true"] {
-        background: var(--jsc-gradient);
+        background: var(--jsc-primary);
         color: white;
-        border-color: var(--jsc-primary);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
     }
     
     /* Progress bars */
@@ -707,38 +621,35 @@ st.markdown("""
     
     /* Success, Warning, Error messages */
     .stAlert {
-        border-radius: 12px;
+        border-radius: 8px;
         border: 1px solid;
-        padding: 1rem;
     }
     
     .stAlert [data-testid="stMarkdownContainer"] {
-        font-weight: 600;
+        font-weight: 500;
     }
     
     /* Section headers */
-    .corporate-section-header {
+    .section-header {
         border-left: 5px solid var(--jsc-primary);
-        padding-left: 1.5rem;
-        margin: 2.5rem 0 1.5rem 0;
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
         color: var(--jsc-primary-dark);
-        font-weight: 800;
-        font-size: 1.6rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        font-weight: 600;
+        font-size: 1.4rem;
     }
     
     /* Quick actions grid */
-    .corporate-quick-action {
+    .quick-action {
         background: white;
-        padding: 2rem 1.5rem;
-        border-radius: 16px;
+        padding: 1.5rem 1rem;
+        border-radius: 12px;
         text-align: center;
         cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 6px 20px rgba(30, 58, 138, 0.1);
-        border: 1px solid #e2e8f0;
-        height: 140px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+        height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -747,53 +658,34 @@ st.markdown("""
         overflow: hidden;
     }
     
-    .corporate-quick-action::before {
+    .quick-action::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
+        height: 3px;
         background: var(--jsc-gradient);
     }
     
-    .corporate-quick-action:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 15px 30px rgba(30, 58, 138, 0.15);
+    .quick-action:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     
-    .quick-action-icon {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-        color: var(--jsc-primary);
-    }
-    
-    .quick-action-title {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: var(--jsc-primary-dark);
-        margin-bottom: 0.5rem;
-    }
-    
-    .quick-action-desc {
-        font-size: 0.85rem;
-        color: #64748b;
-        line-height: 1.4;
-    }
-    
-    /* Professional card for product details */
-    .corporate-product-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    /* Professional card for product details - COMPLETED */
+    .professional-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 2px solid var(--jsc-primary);
-        border-radius: 20px;
-        padding: 2.5rem;
+        border-radius: 15px;
+        padding: 2rem;
         margin: 2rem 0;
-        box-shadow: 0 15px 40px rgba(30, 58, 138, 0.15);
+        box-shadow: 0 10px 30px rgba(0, 102, 179, 0.2);
         position: relative;
         overflow: hidden;
     }
     
-    .corporate-product-card::before {
+    .professional-card::before {
         content: '';
         position: absolute;
         top: 0;
@@ -803,331 +695,274 @@ st.markdown("""
         background: var(--jsc-gradient);
     }
     
-    .product-card-header {
+    .card-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         margin-bottom: 2rem;
-        padding-bottom: 1.5rem;
-        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
     }
     
-    .product-card-title {
-        font-size: 2rem;
-        font-weight: 800;
+    .card-title {
+        font-size: 1.8rem;
+        font-weight: 700;
         color: var(--jsc-primary-dark);
         margin: 0;
-        line-height: 1.2;
     }
     
-    .product-card-subtitle {
-        font-size: 1.3rem;
-        color: #64748b;
+    .card-subtitle {
+        font-size: 1.2rem;
+        color: #6c757d;
         margin: 0.5rem 0 0 0;
-        font-weight: 500;
     }
     
-    .product-card-company {
+    .card-company {
         background: var(--jsc-gradient);
         color: white;
-        padding: 0.7rem 1.5rem;
-        border-radius: 25px;
-        font-weight: 700;
-        font-size: 1rem;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
     }
     
     /* Specification rows for professional card */
-    .corporate-spec-row {
+    .spec-row {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
-        gap: 1.5rem;
+        gap: 1rem;
         align-items: center;
-        margin: 1rem 0;
-        padding: 1rem;
-        border-radius: 10px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+        margin: 0.8rem 0;
+        padding: 0.5rem;
+        border-radius: 6px;
+        background: #f8f9fa;
     }
     
-    .corporate-spec-label-min, .corporate-spec-label-max {
-        font-size: 0.9rem;
-        color: #64748b;
+    .spec-label-min, .spec-label-max {
+        font-size: 0.85rem;
+        color: #6c757d;
         text-align: center;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        font-weight: 500;
     }
     
-    .corporate-spec-dimension {
-        font-weight: 700;
+    .spec-dimension {
+        font-weight: 600;
         color: var(--jsc-primary-dark);
         text-align: center;
-        padding: 0.8rem 1.5rem;
+        padding: 0.3rem 1rem;
         background: white;
-        border-radius: 8px;
-        border: 2px solid #e2e8f0;
-        font-size: 1rem;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
     }
     
-    .corporate-spec-value {
-        font-weight: 700;
+    .spec-value {
+        font-weight: 600;
         color: var(--jsc-primary);
         text-align: center;
-        padding: 0.8rem;
+        padding: 0.3rem;
         background: white;
-        border-radius: 8px;
-        border: 2px solid #e2e8f0;
-        font-size: 1rem;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
     }
     
-    .product-card-footer {
+    .card-footer {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-top: 2.5rem;
-        padding-top: 1.5rem;
-        border-top: 2px solid #e2e8f0;
-        font-size: 0.95rem;
-        color: #64748b;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
+        font-size: 0.9rem;
+        color: #6c757d;
     }
     
-    .product-card-actions {
+    .card-actions {
         display: flex;
         gap: 1rem;
-        margin-top: 2rem;
+        margin-top: 1.5rem;
         justify-content: center;
     }
     
-    .corporate-action-button {
+    .action-button {
         background: var(--jsc-gradient);
         color: white;
         border: none;
-        padding: 1rem 2rem;
-        border-radius: 10px;
-        font-weight: 700;
+        padding: 0.7rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
     }
     
-    .corporate-action-button:hover {
+    .action-button:hover {
         background: var(--jsc-primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(30, 58, 138, 0.3);
     }
     
-    .corporate-action-button.secondary {
+    .action-button.secondary {
         background: white;
         color: var(--jsc-primary);
         border: 2px solid var(--jsc-primary);
     }
     
-    .corporate-action-button.secondary:hover {
+    .action-button.secondary:hover {
         background: var(--jsc-primary);
         color: white;
     }
     
     /* Filter sections */
-    .corporate-filter-section {
+    .filter-section {
         background: white;
-        padding: 2rem;
-        border-radius: 16px;
-        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.1);
-        margin-bottom: 2rem;
-        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e9ecef;
         position: relative;
         overflow: hidden;
     }
     
-    .corporate-filter-section::before {
+    .filter-section::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
+        height: 3px;
         background: var(--jsc-gradient);
     }
     
-    .corporate-filter-header {
-        border-left: 5px solid var(--jsc-primary);
-        padding-left: 1.5rem;
-        margin-bottom: 1.5rem;
+    .filter-header {
+        border-left: 4px solid var(--jsc-primary);
+        padding-left: 1rem;
+        margin-bottom: 1rem;
         color: var(--jsc-primary-dark);
-        font-weight: 800;
-        font-size: 1.4rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        font-weight: 600;
+        font-size: 1.2rem;
     }
     
     /* Independent sections */
-    .corporate-independent-section {
+    .independent-section {
         border: 2px solid var(--jsc-primary);
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2.5rem;
-        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
         position: relative;
         overflow: hidden;
-        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.1);
     }
     
-    .corporate-independent-section::before {
+    .independent-section::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
+        height: 3px;
         background: var(--jsc-gradient);
     }
     
     /* Results sections */
-    .corporate-section-results {
+    .section-results {
         border: 2px solid var(--jsc-success);
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
-        box-shadow: 0 8px 25px rgba(5, 150, 105, 0.1);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
     }
     
-    .corporate-combined-results {
+    .combined-results {
         border: 2px solid var(--jsc-secondary);
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
-        box-shadow: 0 8px 25px rgba(220, 38, 38, 0.1);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
     }
     
     /* Data quality indicators */
-    .corporate-data-quality {
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        font-size: 0.9rem;
-        border-left: 5px solid;
-        font-weight: 600;
+    .data-quality-indicator {
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.3rem 0;
+        font-size: 0.85rem;
+        border-left: 4px solid;
     }
     
     .quality-good {
-        background: #d1fae5;
-        color: #065f46;
+        background: #d4edda;
+        color: #155724;
         border-left-color: var(--jsc-success);
     }
     
     .quality-warning {
-        background: #fef3c7;
-        color: #92400e;
+        background: #fff3cd;
+        color: #856404;
         border-left-color: var(--jsc-warning);
     }
     
     .quality-error {
-        background: #fee2e2;
-        color: #991b1b;
+        background: #f8d7da;
+        color: #721c24;
         border-left-color: var(--jsc-danger);
     }
     
     /* Calculation cards */
-    .corporate-calculation-card {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin: 0.8rem 0;
-        border-left: 5px solid var(--jsc-success);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    .calculation-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border-left: 4px solid var(--jsc-success);
     }
     
     /* Grid layouts */
-    .corporate-spec-grid {
+    .spec-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .property-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
+        margin: 1rem 0;
+    }
+    
+    .specification-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 1.5rem;
         margin: 1.5rem 0;
     }
     
-    .corporate-property-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 1rem;
-        margin: 1.5rem 0;
-    }
-    
-    .corporate-specification-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-        gap: 2rem;
-        margin: 2rem 0;
-    }
-    
     /* Footer */
-    .jsc-corporate-footer {
+    .jsc-footer {
         text-align: center;
-        color: #64748b;
-        padding: 3rem 2rem;
-        margin-top: 4rem;
-        border-top: 2px solid #e2e8f0;
-        background: white;
-        border-radius: 20px 20px 0 0;
-    }
-    
-    .footer-badges {
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        margin-bottom: 2rem;
-        flex-wrap: wrap;
-    }
-    
-    /* Navigation */
-    .corporate-nav-button {
-        background: white;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem 1.5rem;
-        margin: 0.5rem 0;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 600;
-        color: var(--jsc-primary);
-    }
-    
-    .corporate-nav-button:hover {
-        background: var(--jsc-gradient);
-        color: white;
-        border-color: var(--jsc-primary);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
-    }
-    
-    .corporate-nav-button.active {
-        background: var(--jsc-gradient);
-        color: white;
-        border-color: var(--jsc-primary);
+        color: #6c757d;
+        padding: 2rem;
+        margin-top: 3rem;
+        border-top: 1px solid #e9ecef;
     }
     
     /* Responsive design */
     @media (max-width: 768px) {
-        .jsc-corporate-header {
+        .jsc-header {
             padding: 1.5rem !important;
         }
         
-        .jsc-corporate-header h1 {
-            font-size: 2.2rem !important;
+        .jsc-header h1 {
+            font-size: 2rem !important;
         }
         
-        .corporate-spec-grid,
-        .corporate-property-grid,
-        .corporate-specification-grid {
+        .spec-grid,
+        .property-grid,
+        .specification-grid {
             grid-template-columns: 1fr;
         }
         
-        .product-card-header {
+        .card-header {
             flex-direction: column;
             gap: 1rem;
             text-align: center;
@@ -1137,29 +972,14 @@ st.markdown("""
             padding: 0.8rem 1rem;
         }
         
-        .corporate-spec-row {
+        .spec-row {
             grid-template-columns: 1fr;
-            gap: 0.8rem;
+            gap: 0.5rem;
         }
         
-        .product-card-actions {
+        .card-actions {
             flex-direction: column;
         }
-        
-        .footer-badges {
-            flex-direction: column;
-            align-items: center;
-        }
-    }
-    
-    /* Loading animations */
-    @keyframes corporate-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-    
-    .corporate-loading {
-        animation: corporate-pulse 2s infinite;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -2397,7 +2217,7 @@ def apply_section_c_filters():
 def show_section_a_results():
     """Show results for Section A"""
     if not st.session_state.section_a_results.empty:
-        st.markdown('<div class="corporate-section-results">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section A Results - Dimensional Specifications")
         
         # Show professional card if requested
@@ -2414,10 +2234,10 @@ def show_section_a_results():
         # Show export options
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Export Section A Results", key="export_section_a", use_container_width=True):
+            if st.button("Export Section A Results", key="export_section_a"):
                 enhanced_export_data(st.session_state.section_a_results, "Excel")
         with col2:
-            if st.button("Show Professional Card", key="show_pro_card_a", use_container_width=True):
+            if st.button("Show Professional Card", key="show_pro_card_a"):
                 if not st.session_state.section_a_results.empty:
                     # Extract first row for professional card
                     first_row = st.session_state.section_a_results.iloc[0].to_dict()
@@ -2430,7 +2250,7 @@ def show_section_a_results():
 def show_section_b_results():
     """Show results for Section B"""
     if not st.session_state.section_b_results.empty:
-        st.markdown('<div class="corporate-section-results">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section B Results - Thread Specifications")
         
         st.dataframe(
@@ -2439,7 +2259,7 @@ def show_section_b_results():
             height=400
         )
         
-        if st.button("Export Section B Results", key="export_section_b", use_container_width=True):
+        if st.button("Export Section B Results", key="export_section_b"):
             enhanced_export_data(st.session_state.section_b_results, "Excel")
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2447,7 +2267,7 @@ def show_section_b_results():
 def show_section_c_results():
     """Show results for Section C"""
     if not st.session_state.section_c_results.empty:
-        st.markdown('<div class="corporate-section-results">', unsafe_allow_html=True)
+        st.markdown('<div class="section-results">', unsafe_allow_html=True)
         st.markdown("### Section C Results - Material Properties")
         
         st.dataframe(
@@ -2460,7 +2280,7 @@ def show_section_c_results():
         if st.session_state.section_c_filters.get('property_class') and st.session_state.section_c_filters.get('property_class') != "All":
             show_mechanical_chemical_details(st.session_state.section_c_filters.get('property_class'))
         
-        if st.button("Export Section C Results", key="export_section_c", use_container_width=True):
+        if st.button("Export Section C Results", key="export_section_c"):
             enhanced_export_data(st.session_state.section_c_results, "Excel")
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2492,7 +2312,7 @@ def combine_all_results():
 def show_combined_results():
     """Show combined results from all sections"""
     if not st.session_state.combined_results.empty:
-        st.markdown('<div class="corporate-combined-results">', unsafe_allow_html=True)
+        st.markdown('<div class="combined-results">', unsafe_allow_html=True)
         st.markdown("### Combined Results - All Sections")
         
         st.dataframe(
@@ -2503,10 +2323,10 @@ def show_combined_results():
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Export Combined Results", key="export_combined", use_container_width=True):
+            if st.button("Export Combined Results", key="export_combined"):
                 enhanced_export_data(st.session_state.combined_results, "Excel")
         with col2:
-            if st.button("Clear Combined Results", key="clear_combined", use_container_width=True):
+            if st.button("Clear Combined Results", key="clear_combined"):
                 st.session_state.combined_results = pd.DataFrame()
                 st.rerun()
         
@@ -2516,30 +2336,16 @@ def show_weight_calculator_rectified():
     """RECTIFIED weight calculator with proper unit tracking"""
     
     st.markdown("""
-    <div class="jsc-corporate-header">
-        <h1>JSC Industries</h1>
-        <p>Professional Fastener Intelligence Platform</p>
-        <div class="jsc-corporate-subtitle">
-            Advanced Weight Calculator with Precision Engineering Specifications
-        </div>
-        <div style="margin-top: 1.5rem;">
-            <span class="corporate-badge">RECTIFIED</span>
-            <span class="corporate-badge-accent">MM-Only</span>
-            <span class="corporate-badge-success">0.0000 Format</span>
-            <span class="corporate-badge">Proper Unit Tracking</span>
+    <div class="jsc-header">
+        <h1>Weight Calculator - RECTIFIED WORKFLOW</h1>
+        <p>MM-only calculations with proper unit tracking and 0.0000 precision formatting</p>
+        <div>
+            <span class="jsc-badge">RECTIFIED</span>
+            <span class="jsc-badge-accent">MM-Only</span>
+            <span class="jsc-badge-secondary">0.0000 Format</span>
+            <span class="jsc-badge-success">Proper Unit Tracking</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
-    st.markdown("""
-        <div class="corporate-card-header">
-            <div class="corporate-card-icon">⚖️</div>
-            <div>
-                <div class="corporate-card-title">Weight Calculator - RECTIFIED WORKFLOW</div>
-                <div class="corporate-card-subtitle">MM-only calculations with proper unit tracking and 0.0000 precision formatting</div>
-            </div>
-        </div>
     """, unsafe_allow_html=True)
     
     st.info("""
@@ -3030,22 +2836,11 @@ def show_weight_calculator_rectified():
                 - Formula: total_volume_cm³ × density_g/cm³
                 - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
                 """)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 def show_batch_calculator_rectified():
     """RECTIFIED batch calculator with proper unit tracking"""
     
-    st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
-    st.markdown("""
-        <div class="corporate-card-header">
-            <div class="corporate-card-icon">📊</div>
-            <div>
-                <div class="corporate-card-title">Batch Weight Calculator - RECTIFIED WORKFLOW</div>
-                <div class="corporate-card-subtitle">Process multiple calculations with proper unit tracking</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### Batch Weight Calculator - RECTIFIED WORKFLOW")
     
     st.info("""
     **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with proper unit tracking
@@ -3111,8 +2906,6 @@ def show_batch_calculator_rectified():
                     
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
 # RECTIFIED CALCULATIONS PAGE - PROPER UNIT TRACKING
@@ -3129,24 +2922,13 @@ def show_rectified_calculations():
         show_batch_calculator_rectified()
     
     with tab3:
-        st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
-        st.markdown("""
-            <div class="corporate-card-header">
-                <div class="corporate-card-icon">📈</div>
-                <div>
-                    <div class="corporate-card-title">Calculation Analytics - RECTIFIED</div>
-                    <div class="corporate-card-subtitle">Track calculation history and performance metrics</div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("### Calculation Analytics - RECTIFIED")
         st.info("Analytics dashboard will show calculation history and trends after weight calculations are performed.")
         
         if 'calculation_history' in st.session_state and st.session_state.calculation_history:
             st.write("Calculation history will be displayed here")
         else:
             st.write("No calculation history yet. Perform calculations to see analytics here.")
-        st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
 # ENHANCED DATA QUALITY INDICATORS
@@ -3159,30 +2941,30 @@ def show_data_quality_indicators():
             total_rows = len(df)
             missing_data = df.isnull().sum().sum()
             completeness = ((total_rows * len(df.columns) - missing_data) / (total_rows * len(df.columns))) * 100
-            st.markdown(f'<div class="corporate-data-quality quality-good">Main Data: {completeness:.1f}% Complete</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="data-quality-indicator quality-good">Main Data: {completeness:.1f}% Complete</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="corporate-data-quality quality-error">Main Data: Not Loaded</div>', unsafe_allow_html=True)
+            st.markdown('<div class="data-quality-indicator quality-error">Main Data: Not Loaded</div>', unsafe_allow_html=True)
         
         if not df_iso4014.empty:
-            st.markdown(f'<div class="corporate-data-quality quality-good">ISO 4014: {len(df_iso4014)} Records</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="data-quality-indicator quality-good">ISO 4014: {len(df_iso4014)} Records</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="corporate-data-quality quality-warning">ISO 4014: Limited Access</div>', unsafe_allow_html=True)
+            st.markdown('<div class="data-quality-indicator quality-warning">ISO 4014: Limited Access</div>', unsafe_allow_html=True)
         
         if st.session_state.din7991_loaded:
-            st.markdown(f'<div class="corporate-data-quality quality-good">DIN-7991: {len(df_din7991)} Records</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="data-quality-indicator quality-good">DIN-7991: {len(df_din7991)} Records</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="corporate-data-quality quality-warning">DIN-7991: Limited Access</div>', unsafe_allow_html=True)
+            st.markdown('<div class="data-quality-indicator quality-warning">DIN-7991: Limited Access</div>', unsafe_allow_html=True)
         
         if st.session_state.asme_b18_3_loaded:
-            st.markdown(f'<div class="corporate-data-quality quality-good">ASME B18.3: {len(df_asme_b18_3)} Records</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="data-quality-indicator quality-good">ASME B18.3: {len(df_asme_b18_3)} Records</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="corporate-data-quality quality-warning">ASME B18.3: Limited Access</div>', unsafe_allow_html=True)
+            st.markdown('<div class="data-quality-indicator quality-warning">ASME B18.3: Limited Access</div>', unsafe_allow_html=True)
         
         if not df_mechem.empty:
-            st.markdown(f'<div class="corporate-data-quality quality-good">Mech & Chem: {len(df_mechem)} Records</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="data-quality-indicator quality-good">Mech & Chem: {len(df_mechem)} Records</div>', unsafe_allow_html=True)
             st.markdown(f'<div style="font-size: 0.8rem; margin: 0.1rem 0;">Property Classes: {len(st.session_state.property_classes)}</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="corporate-data-quality quality-warning">Mech & Chem: Limited Access</div>', unsafe_allow_html=True)
+            st.markdown('<div class="data-quality-indicator quality-warning">Mech & Chem: Limited Access</div>', unsafe_allow_html=True)
         
         thread_status = []
         for standard, url in thread_files.items():
@@ -3192,7 +2974,7 @@ def show_data_quality_indicators():
             else:
                 thread_status.append(f"{standard}: Limited")
         
-        st.markdown(f'<div class="corporate-data-quality quality-good">Thread Data: Available</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="data-quality-indicator quality-good">Thread Data: Available</div>', unsafe_allow_html=True)
         for status in thread_status:
             st.markdown(f'<div style="font-size: 0.8rem; margin: 0.1rem 0;">{status}</div>', unsafe_allow_html=True)
 
@@ -3274,7 +3056,7 @@ def show_calculation_history():
         for calc in reversed(st.session_state.calculation_history[-5:]):
             with st.container():
                 st.markdown(f"""
-                <div class="corporate-calculation-card">
+                <div class="calculation-card">
                     <strong>{calc.get('product', 'N/A')}</strong> | 
                     Size: {calc.get('size', 'N/A')} | 
                     Grade: {calc.get('grade', 'N/A')} |
@@ -3302,185 +3084,185 @@ def show_professional_product_card(product_details):
     
     # Create the professional card HTML
     card_html = f"""
-    <div class="corporate-product-card">
-        <div class="product-card-header">
+    <div class="professional-card">
+        <div class="card-header">
             <div>
-                <h1 class="product-card-title">{product_name}</h1>
-                <p class="product-card-subtitle">Size: {size} | Standard: {standard} | Grade: {grade}</p>
+                <h1 class="card-title">{product_name}</h1>
+                <p class="card-subtitle">Size: {size} | Standard: {standard} | Grade: {grade}</p>
             </div>
-            <div class="product-card-company">JSC India</div>
+            <div class="card-company">JSC India</div>
         </div>
         
-        <div class="corporate-specification-grid">
+        <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
-            <div class="corporate-card">
-                <div class="corporate-filter-header">Dimensional Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Body Dia (Min)</div>
-                    <div class="corporate-spec-dimension">Body Diameter</div>
-                    <div class="corporate-spec-label-max">Body Dia (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Body Dia (Min)</div>
+                    <div class="spec-dimension">Body Diameter</div>
+                    <div class="spec-label-max">Body Dia (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Body_Dia_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Body_Dia_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Body_Dia_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Body_Dia_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Width Across Flats -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Width Across Flats (Min)</div>
-                    <div class="corporate-spec-dimension">Width Across Flats</div>
-                    <div class="corporate-spec-label-max">Width Across Flats (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Flats (Min)</div>
+                    <div class="spec-dimension">Width Across Flats</div>
+                    <div class="spec-label-max">Width Across Flats (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Width_Across_Flats_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Width_Across_Flats_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Flats_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Width Across Corners -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Width Across Corners (Min)</div>
-                    <div class="corporate-spec-dimension">Width Across Corners</div>
-                    <div class="corporate-spec-label-max">Width Across Corners (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Width Across Corners (Min)</div>
+                    <div class="spec-dimension">Width Across Corners</div>
+                    <div class="spec-label-max">Width Across Corners (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Width_Across_Corners_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Width_Across_Corners_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Width_Across_Corners_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Head Height -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Head Height (Min)</div>
-                    <div class="corporate-spec-dimension">Head Height</div>
-                    <div class="corporate-spec-label-max">Head Height (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Head Height (Min)</div>
+                    <div class="spec-dimension">Head Height</div>
+                    <div class="spec-label-max">Head Height (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Radius of Fillet -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Radius of Fillet (Min)</div>
-                    <div class="corporate-spec-dimension">Radius of Fillet</div>
-                    <div class="corporate-spec-label-max">Radius of Fillet (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Radius of Fillet (Min)</div>
+                    <div class="spec-dimension">Radius of Fillet</div>
+                    <div class="spec-label-max">Radius of Fillet (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Washer Face Thickness -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Washer Face Thickness (Min)</div>
-                    <div class="corporate-spec-dimension">Washer Face Thickness</div>
-                    <div class="corporate-spec-label-max">Washer Face Thickness (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Washer Face Thickness (Min)</div>
+                    <div class="spec-dimension">Washer Face Thickness</div>
+                    <div class="spec-label-max">Washer Face Thickness (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Wrenching Height -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Wrenching Height (Min)</div>
-                    <div class="corporate-spec-dimension">Wrenching Height</div>
-                    <div class="corporate-spec-label-max">Total Runout (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Wrenching Height (Min)</div>
+                    <div class="spec-dimension">Wrenching Height</div>
+                    <div class="spec-label-max">Total Runout (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
                 </div>
             </div>
             
             <!-- Head Specifications Group -->
-            <div class="corporate-card">
-                <div class="corporate-filter-header">Head Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Head Specifications</div>
                 
                 <!-- Head Height -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Head Height (Min)</div>
-                    <div class="corporate-spec-dimension">Head Height</div>
-                    <div class="corporate-spec-label-max">Head Height (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Head Height (Min)</div>
+                    <div class="spec-dimension">Head Height</div>
+                    <div class="spec-label-max">Head Height (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Head_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Head_Height_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Radius of Fillet -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Radius of Fillet (Min)</div>
-                    <div class="corporate-spec-dimension">Radius of Fillet</div>
-                    <div class="corporate-spec-label-max">Radius of Fillet (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Radius of Fillet (Min)</div>
+                    <div class="spec-dimension">Radius of Fillet</div>
+                    <div class="spec-label-max">Radius of Fillet (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Radius_Fillet_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Washer Face Thickness -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Washer Face Thickness (Min)</div>
-                    <div class="corporate-spec-dimension">Washer Face Thickness</div>
-                    <div class="corporate-spec-label-max">Washer Face Thickness (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Washer Face Thickness (Min)</div>
+                    <div class="spec-dimension">Washer Face Thickness</div>
+                    <div class="spec-label-max">Washer Face Thickness (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Washer_Face_Thickness_Max', 'N/A')}</div>
                 </div>
             </div>
             
             <!-- Additional Specifications Group -->
-            <div class="corporate-card">
-                <div class="corporate-filter-header">Additional Specifications</div>
+            <div class="jsc-card">
+                <div class="filter-header">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-label-min">Wrenching Height (Min)</div>
-                    <div class="corporate-spec-dimension">Wrenching Height</div>
-                    <div class="corporate-spec-label-max">Total Runout (Max)</div>
+                <div class="spec-row">
+                    <div class="spec-label-min">Wrenching Height (Min)</div>
+                    <div class="spec-dimension">Wrenching Height</div>
+                    <div class="spec-label-max">Total Runout (Max)</div>
                 </div>
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
-                    <div class="corporate-spec-dimension"></div>
-                    <div class="corporate-spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
+                <div class="spec-row">
+                    <div class="spec-value">{product_details.get('Wrenching_Height_Min', 'N/A')}</div>
+                    <div class="spec-dimension"></div>
+                    <div class="spec-value">{product_details.get('Total_Runout_Max', 'N/A')}</div>
                 </div>
                 
                 <!-- Thread Information -->
-                <div class="corporate-spec-row">
-                    <div class="corporate-spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--jsc-gradient); color: white; padding: 0.8rem;">
+                <div class="spec-row">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--jsc-gradient); color: white; padding: 0.8rem;">
                         <strong>Thread: {thread}</strong>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="product-card-footer">
+        <div class="card-footer">
             <div>
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div class="corporate-badge">
+            <div class="jsc-badge">
                 Professional Specification
             </div>
         </div>
         
-        <div class="product-card-actions">
-            <button class="corporate-action-button" onclick="window.print()">Print Specification</button>
-            <button class="corporate-action-button secondary">Email Specification</button>
-            <button class="corporate-action-button secondary">Save as PDF</button>
+        <div class="card-actions">
+            <button class="action-button" onclick="window.print()">Print Specification</button>
+            <button class="action-button secondary">Email Specification</button>
+            <button class="action-button secondary">Save as PDF</button>
         </div>
     </div>
     """
@@ -3586,17 +3368,14 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="jsc-corporate-header">
-        <h1>JSC Industries</h1>
-        <p>Professional Fastener Intelligence Platform</p>
-        <div class="jsc-corporate-subtitle">
-            Product Intelligence Center - Independent Engineering Sections
-        </div>
-        <div style="margin-top: 1.5rem;">
-            <span class="corporate-badge">Enhanced Calculator</span>
-            <span class="corporate-badge-accent">Product-Based Workflow</span>
-            <span class="corporate-badge-success">Dynamic Standards</span>
-            <span class="corporate-badge">Professional Grade</span>
+    <div class="jsc-header">
+        <h1>Product Intelligence Center - Independent Sections</h1>
+        <p>Each section works completely independently - No dependencies</p>
+        <div>
+            <span class="jsc-badge">Enhanced Calculator</span>
+            <span class="jsc-badge-accent">Product-Based Workflow</span>
+            <span class="jsc-badge-secondary">Dynamic Standards</span>
+            <span class="jsc-badge-success">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3606,7 +3385,6 @@ def show_enhanced_product_database():
         return
     
     # Section toggles
-    st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
     st.markdown("### Section Controls")
     col1, col2, col3 = st.columns(3)
     
@@ -3621,15 +3399,14 @@ def show_enhanced_product_database():
     with col3:
         section_c_active = st.checkbox("Section C - Material Properties", value=st.session_state.section_c_view, key="section_c_toggle")
         st.session_state.section_c_view = section_c_active
-    st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
     # SECTION A - DIMENSIONAL SPECIFICATIONS (FIXED RELATIONSHIPS)
     if st.session_state.section_a_view:
-        st.markdown('<div class="corporate-independent-section">', unsafe_allow_html=True)
         st.markdown("""
-            <h3 class="corporate-filter-header">Section A - Dimensional Specifications</h3>
+        <div class="independent-section">
+            <h3 class="filter-header">Section A - Dimensional Specifications</h3>
             <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
         """, unsafe_allow_html=True)
         
@@ -3750,9 +3527,9 @@ def show_enhanced_product_database():
     
     # SECTION B - THREAD SPECIFICATIONS (FIXED DATA TYPES)
     if st.session_state.section_b_view:
-        st.markdown('<div class="corporate-independent-section">', unsafe_allow_html=True)
         st.markdown("""
-            <h3 class="corporate-filter-header">Section B - Thread Specifications</h3>
+        <div class="independent-section">
+            <h3 class="filter-header">Section B - Thread Specifications</h3>
             <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
         """, unsafe_allow_html=True)
         
@@ -3862,9 +3639,9 @@ def show_enhanced_product_database():
     
     # SECTION C - MATERIAL PROPERTIES (COMPLETELY INDEPENDENT) - COMPLETELY FIXED VERSION
     if st.session_state.section_c_view:
-        st.markdown('<div class="corporate-independent-section">', unsafe_allow_html=True)
         st.markdown("""
-            <h3 class="corporate-filter-header">Section C - Material Properties</h3>
+        <div class="independent-section">
+            <h3 class="filter-header">Section C - Material Properties</h3>
             <p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>
         """, unsafe_allow_html=True)
         
@@ -3961,7 +3738,6 @@ def show_enhanced_product_database():
     
     # COMBINE ALL RESULTS SECTION
     st.markdown("---")
-    st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
     st.markdown("### Combine All Sections")
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -3972,11 +3748,9 @@ def show_enhanced_product_database():
     
     # Show Combined Results
     show_combined_results()
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Quick actions
     st.markdown("---")
-    st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
     st.markdown("### Quick Actions")
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
@@ -4029,7 +3803,6 @@ def show_enhanced_product_database():
             st.session_state.section_b_view = True
             st.session_state.section_c_view = True
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
 # RECTIFIED HOME DASHBOARD
@@ -4038,17 +3811,14 @@ def show_rectified_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="jsc-corporate-header">
+    <div class="jsc-header">
         <h1>JSC Industries</h1>
-        <p>Professional Fastener Intelligence Platform</p>
-        <div class="jsc-corporate-subtitle">
-            Advanced Engineering Solutions for Fastener Specifications and Calculations
-        </div>
-        <div style="margin-top: 1.5rem;">
-            <span class="corporate-badge">RECTIFIED Calculator</span>
-            <span class="corporate-badge-accent">Proper Unit Tracking</span>
-            <span class="corporate-badge-success">0.0000 Precision</span>
-            <span class="corporate-badge">No Unnecessary Conversion</span>
+        <p>Professional Fastener Intelligence Platform v4.0 - RECTIFIED</p>
+        <div>
+            <span class="jsc-badge">RECTIFIED Calculator</span>
+            <span class="jsc-badge-accent">Proper Unit Tracking</span>
+            <span class="jsc-badge-secondary">0.0000 Precision</span>
+            <span class="jsc-badge-success">No Unnecessary Conversion</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4062,69 +3832,57 @@ def show_rectified_home():
     
     with col1:
         st.markdown(f"""
-        <div class="corporate-metric">
-            <div class="metric-label">Products</div>
-            <div class="metric-value">{total_products}</div>
-            <div style="color: #64748b; font-size: 0.8rem;">Total Records</div>
+        <div class="metric-card">
+            <h3 style="color: var(--jsc-primary); margin:0;">Products</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_products}</h2>
+            <p style="color: #7f8c8d; margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
-        <div class="corporate-metric">
-            <div class="metric-label">Dimensional Standards</div>
-            <div class="metric-value">{total_dimensional_standards}</div>
-            <div style="color: #64748b; font-size: 0.8rem;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</div>
+        <div class="metric-card">
+            <h3 style="color: var(--jsc-primary); margin:0;">Dimensional Standards</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
-        <div class="corporate-metric">
-            <div class="metric-label">Thread Types</div>
-            <div class="metric-value">{total_threads}</div>
-            <div style="color: #64748b; font-size: 0.8rem;">Available</div>
+        <div class="metric-card">
+            <h3 style="color: var(--jsc-primary); margin:0;">Thread Types</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_threads}</h2>
+            <p style="color: #7f8c8d; margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
-        <div class="corporate-metric">
-            <div class="metric-label">ME&CERT</div>
-            <div class="metric-value">{total_mecert}</div>
-            <div style="color: #64748b; font-size: 0.8rem;">Properties</div>
+        <div class="metric-card">
+            <h3 style="color: var(--jsc-primary); margin:0;">ME&CERT</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_mecert}</h2>
+            <p style="color: #7f8c8d; margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown('<h2 class="corporate-section-header">Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">Engineering Tools - RECTIFIED</h2>', unsafe_allow_html=True)
     
     cols = st.columns(3)
     actions = [
-        ("Product Database", "Professional product discovery with engineering filters", "database", "📋"),
-        ("Engineering Calculator", "RECTIFIED weight calculations with proper unit tracking", "calculator", "⚖️"),
-        ("Analytics Dashboard", "Visual insights and performance metrics", "analytics", "📈"),
-        ("Compare Products", "Side-by-side technical comparison", "compare", "🔍"),
-        ("Export Reports", "Generate professional engineering reports", "export", "📤"),
-        ("System Status", "Monitor data sources and system health", "status", "🔧")
+        ("Product Database", "Professional product discovery with engineering filters", "database"),
+        ("Engineering Calculator", "RECTIFIED weight calculations with proper unit tracking", "calculator"),
+        ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
+        ("Compare Products", "Side-by-side technical comparison", "compare"),
+        ("Export Reports", "Generate professional engineering reports", "export")
     ]
     
-    for idx, (title, description, key, icon) in enumerate(actions):
+    for idx, (title, description, key) in enumerate(actions):
         with cols[idx % 3]:
-            st.markdown(f"""
-            <div class="corporate-quick-action" onclick="document.getElementById('nav_{key}').click()">
-                <div class="quick-action-icon">{icon}</div>
-                <div class="quick-action-title">{title}</div>
-                <div class="quick-action-desc">{description}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"Navigate to {title}", key=f"nav_{key}", use_container_width=True, type="secondary"):
+            if st.button(f"**{title}**\n\n{description}", key=f"home_{key}"):
                 section_map = {
                     "database": "Product Database",
-                    "calculator": "Calculations",
-                    "analytics": "Calculations",
-                    "compare": "Product Database", 
-                    "export": "Product Database",
-                    "status": "Product Database"
+                    "calculator": "Calculations"
                 }
                 st.session_state.selected_section = section_map.get(key, "Product Database")
                 st.rerun()
@@ -4132,30 +3890,27 @@ def show_rectified_home():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
-        st.markdown('<h3 class="corporate-filter-header">System Status - RECTIFIED</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">System Status - RECTIFIED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "corporate-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "corporate-badge-accent"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "corporate-badge-success"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "corporate-badge"),
-            ("ME&CERT Data", not df_mechem.empty, "corporate-badge-accent"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "corporate-badge-success"),
-            ("Weight Calculations", True, "corporate-badge"),
-            ("RECTIFIED Calculator", True, "corporate-badge-accent"),
+            ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "jsc-badge-accent"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "jsc-badge-secondary"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "jsc-badge-success"),
+            ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-accent"),
+            ("Weight Calculations", True, "jsc-badge-secondary"),
+            ("RECTIFIED Calculator", True, "jsc-badge-success"),
         ]
         
         for item_name, status, badge_class in status_items:
             if status:
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="corporate-badge" style="margin: 0.3rem 0; background: #64748b;">{item_name} - Limited</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<div class="corporate-card">', unsafe_allow_html=True)
-        st.markdown('<h3 class="corporate-filter-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">RECTIFIED Features</h3>', unsafe_allow_html=True)
         
         features = [
             "Proper unit tracking for database dimensions",
@@ -4174,8 +3929,7 @@ def show_rectified_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div class="corporate-calculation-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="jsc-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -4257,11 +4011,7 @@ def main():
         ]
         
         for section in sections:
-            is_active = st.session_state.selected_section == section or (section == "Home Dashboard" and st.session_state.selected_section is None)
-            button_class = "corporate-nav-button active" if is_active else "corporate-nav-button"
-            
-            st.markdown(f'<div class="{button_class}" onclick="document.getElementById(\'nav_{section}\').click()">{section}</div>', unsafe_allow_html=True)
-            if st.button(section, use_container_width=True, key=f"nav_{section}", type="primary" if is_active else "secondary"):
+            if st.button(section, use_container_width=True, key=f"nav_{section}"):
                 if section == "Home Dashboard":
                     st.session_state.selected_section = None
                 else:
@@ -4278,12 +4028,13 @@ def main():
         show_section(st.session_state.selected_section)
     
     st.markdown("""
-        <div class="jsc-corporate-footer">
-            <div class="footer-badges">
-                <span class="corporate-badge">RECTIFIED Calculator</span>
-                <span class="corporate-badge-accent">Proper Unit Tracking</span>
-                <span class="corporate-badge-success">0.0000 Precision</span>
-                <span class="corporate-badge">No Unnecessary Conversion</span>
+        <hr>
+        <div class="jsc-footer">
+            <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
+                <span class="jsc-badge">RECTIFIED Calculator</span>
+                <span class="jsc-badge-accent">Proper Unit Tracking</span>
+                <span class="jsc-badge-secondary">0.0000 Precision</span>
+                <span class="jsc-badge-success">No Unnecessary Conversion</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - RECTIFIED Weight Calculator with proper unit tracking and 0.0000 precision formatting</p>
