@@ -1618,12 +1618,18 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
         return None, None, "unknown"
 
 def get_countersunk_head_dimensions(standard, product, size, grade="All"):
-    """Get head diameter and head height for countersunk head products from database"""
+    """RECTIFIED: Get head diameter and head height for countersunk head products from database"""
     try:
         # Get the appropriate dataframe based on standard
         if standard == "DIN-7991":
             temp_df = df_din7991.copy()
             original_unit = "mm"  # DIN-7991 data is in mm
+            
+            # Debug: Show available columns
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"DIN-7991 Columns: {temp_df.columns.tolist()}")
+                if 'Size' in temp_df.columns:
+                    st.sidebar.write(f"DIN-7991 Sizes: {temp_df['Size'].unique()}")
         else:
             return None, None, "unknown"
         
@@ -1632,27 +1638,33 @@ def get_countersunk_head_dimensions(standard, product, size, grade="All"):
             temp_df = temp_df[temp_df['Product'] == product]
         
         if 'Size' in temp_df.columns and size != "All":
-            # Normalize size comparison
-            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+            # Normalize size comparison - handle M6, M8, etc.
+            size_str = str(size).strip()
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == size_str]
         
         if temp_df.empty:
+            st.warning(f"No DIN-7991 data found for size: {size}")
             return None, None, original_unit
         
-        # Look for head diameter column (dk)
-        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'dk'])]
+        # RECTIFIED: Look for head diameter column (dk) - FIXED COLUMN NAMES
+        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['dk', 'head diameter', 'head_dia'])]
         head_dia_col = None
+        
+        # Prioritize 'dk' column for DIN standards
         for col in head_dia_cols:
-            if 'min' in col.lower():
+            if 'dk' in col.lower():
                 head_dia_col = col
                 break
         if not head_dia_col and head_dia_cols:
             head_dia_col = head_dia_cols[0]
         
-        # Look for head height column (k)
-        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'k'])]
+        # RECTIFIED: Look for head height column (k) - FIXED COLUMN NAMES
+        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['k', 'head height', 'head_height'])]
         head_height_col = None
+        
+        # Prioritize 'k' column for DIN standards
         for col in head_height_cols:
-            if 'max' in col.lower():  # Use MAX for countersunk head height
+            if 'k' in col.lower() and 'max' not in col.lower():  # Use nominal value, not max
                 head_height_col = col
                 break
         if not head_height_col and head_height_cols:
@@ -1661,15 +1673,35 @@ def get_countersunk_head_dimensions(standard, product, size, grade="All"):
         head_diameter = None
         head_height = None
         
+        # RECTIFIED: Extract values with proper handling
         if head_dia_col and head_dia_col in temp_df.columns:
-            head_diameter = temp_df[head_dia_col].iloc[0]
-            if pd.notna(head_diameter):
-                head_diameter = float(head_diameter)
+            head_diameter_val = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter_val):
+                try:
+                    head_diameter = float(head_diameter_val)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"DIN-7991 Head Diameter ({head_dia_col}): {head_diameter}")
+                except (ValueError, TypeError):
+                    st.warning(f"Invalid head diameter value: {head_diameter_val}")
         
         if head_height_col and head_height_col in temp_df.columns:
-            head_height = temp_df[head_height_col].iloc[0]
-            if pd.notna(head_height):
-                head_height = float(head_height)
+            head_height_val = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height_val):
+                try:
+                    head_height = float(head_height_val)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"DIN-7991 Head Height ({head_height_col}): {head_height}")
+                except (ValueError, TypeError):
+                    st.warning(f"Invalid head height value: {head_height_val}")
+        
+        # RECTIFIED: Debug information
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"DIN-7991 Head Dimensions for {size}:")
+            st.sidebar.write(f"- Head Diameter Column: {head_dia_col}")
+            st.sidebar.write(f"- Head Height Column: {head_height_col}")
+            st.sidebar.write(f"- Head Diameter: {head_diameter}")
+            st.sidebar.write(f"- Head Height: {head_height}")
+            st.sidebar.write(f"- Filtered Rows: {len(temp_df)}")
         
         return head_diameter, head_height, original_unit
         
