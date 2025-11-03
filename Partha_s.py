@@ -1576,9 +1576,21 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
             if temp_df.empty:
                 return None, None, original_unit
             
-            # FIXED: Look for correct head diameter column in ASME B18.3
+            # FIXED: Look for SEPARATE head diameter and head height columns in ASME B18.3
             head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
+            head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
+            
+            # Debug: Show available columns
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"ASME B18.3 Debug - Size: {size}")
+                st.sidebar.write(f"All columns: {temp_df.columns.tolist()}")
+                st.sidebar.write(f"Head diameter columns found: {head_dia_cols}")
+                st.sidebar.write(f"Head height columns found: {head_height_cols}")
+            
             head_dia_col = None
+            head_height_col = None
+            
+            # Find head diameter column - prioritize minimum values
             for col in head_dia_cols:
                 if 'min' in col.lower():
                     head_dia_col = col
@@ -1586,9 +1598,7 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
             if not head_dia_col and head_dia_cols:
                 head_dia_col = head_dia_cols[0]
             
-            # FIXED: Look for correct head height column in ASME B18.3
-            head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
-            head_height_col = None
+            # Find head height column - prioritize minimum values  
             for col in head_height_cols:
                 if 'min' in col.lower():
                     head_height_col = col
@@ -1599,15 +1609,49 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
             head_diameter = None
             head_height = None
             
+            # Get head diameter value
             if head_dia_col and head_dia_col in temp_df.columns:
                 head_diameter = temp_df[head_dia_col].iloc[0]
                 if pd.notna(head_diameter):
                     head_diameter = float(head_diameter)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Head Diameter from {head_dia_col}: {head_diameter}")
             
+            # Get head height value - SEPARATE from head diameter
             if head_height_col and head_height_col in temp_df.columns:
                 head_height = temp_df[head_height_col].iloc[0]
                 if pd.notna(head_height):
                     head_height = float(head_height)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Head Height from {head_height_col}: {head_height}")
+            
+            # If still no values found, try alternative column names
+            if head_diameter is None:
+                # Try common ASME B18.3 column names
+                for col in temp_df.columns:
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
+                        if 'thread' not in col_lower and 'body' not in col_lower:
+                            head_diameter = temp_df[col].iloc[0]
+                            if pd.notna(head_diameter):
+                                head_diameter = float(head_diameter)
+                                head_dia_col = col
+                                break
+            
+            if head_height is None:
+                # Try common ASME B18.3 column names for head height
+                for col in temp_df.columns:
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in ['head', 'height']):
+                        head_height = temp_df[col].iloc[0]
+                        if pd.notna(head_height):
+                            head_height = float(head_height)
+                            head_height_col = col
+                            break
+            
+            if st.session_state.debug_mode:
+                st.sidebar.write(f"Final Head Diameter: {head_diameter}")
+                st.sidebar.write(f"Final Head Height: {head_height}")
             
             return head_diameter, head_height, original_unit
         else:
