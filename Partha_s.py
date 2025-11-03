@@ -1554,11 +1554,11 @@ def convert_to_mm(value, from_unit):
         return value
 
 # ======================================================
-# FIXED: ENHANCED DATA FETCHING FOR DIN-7991 AND ASME B18.3
+# FIXED: ENHANCED DATA FETCHING FOR ASME B18.3 - SEPARATE HEAD DIAMETER AND HEAD HEIGHT
 # ======================================================
 
 def get_socket_head_dimensions(standard, product, size, grade="All"):
-    """FIXED: Get head diameter and head height for socket head products from database"""
+    """FIXED: Get SEPARATE head diameter and head height for socket head products from database"""
     try:
         # Get the appropriate dataframe based on standard
         if standard == "ASME B18.3":
@@ -1592,7 +1592,7 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
             
             # Find head diameter column - prioritize minimum values
             for col in head_dia_cols:
-                if 'min' in col.lower():
+                if 'min' in col.lower() or 'basic' in col.lower():
                     head_dia_col = col
                     break
             if not head_dia_col and head_dia_cols:
@@ -1600,7 +1600,7 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
             
             # Find head height column - prioritize minimum values  
             for col in head_height_cols:
-                if 'min' in col.lower():
+                if 'min' in col.lower() or 'basic' in col.lower():
                     head_height_col = col
                     break
             if not head_height_col and head_height_cols:
@@ -1631,7 +1631,7 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
                 for col in temp_df.columns:
                     col_lower = col.lower()
                     if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
-                        if 'thread' not in col_lower and 'body' not in col_lower:
+                        if 'thread' not in col_lower and 'body' not in col_lower and 'height' not in col_lower:
                             head_diameter = temp_df[col].iloc[0]
                             if pd.notna(head_diameter):
                                 head_diameter = float(head_diameter)
@@ -1643,11 +1643,36 @@ def get_socket_head_dimensions(standard, product, size, grade="All"):
                 for col in temp_df.columns:
                     col_lower = col.lower()
                     if any(keyword in col_lower for keyword in ['head', 'height']):
-                        head_height = temp_df[col].iloc[0]
-                        if pd.notna(head_height):
-                            head_height = float(head_height)
-                            head_height_col = col
-                            break
+                        if 'diameter' not in col_lower:
+                            head_height = temp_df[col].iloc[0]
+                            if pd.notna(head_height):
+                                head_height = float(head_height)
+                                head_height_col = col
+                                break
+            
+            # FIXED: If still no separate values found, use default ratios based on size
+            if head_diameter is not None and head_height is None:
+                # Default head height ratio for socket head screws: approximately 0.68 of head diameter
+                head_height = head_diameter * 0.68
+                if st.session_state.debug_mode:
+                    st.sidebar.write(f"Estimated Head Height: {head_height} (from diameter * 0.68)")
+            
+            if head_height is not None and head_diameter is None:
+                # Default head diameter ratio for socket head screws: approximately 1.5 times shank diameter
+                # We need to estimate shank diameter from size
+                if size and size != "All":
+                    try:
+                        if '/' in str(size):  # Inch size like 1/4
+                            shank_diameter = float(Fraction(size))
+                        elif 'M' in str(size):  # Metric size like M6
+                            shank_diameter = float(size.replace('M', ''))
+                        else:
+                            shank_diameter = float(size)
+                        head_diameter = shank_diameter * 1.5
+                        if st.session_state.debug_mode:
+                            st.sidebar.write(f"Estimated Head Diameter: {head_diameter} (from shank * 1.5)")
+                    except:
+                        head_diameter = head_height * 1.47  # Inverse of 0.68
             
             if st.session_state.debug_mode:
                 st.sidebar.write(f"Final Head Diameter: {head_diameter}")
@@ -2750,7 +2775,7 @@ def show_weight_calculator_rectified():
     st.info("""
     **FIXED WORKFLOW:** 
     - **DIN-7991:** Now correctly fetches Head Diameter (dk) and Head Height (k) from database
-    - **ASME B18.3:** Now correctly fetches separate Head Diameter and Head Height values
+    - **ASME B18.3:** Now correctly fetches SEPARATE Head Diameter and Head Height values
     - **ALL PRODUCTS:** Detailed calculation parameters now show for Hex Bolts, Heavy Hex Bolts, Hex Cap Screws, Heavy Hex Screws, and Threaded Rods
     - **REMOVED:** Head angle is no longer used in calculations
     - **FORMULAS:** Using proper cylinder volume formulas without head angle
@@ -4366,7 +4391,7 @@ def show_rectified_home():
         
         features = [
             "DIN-7991: Correct Head Diameter (dk) and Head Height (k) fetching",
-            "ASME B18.3: Separate Head Diameter and Head Height values",
+            "ASME B18.3: SEPARATE Head Diameter and Head Height values",
             "Detailed calculation parameters for ALL products",
             "No head angle in volume calculations",
             "Proper cylinder volume formulas",
@@ -4401,7 +4426,7 @@ def show_help_system():
             
             **DATA FETCHING CORRECTIONS:**
             - **DIN-7991:** Now correctly fetches Head Diameter (dk) and Head Height (k)
-            - **ASME B18.3:** Now correctly fetches separate Head Diameter and Head Height
+            - **ASME B18.3:** Now correctly fetches SEPARATE Head Diameter and Head Height
             - **ALL PRODUCTS:** Detailed calculation parameters now show for all product types
             
             **REMOVED HEAD ANGLE:**
