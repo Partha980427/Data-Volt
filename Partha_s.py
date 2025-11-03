@@ -2596,10 +2596,10 @@ def apply_section_c_filters():
     
     for col in df_mechem.columns:
         col_lower = str(col).lower()
-            for possible in possible_class_cols:
-                if possible.lower() in col_lower:
-                    property_class_cols.append(col)
-                    break
+        for possible in possible_class_cols:
+            if possible.lower() in col_lower:
+                property_class_cols.append(col)
+                break
     
     # Try to find matching data
     filtered_data = pd.DataFrame()
