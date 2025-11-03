@@ -1554,8 +1554,128 @@ def convert_to_mm(value, from_unit):
         return value
 
 # ======================================================
-# ENHANCED WEIGHT CALCULATION FUNCTIONS FOR HEX PRODUCTS - RECTIFIED
+# ENHANCED WEIGHT CALCULATION FUNCTIONS FOR ALL PRODUCTS - RECTIFIED
 # ======================================================
+
+def get_socket_head_dimensions(standard, product, size, grade="All"):
+    """Get head diameter and head height for socket head products from database - FIXED VERSION"""
+    try:
+        # Get the appropriate dataframe based on standard
+        if standard == "ASME B18.3":
+            temp_df = df_asme_b18_3.copy()
+            original_unit = "inch"  # ASME B18.3 data is in inches
+        else:
+            return None, None, "unknown"
+        
+        # Filter by product and size
+        if 'Product' in temp_df.columns and product != "All":
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        if 'Size' in temp_df.columns and size != "All":
+            # Normalize size comparison
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        if temp_df.empty:
+            return None, None, original_unit
+        
+        # Look for head diameter column - FIXED: Use Head Diameter Min
+        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
+        head_dia_col = None
+        for col in head_dia_cols:
+            if 'min' in col.lower():
+                head_dia_col = col
+                break
+        if not head_dia_col and head_dia_cols:
+            head_dia_col = head_dia_cols[0]
+        
+        # Look for head height column - FIXED: Use Head Height Min
+        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
+        head_height_col = None
+        for col in head_height_cols:
+            if 'min' in col.lower():
+                head_height_col = col
+                break
+        if not head_height_col and head_height_cols:
+            head_height_col = head_height_cols[0]
+        
+        head_diameter = None
+        head_height = None
+        
+        if head_dia_col and head_dia_col in temp_df.columns:
+            head_diameter = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter):
+                head_diameter = float(head_diameter)
+        
+        if head_height_col and head_height_col in temp_df.columns:
+            head_height = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height):
+                head_height = float(head_height)
+        
+        return head_diameter, head_height, original_unit
+        
+    except Exception as e:
+        st.warning(f"Error getting socket head dimensions: {str(e)}")
+        return None, None, "unknown"
+
+def get_countersunk_head_dimensions(standard, product, size, grade="All"):
+    """Get head diameter and head height for countersunk head products from database - FIXED VERSION"""
+    try:
+        # Get the appropriate dataframe based on standard
+        if standard == "DIN-7991":
+            temp_df = df_din7991.copy()
+            original_unit = "mm"  # DIN-7991 data is in mm
+        else:
+            return None, None, "unknown"
+        
+        # Filter by product and size
+        if 'Product' in temp_df.columns and product != "All":
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        if 'Size' in temp_df.columns and size != "All":
+            # Normalize size comparison
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        if temp_df.empty:
+            return None, None, original_unit
+        
+        # Look for head diameter column (dk) - FIXED: Use Head Diameter Min
+        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'dk'])]
+        head_dia_col = None
+        for col in head_dia_cols:
+            if 'min' in col.lower():
+                head_dia_col = col
+                break
+        if not head_dia_col and head_dia_cols:
+            head_dia_col = head_dia_cols[0]
+        
+        # Look for head height column (k) - FIXED: Use Head Height Max (not Min)
+        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'k'])]
+        head_height_col = None
+        for col in head_height_cols:
+            if 'max' in col.lower():  # FIXED: Use MAX for countersunk head height as per requirement
+                head_height_col = col
+                break
+        if not head_height_col and head_height_cols:
+            head_height_col = head_height_cols[0]
+        
+        head_diameter = None
+        head_height = None
+        
+        if head_dia_col and head_dia_col in temp_df.columns:
+            head_diameter = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter):
+                head_diameter = float(head_diameter)
+        
+        if head_height_col and head_height_col in temp_df.columns:
+            head_height = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height):
+                head_height = float(head_height)
+        
+        return head_diameter, head_height, original_unit
+        
+    except Exception as e:
+        st.warning(f"Error getting countersunk head dimensions: {str(e)}")
+        return None, None, "unknown"
 
 def get_hex_head_dimensions(standard, product, size, grade="All"):
     """RECTIFIED: Get width across flats and head height for hex products from database with proper unit tracking"""
@@ -1630,6 +1750,194 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
         st.warning(f"Error getting hex head dimensions: {str(e)}")
         return None, None, "unknown"
 
+def calculate_socket_head_volume_rectified(head_diameter_mm, head_height_mm):
+    """Calculate volume for socket head using cylinder formula - RECTIFIED"""
+    try:
+        # For socket head, we use cylinder volume formula: V = 0.7853 × d² × h
+        head_volume_mm3 = 0.7853 * (head_diameter_mm ** 2) * head_height_mm
+        return head_volume_mm3
+    except Exception as e:
+        st.warning(f"Error calculating socket head volume: {str(e)}")
+        return 0.0
+
+def calculate_countersunk_head_volume_rectified(head_diameter_mm, head_height_mm):
+    """Calculate volume for countersunk head using cylinder formula - RECTIFIED"""
+    try:
+        # For countersunk head, we use cylinder volume formula: V = 0.7853 × d² × h
+        head_volume_mm3 = 0.7853 * (head_diameter_mm ** 2) * head_height_mm
+        return head_volume_mm3
+    except Exception as e:
+        st.warning(f"Error calculating countersunk head volume: {str(e)}")
+        return 0.0
+
+def calculate_shank_volume_rectified(diameter_mm, length_mm):
+    """Calculate shank volume using cylinder formula - RECTIFIED"""
+    try:
+        # Shank volume formula: V = 0.7853 × d² × L
+        shank_volume_mm3 = 0.7853 * (diameter_mm ** 2) * length_mm
+        return shank_volume_mm3
+    except Exception as e:
+        st.warning(f"Error calculating shank volume: {str(e)}")
+        return 0.0
+
+def calculate_socket_product_weight_rectified(parameters, head_diameter, head_height, original_unit):
+    """RECTIFIED: Calculate weight for Hexagon Socket Head Cap Screws using new formula"""
+    try:
+        # Extract parameters
+        product_type = parameters.get('product_type', 'Hexagon Socket Head Cap Screws')
+        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
+        diameter_value = parameters.get('diameter_value', 0.0)
+        diameter_unit = parameters.get('diameter_unit', 'mm')
+        length = parameters.get('length', 0.0)
+        length_unit = parameters.get('length_unit', 'mm')
+        material = parameters.get('material', 'Carbon Steel')
+        
+        # RECTIFIED: Convert dimensions to mm only if needed
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit)
+        length_mm = convert_to_mm(length, length_unit)
+        
+        # Convert head dimensions to mm (they should already be in mm from database)
+        if head_diameter is not None:
+            head_diameter_mm = convert_to_mm(head_diameter, original_unit)
+        else:
+            head_diameter_mm = diameter_mm * 1.5  # Default ratio if not available
+        
+        if head_height is not None:
+            head_height_mm = convert_to_mm(head_height, original_unit)
+        else:
+            head_height_mm = diameter_mm * 0.65  # Default ratio if not available
+        
+        # Get material density in g/cm³
+        density_g_cm3 = get_material_density_rectified(material)
+        
+        # RECTIFIED: Calculate volumes in mm³ using new formulas
+        # 1. Calculate Shank Volume: 0.7853 × (Pitch Diameter/Body Diameter)² × Length
+        shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
+        
+        # 2. Calculate Head Volume: 0.7853 × (Head Diameter (Min))² × Head Height (Min)
+        head_volume_mm3 = calculate_socket_head_volume_rectified(head_diameter_mm, head_height_mm)
+        
+        # 3. Total Volume in mm³
+        total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
+        
+        # RECTIFIED: Convert mm³ to cm³ for weight calculation
+        total_volume_cm3 = total_volume_mm3 / 1000
+        
+        # Calculate Weight in grams and kg
+        weight_g = total_volume_cm3 * density_g_cm3
+        weight_kg = weight_g / 1000
+        weight_lb = weight_kg * 2.20462
+        
+        return {
+            'weight_kg': weight_kg,
+            'weight_g': weight_g,
+            'weight_lb': weight_lb,
+            'shank_volume_mm3': shank_volume_mm3,
+            'head_volume_mm3': head_volume_mm3,
+            'total_volume_mm3': total_volume_mm3,
+            'total_volume_cm3': total_volume_cm3,
+            'diameter_mm': diameter_mm,
+            'length_mm': length_mm,
+            'head_diameter_mm': head_diameter_mm,
+            'head_height_mm': head_height_mm,
+            'density_g_cm3': density_g_cm3,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}",
+            'original_head_diameter': f"{head_diameter} {original_unit}" if head_diameter else "N/A",
+            'original_head_height': f"{head_height} {original_unit}" if head_height else "N/A",
+            'calculation_method': 'Socket Head Formula (RECTIFIED)',
+            'formula_details': {
+                'shank_volume_formula': '0.7853 × (diameter)² × length (mm³)',
+                'head_volume_formula': '0.7853 × (head_diameter_min)² × head_height_min (mm³)',
+                'total_volume_formula': 'shank_volume + head_volume (mm³)',
+                'volume_conversion': 'mm³ to cm³: divide by 1000',
+                'weight_formula': 'total_volume_cm³ × density_g/cm³'
+            }
+        }
+        
+    except Exception as e:
+        st.error(f"Socket product calculation error: {str(e)}")
+        return None
+
+def calculate_countersunk_product_weight_rectified(parameters, head_diameter, head_height, original_unit):
+    """RECTIFIED: Calculate weight for Hexagon Socket Countersunk Head Cap Screw using new formula"""
+    try:
+        # Extract parameters
+        product_type = parameters.get('product_type', 'Hexagon Socket Countersunk Head Cap Screw')
+        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
+        diameter_value = parameters.get('diameter_value', 0.0)
+        diameter_unit = parameters.get('diameter_unit', 'mm')
+        length = parameters.get('length', 0.0)
+        length_unit = parameters.get('length_unit', 'mm')
+        material = parameters.get('material', 'Carbon Steel')
+        
+        # RECTIFIED: Convert dimensions to mm only if needed
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit)
+        length_mm = convert_to_mm(length, length_unit)
+        
+        # Convert head dimensions to mm (they should already be in mm from database)
+        if head_diameter is not None:
+            head_diameter_mm = convert_to_mm(head_diameter, original_unit)
+        else:
+            head_diameter_mm = diameter_mm * 1.8  # Default ratio if not available
+        
+        if head_height is not None:
+            head_height_mm = convert_to_mm(head_height, original_unit)
+        else:
+            head_height_mm = diameter_mm * 0.6  # Default ratio if not available
+        
+        # Get material density in g/cm³
+        density_g_cm3 = get_material_density_rectified(material)
+        
+        # RECTIFIED: Calculate volumes in mm³ using new formulas
+        # 1. Calculate Shank Volume: 0.7853 × (Pitch Diameter/Body Diameter)² × Length
+        shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
+        
+        # 2. Calculate Head Volume: 0.7853 × (Head Diameter (Min))² × Head Height (Max)
+        head_volume_mm3 = calculate_countersunk_head_volume_rectified(head_diameter_mm, head_height_mm)
+        
+        # 3. Total Volume in mm³
+        total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
+        
+        # RECTIFIED: Convert mm³ to cm³ for weight calculation
+        total_volume_cm3 = total_volume_mm3 / 1000
+        
+        # Calculate Weight in grams and kg
+        weight_g = total_volume_cm3 * density_g_cm3
+        weight_kg = weight_g / 1000
+        weight_lb = weight_kg * 2.20462
+        
+        return {
+            'weight_kg': weight_kg,
+            'weight_g': weight_g,
+            'weight_lb': weight_lb,
+            'shank_volume_mm3': shank_volume_mm3,
+            'head_volume_mm3': head_volume_mm3,
+            'total_volume_mm3': total_volume_mm3,
+            'total_volume_cm3': total_volume_cm3,
+            'diameter_mm': diameter_mm,
+            'length_mm': length_mm,
+            'head_diameter_mm': head_diameter_mm,
+            'head_height_mm': head_height_mm,
+            'density_g_cm3': density_g_cm3,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}",
+            'original_head_diameter': f"{head_diameter} {original_unit}" if head_diameter else "N/A",
+            'original_head_height': f"{head_height} {original_unit}" if head_height else "N/A",
+            'calculation_method': 'Countersunk Head Formula (RECTIFIED)',
+            'formula_details': {
+                'shank_volume_formula': '0.7853 × (diameter)² × length (mm³)',
+                'head_volume_formula': '0.7853 × (head_diameter_min)² × head_height_max (mm³)',
+                'total_volume_formula': 'shank_volume + head_volume (mm³)',
+                'volume_conversion': 'mm³ to cm³: divide by 1000',
+                'weight_formula': 'total_volume_cm³ × density_g/cm³'
+            }
+        }
+        
+    except Exception as e:
+        st.error(f"Countersunk product calculation error: {str(e)}")
+        return None
+
 def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit):
     """RECTIFIED: Calculate weight for hex products using MM only with proper unit tracking"""
     try:
@@ -1662,8 +1970,7 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
         
         # RECTIFIED: Calculate volumes in mm³
         # 1. Calculate Shank Volume (Cylinder Volume) in mm³
-        shank_radius_mm = diameter_mm / 2
-        shank_volume_mm3 = math.pi * shank_radius_mm**2 * length_mm
+        shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
         
         # 2. Calculate Head Volume using the specific formula in mm³
         side_length_mm = width_across_flats_mm * 1.1547
@@ -1700,7 +2007,7 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
             'original_head_height': f"{head_height} {original_unit}" if head_height else "N/A",
             'calculation_method': 'Rectified Hex Product Formula (MM only)',
             'formula_details': {
-                'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
+                'shank_volume_formula': '0.7853 × (diameter)² × length (mm³)',
                 'head_volume_formula': '0.65 × side_length² × head_height (mm³)',
                 'side_length_formula': 'width_across_flats × 1.1547 (mm)',
                 'total_volume_formula': 'shank_volume + head_volume (mm³)',
@@ -1875,7 +2182,59 @@ def calculate_weight_rectified(parameters):
         size = parameters.get('size', 'All')
         grade = parameters.get('grade', 'All')
         
-        # Get hex head dimensions from database WITH ORIGINAL UNIT
+        # SPECIAL CASE: For Hexagon Socket Head Cap Screws (ASME B18.3)
+        if product_type == "Hexagon Socket Head Cap Screws" and standard == "ASME B18.3":
+            # Get socket head dimensions from database WITH ORIGINAL UNIT
+            head_diameter, head_height, original_unit = get_socket_head_dimensions(standard, product_type, size, grade)
+            
+            # Store original dimensions for display
+            original_head_diameter = head_diameter
+            original_head_height = head_height
+            
+            # If dimensions not found in database, use default ratios
+            if head_diameter is None:
+                # Estimate head diameter based on shank diameter
+                diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+                head_diameter = diameter_mm_temp * 1.5  # Default ratio
+                original_head_diameter = head_diameter
+                original_unit = "mm"  # Default to mm for estimated values
+            
+            if head_height is None:
+                # Estimate head height based on shank diameter
+                diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+                head_height = diameter_mm_temp * 0.65  # Default ratio
+                original_head_height = head_height
+            
+            # Calculate using socket head formula
+            return calculate_socket_product_weight_rectified(parameters, head_diameter, head_height, original_unit)
+        
+        # SPECIAL CASE: For Hexagon Socket Countersunk Head Cap Screw (DIN-7991)
+        if product_type == "Hexagon Socket Countersunk Head Cap Screw" and standard == "DIN-7991":
+            # Get countersunk head dimensions from database WITH ORIGINAL UNIT
+            head_diameter, head_height, original_unit = get_countersunk_head_dimensions(standard, product_type, size, grade)
+            
+            # Store original dimensions for display
+            original_head_diameter = head_diameter
+            original_head_height = head_height
+            
+            # If dimensions not found in database, use default ratios
+            if head_diameter is None:
+                # Estimate head diameter based on shank diameter
+                diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+                head_diameter = diameter_mm_temp * 1.8  # Default ratio
+                original_head_diameter = head_diameter
+                original_unit = "mm"  # Default to mm for estimated values
+            
+            if head_height is None:
+                # Estimate head height based on shank diameter
+                diameter_mm_temp = convert_to_mm(diameter_value, diameter_unit)
+                head_height = diameter_mm_temp * 0.6  # Default ratio
+                original_head_height = head_height
+            
+            # Calculate using countersunk head formula
+            return calculate_countersunk_product_weight_rectified(parameters, head_diameter, head_height, original_unit)
+        
+        # For hex products, get hex head dimensions
         width_across_flats, head_height, original_unit = get_hex_head_dimensions(standard, product_type, size, grade)
         
         # Store original dimensions for display
@@ -1896,7 +2255,7 @@ def calculate_weight_rectified(parameters):
             head_height = diameter_mm_temp * 0.65  # Default ratio
             original_head_height = head_height
         
-        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws"]
+        hex_products = ["Hex Bolt", "Heavy Hex Bolt", "Hex Cap Screws", "Heavy Hex Screws", "Hexagon Socket Head Cap Screws"]
         
         # RECTIFIED: Convert dimensions to mm only if needed
         diameter_mm = convert_to_mm(diameter_value, diameter_unit)
@@ -1932,11 +2291,10 @@ def calculate_weight_rectified(parameters):
         # For Threaded Rod, use simple cylinder volume calculation in mm³
         if product_type == "Threaded Rod":
             # Simple cylinder volume for threaded rod in mm³
-            radius_mm = diameter_mm / 2
-            volume_mm3 = math.pi * radius_mm**2 * length_mm
+            shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
             
             # Convert mm³ to cm³ for weight calculation
-            volume_cm3 = volume_mm3 / 1000
+            volume_cm3 = shank_volume_mm3 / 1000
             weight_g = volume_cm3 * density_g_cm3
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
@@ -1945,21 +2303,20 @@ def calculate_weight_rectified(parameters):
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
-                'volume_mm3': volume_mm3,
+                'volume_mm3': shank_volume_mm3,
                 'volume_cm3': volume_cm3,
                 'density_g_cm3': density_g_cm3,
                 'diameter_mm': diameter_mm,
                 'length_mm': length_mm,
                 'original_diameter': f"{diameter_value} {diameter_unit}",
                 'original_length': f"{length} {length_unit}",
-                'calculation_method': 'Threaded Rod Cylinder Formula (MM only)',
+                'calculation_method': 'Threaded Rod Cylinder Formula (RECTIFIED)',
                 'dimensions_used': {
                     'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
                     'diameter_calculation_mm': f"{diameter_mm:.4f}",
                     'length_input': f"{length:.4f} {length_unit}",
                     'length_calculation_mm': f"{length_mm:.4f}",
-                    'radius_mm': f"{radius_mm:.4f}",
-                    'volume_mm3': f"{volume_mm3:.4f}",
+                    'volume_mm3': f"{shank_volume_mm3:.4f}",
                     'volume_cm3': f"{volume_cm3:.4f}",
                     'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
@@ -1967,77 +2324,12 @@ def calculate_weight_rectified(parameters):
         
         # For hex products, use rectified hex product formula in mm³
         elif product_type in hex_products:
-            # 1. Calculate Shank Volume (Cylinder Volume) in mm³
-            shank_radius_mm = diameter_mm / 2
-            shank_volume_mm3 = math.pi * shank_radius_mm**2 * length_mm
-            
-            # 2. Calculate Head Volume using the specific formula in mm³
-            side_length_mm = width_across_flats_mm * 1.1547
-            head_volume_mm3 = 0.65 * (side_length_mm**2) * head_height_mm
-            
-            # 3. Total Volume in mm³
-            total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
-            
-            # 4. Convert mm³ to cm³ for weight calculation
-            total_volume_cm3 = total_volume_mm3 / 1000
-            
-            # 5. Calculate Weight
-            weight_g = total_volume_cm3 * density_g_cm3
-            weight_kg = weight_g / 1000
-            weight_lb = weight_kg * 2.20462
-            
-            return {
-                'weight_kg': weight_kg,
-                'weight_g': weight_g,
-                'weight_lb': weight_lb,
-                'shank_volume_mm3': shank_volume_mm3,
-                'head_volume_mm3': head_volume_mm3,
-                'total_volume_mm3': total_volume_mm3,
-                'total_volume_cm3': total_volume_cm3,
-                'diameter_mm': diameter_mm,
-                'length_mm': length_mm,
-                'width_across_flats_mm': width_across_flats_mm,
-                'head_height_mm': head_height_mm,
-                'side_length_mm': side_length_mm,
-                'density_g_cm3': density_g_cm3,
-                'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
-                'original_length': f"{length:.4f} {length_unit}",
-                'original_width_across_flats': f"{original_width_across_flats:.4f} {original_unit}" if original_width_across_flats else "N/A",
-                'original_head_height': f"{original_head_height:.4f} {original_unit}" if original_head_height else "N/A",
-                'calculation_method': 'Rectified Hex Product Formula (MM only)',
-                'formula_details': {
-                    'shank_volume_formula': 'π × (diameter/2)² × length (mm³)',
-                    'head_volume_formula': '0.65 × side_length² × head_height (mm³)',
-                    'side_length_formula': 'width_across_flats × 1.1547 (mm)',
-                    'total_volume_formula': 'shank_volume + head_volume (mm³)',
-                    'volume_conversion': 'mm³ to cm³: divide by 1000',
-                    'weight_formula': 'total_volume_cm³ × density_g/cm³'
-                },
-                'dimensions_used': {
-                    'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
-                    'diameter_calculation_mm': f"{diameter_mm:.4f}",
-                    'length_input': f"{length:.4f} {length_unit}",
-                    'length_calculation_mm': f"{length_mm:.4f}",
-                    'width_across_flats_input': f"{original_width_across_flats:.4f} {original_unit}",
-                    'width_across_flats_calculation_mm': f"{width_across_flats_mm:.4f}",
-                    'head_height_input': f"{original_head_height:.4f} {original_unit}",
-                    'head_height_calculation_mm': f"{head_height_mm:.4f}",
-                    'side_length_calculation_mm': f"{side_length_mm:.4f}",
-                    'shank_radius_mm': f"{shank_radius_mm:.4f}",
-                    'shank_volume_mm3': f"{shank_volume_mm3:.4f}",
-                    'head_volume_mm3': f"{head_volume_mm3:.4f}",
-                    'total_volume_mm3': f"{total_volume_mm3:.4f}",
-                    'total_volume_cm3': f"{total_volume_cm3:.4f}",
-                    'density_g_cm3': f"{density_g_cm3:.4f}",
-                    'unit_conversion_applied': diameter_unit != 'mm' or length_unit != 'mm' or original_unit != 'mm'
-                }
-            }
+            return calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit)
         
         # For other products, use simple cylinder calculation in mm³
         else:
-            radius_mm = diameter_mm / 2
-            volume_mm3 = math.pi * radius_mm**2 * length_mm
-            volume_cm3 = volume_mm3 / 1000
+            shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
+            volume_cm3 = shank_volume_mm3 / 1000
             weight_g = volume_cm3 * density_g_cm3
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
@@ -2046,21 +2338,20 @@ def calculate_weight_rectified(parameters):
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
-                'volume_mm3': volume_mm3,
+                'volume_mm3': shank_volume_mm3,
                 'volume_cm3': volume_cm3,
                 'density_g_cm3': density_g_cm3,
                 'diameter_mm': diameter_mm,
                 'length_mm': length_mm,
                 'original_diameter': f"{diameter_value:.4f} {diameter_unit}",
                 'original_length': f"{length:.4f} {length_unit}",
-                'calculation_method': 'Standard Cylinder Formula (MM only)',
+                'calculation_method': 'Standard Cylinder Formula (RECTIFIED)',
                 'dimensions_used': {
                     'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
                     'diameter_calculation_mm': f"{diameter_mm:.4f}",
                     'length_input': f"{length:.4f} {length_unit}",
                     'length_calculation_mm': f"{length_mm:.4f}",
-                    'radius_mm': f"{radius_mm:.4f}",
-                    'volume_mm3': f"{volume_mm3:.4f}",
+                    'volume_mm3': f"{shank_volume_mm3:.4f}",
                     'volume_cm3': f"{volume_cm3:.4f}",
                     'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
@@ -2353,6 +2644,8 @@ def show_weight_calculator_rectified():
     **PRECISION:** All dimensions and results displayed in 0.0000 format
     **UNIT CONVERSION:** Only convert when needed (inch/ft/meter → mm) with proper unit labels
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
+    **SOCKET HEAD FORMULA:** 0.7853 × d² × h formula for Hexagon Socket Head Cap Screws
+    **COUNTERSUNK HEAD FORMULA:** 0.7853 × d² × h formula for Hexagon Socket Countersunk Head Cap Screw
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
     **FIXED:** Proper unit labeling for database dimensions (Inch series shows inches, Metric shows mm)
     """)
@@ -2748,7 +3041,7 @@ def show_weight_calculator_rectified():
         
         # RECTIFIED: Enhanced detailed results with PROPER UNIT LABELING
         with st.expander("📐 Detailed Calculation Parameters - RECTIFIED (Proper Unit Tracking)"):
-            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula (MM only)')
+            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula (RECTIFIED)')
             
             # Show calculation method
             st.markdown(f"**Calculation Method:** `{calculation_method}`")
@@ -2798,33 +3091,76 @@ def show_weight_calculator_rectified():
                 else:
                     st.success("**No Unit Conversion Needed:** All dimensions were already in millimeters")
             
-            # Show formula details for hex products
-            if 'Rectified Hex Product Formula' in calculation_method and 'formula_details' in result:
-                st.markdown("### 🧮 RECTIFIED Formula Details (MM Only)")
+            # Show formula details for socket products
+            if 'Socket Head Formula' in calculation_method and 'formula_details' in result:
+                st.markdown("### 🧮 SOCKET HEAD Formula Details (RECTIFIED)")
                 formulas = result['formula_details']
                 for formula_name, formula in formulas.items():
                     st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
             
-            # Show RECTIFIED hex product specific details with PROPER UNIT LABELS
-            if 'Rectified Hex Product Formula' in calculation_method:
-                st.markdown("### 🔧 RECTIFIED Hex Product Specific Details")
+            # Show formula details for countersunk products
+            if 'Countersunk Head Formula' in calculation_method and 'formula_details' in result:
+                st.markdown("### 🧮 COUNTERSUNK HEAD Formula Details (RECTIFIED)")
+                formulas = result['formula_details']
+                for formula_name, formula in formulas.items():
+                    st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
+            
+            # Show RECTIFIED socket product specific details with PROPER UNIT LABELS
+            if 'Socket Head Formula' in calculation_method:
+                st.markdown("### 🔧 RECTIFIED Socket Head Specific Details")
                 
                 # Show original database dimensions with proper units
-                if 'original_width_across_flats' in result and result['original_width_across_flats'] != "N/A":
+                if 'original_head_diameter' in result and result['original_head_diameter'] != "N/A":
                     st.markdown(f"**Database Dimensions:**")
-                    st.markdown(f"- **Width Across Flats (from database):** `{result['original_width_across_flats']}`")
+                    st.markdown(f"- **Head Diameter (from database):** `{result['original_head_diameter']}`")
                     if 'original_head_height' in result and result['original_head_height'] != "N/A":
                         st.markdown(f"- **Head Height (from database):** `{result['original_head_height']}`")
                 
                 st.markdown(f"""
                 **Shank Volume Calculation:**
-                - Formula: π × (diameter/2)² × length
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
                 - Result: `{result['shank_volume_mm3']:.4f} mm³`
                 
                 **Head Volume Calculation:**
-                - Side Length Formula: Width Across Flats × 1.1547
-                - Side Length: `{result['side_length_mm']:.4f} mm`
-                - Head Volume Formula: 0.65 × side_length² × head_height
+                - Formula: 0.7853 × (head_diameter_min)² × head_height_min
+                - Head Diameter: `{result['head_diameter_mm']:.4f} mm`
+                - Head Height: `{result['head_height_mm']:.4f} mm`
+                - Result: `{result['head_volume_mm3']:.4f} mm³`
+                
+                **Total Volume:**
+                - Formula: shank_volume + head_volume
+                - Result: `{result['total_volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['total_volume_cm3']:.4f} cm³`
+                
+                **Weight Calculation:**
+                - Formula: total_volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
+                """)
+            
+            # Show RECTIFIED countersunk product specific details with PROPER UNIT LABELS
+            if 'Countersunk Head Formula' in calculation_method:
+                st.markdown("### 🔧 RECTIFIED Countersunk Head Specific Details")
+                
+                # Show original database dimensions with proper units
+                if 'original_head_diameter' in result and result['original_head_diameter'] != "N/A":
+                    st.markdown(f"**Database Dimensions:**")
+                    st.markdown(f"- **Head Diameter (from database):** `{result['original_head_diameter']}`")
+                    if 'original_head_height' in result and result['original_head_height'] != "N/A":
+                        st.markdown(f"- **Head Height (from database):** `{result['original_head_height']}`")
+                
+                st.markdown(f"""
+                **Shank Volume Calculation:**
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
+                - Result: `{result['shank_volume_mm3']:.4f} mm³`
+                
+                **Head Volume Calculation:**
+                - Formula: 0.7853 × (head_diameter_min)² × head_height_max
+                - Head Diameter: `{result['head_diameter_mm']:.4f} mm`
+                - Head Height: `{result['head_height_mm']:.4f} mm`
                 - Result: `{result['head_volume_mm3']:.4f} mm³`
                 
                 **Total Volume:**
@@ -2846,6 +3182,8 @@ def show_batch_calculator_rectified():
     **RECTIFIED BATCH PROCESSING:** All calculations use millimeters only with proper unit tracking
     **UNIT CONVERSION:** Only convert when needed (non-mm units to mm) with proper unit labels
     **RECTIFIED HEX PRODUCT FORMULA:** Specialized calculation using mm³ volumes
+    **SOCKET HEAD FORMULA:** 0.7853 × d² × h formula for Hexagon Socket Head Cap Screws
+    **COUNTERSUNK HEAD FORMULA:** 0.7853 × d² × h formula for Hexagon Socket Countersunk Head Cap Screw
     **DENSITY:** Using g/cm³ for direct weight calculation from mm³ volumes
     **FIXED:** Proper unit labeling for database dimensions
     """)
@@ -2853,20 +3191,20 @@ def show_batch_calculator_rectified():
     # Download template
     st.markdown("### Download RECTIFIED Batch Template")
     template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt'],
-        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014'],
-        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10'],
-        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A'],
-        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A'],
-        'Length': [50, 100, 200, 75, 60],
-        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel']
+        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
+        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
+        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
+        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
+        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
+        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
+        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
+        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Length': [50, 100, 200, 75, 60, 50, 40],
+        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
+        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
     }
     template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
@@ -3920,6 +4258,8 @@ def show_rectified_home():
             "g/cm³ density for direct weight calculation",
             "Only convert non-mm units to mm",
             "Rectified hex product formulas",
+            "Socket head 0.7853 × d² × h formulas",
+            "Countersunk head 0.7853 × d² × h formulas",
             "Professional reporting",
             "Carbon steel density: 7.85 g/cm³",
             "Batch processing capabilities",
@@ -3952,7 +4292,10 @@ def show_help_system():
             - Display: Shows original units AND converted mm values
             
             **RECTIFIED FORMULAS:**
-            - **Volume Calculation:** π × (diameter/2)² × length (mm³)
+            - **Shank Volume:** 0.7853 × (diameter)² × length (mm³)
+            - **Socket Head Volume:** 0.7853 × (head_diameter_min)² × head_height_min (mm³)
+            - **Countersunk Head Volume:** 0.7853 × (head_diameter_min)² × head_height_max (mm³)
+            - **Hex Head Volume:** 0.65 × side_length² × head_height (mm³)
             - **Volume Conversion:** mm³ to cm³ = divide by 1000
             - **Weight Calculation:** volume_cm³ × density_g/cm³
             
