@@ -1554,137 +1554,8 @@ def convert_to_mm(value, from_unit):
         return value
 
 # ======================================================
-# FIXED: ENHANCED DATA FETCHING FOR ASME B18.3 - SEPARATE HEAD DIAMETER AND HEAD HEIGHT
+# REMOVED: Socket Head Dimensions Function for ASME B18.3
 # ======================================================
-
-def get_socket_head_dimensions(standard, product, size, grade="All"):
-    """FIXED: Get SEPARATE head diameter and head height for socket head products from database"""
-    try:
-        # Get the appropriate dataframe based on standard
-        if standard == "ASME B18.3":
-            temp_df = df_asme_b18_3.copy()
-            original_unit = "inch"  # ASME B18.3 data is in inches
-            
-            # Filter by product and size
-            if 'Product' in temp_df.columns and product != "All":
-                temp_df = temp_df[temp_df['Product'] == product]
-            
-            if 'Size' in temp_df.columns and size != "All":
-                # Normalize size comparison
-                temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
-            
-            if temp_df.empty:
-                return None, None, original_unit
-            
-            # FIXED: Look for SEPARATE head diameter and head height columns in ASME B18.3
-            head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
-            head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
-            
-            # Debug: Show available columns
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"ASME B18.3 Debug - Size: {size}")
-                st.sidebar.write(f"All columns: {temp_df.columns.tolist()}")
-                st.sidebar.write(f"Head diameter columns found: {head_dia_cols}")
-                st.sidebar.write(f"Head height columns found: {head_height_cols}")
-            
-            head_dia_col = None
-            head_height_col = None
-            
-            # Find head diameter column - prioritize minimum values
-            for col in head_dia_cols:
-                if 'min' in col.lower() or 'basic' in col.lower():
-                    head_dia_col = col
-                    break
-            if not head_dia_col and head_dia_cols:
-                head_dia_col = head_dia_cols[0]
-            
-            # Find head height column - prioritize minimum values  
-            for col in head_height_cols:
-                if 'min' in col.lower() or 'basic' in col.lower():
-                    head_height_col = col
-                    break
-            if not head_height_col and head_height_cols:
-                head_height_col = head_height_cols[0]
-            
-            head_diameter = None
-            head_height = None
-            
-            # Get head diameter value
-            if head_dia_col and head_dia_col in temp_df.columns:
-                head_diameter = temp_df[head_dia_col].iloc[0]
-                if pd.notna(head_diameter):
-                    head_diameter = float(head_diameter)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Head Diameter from {head_dia_col}: {head_diameter}")
-            
-            # Get head height value - SEPARATE from head diameter
-            if head_height_col and head_height_col in temp_df.columns:
-                head_height = temp_df[head_height_col].iloc[0]
-                if pd.notna(head_height):
-                    head_height = float(head_height)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Head Height from {head_height_col}: {head_height}")
-            
-            # If still no values found, try alternative column names
-            if head_diameter is None:
-                # Try common ASME B18.3 column names
-                for col in temp_df.columns:
-                    col_lower = col.lower()
-                    if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
-                        if 'thread' not in col_lower and 'body' not in col_lower and 'height' not in col_lower:
-                            head_diameter = temp_df[col].iloc[0]
-                            if pd.notna(head_diameter):
-                                head_diameter = float(head_diameter)
-                                head_dia_col = col
-                                break
-            
-            if head_height is None:
-                # Try common ASME B18.3 column names for head height
-                for col in temp_df.columns:
-                    col_lower = col.lower()
-                    if any(keyword in col_lower for keyword in ['head', 'height']):
-                        if 'diameter' not in col_lower:
-                            head_height = temp_df[col].iloc[0]
-                            if pd.notna(head_height):
-                                head_height = float(head_height)
-                                head_height_col = col
-                                break
-            
-            # FIXED: If still no separate values found, use default ratios based on size
-            if head_diameter is not None and head_height is None:
-                # Default head height ratio for socket head screws: approximately 0.68 of head diameter
-                head_height = head_diameter * 0.68
-                if st.session_state.debug_mode:
-                    st.sidebar.write(f"Estimated Head Height: {head_height} (from diameter * 0.68)")
-            
-            if head_height is not None and head_diameter is None:
-                # Default head diameter ratio for socket head screws: approximately 1.5 times shank diameter
-                # We need to estimate shank diameter from size
-                if size and size != "All":
-                    try:
-                        if '/' in str(size):  # Inch size like 1/4
-                            shank_diameter = float(Fraction(size))
-                        elif 'M' in str(size):  # Metric size like M6
-                            shank_diameter = float(size.replace('M', ''))
-                        else:
-                            shank_diameter = float(size)
-                        head_diameter = shank_diameter * 1.5
-                        if st.session_state.debug_mode:
-                            st.sidebar.write(f"Estimated Head Diameter: {head_diameter} (from shank * 1.5)")
-                    except:
-                        head_diameter = head_height * 1.47  # Inverse of 0.68
-            
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"Final Head Diameter: {head_diameter}")
-                st.sidebar.write(f"Final Head Height: {head_height}")
-            
-            return head_diameter, head_height, original_unit
-        else:
-            return None, None, "unknown"
-        
-    except Exception as e:
-        st.warning(f"Error getting socket head dimensions: {str(e)}")
-        return None, None, "unknown"
 
 def get_countersunk_head_dimensions(standard, product, size, grade="All"):
     """FIXED: Get head diameter and head height for countersunk head products from database"""
@@ -1858,6 +1729,109 @@ def calculate_shank_volume_rectified(diameter_mm, length_mm):
         st.warning(f"Error calculating shank volume: {str(e)}")
         return 0.0
 
+def calculate_countersunk_head_volume_rectified(head_diameter_mm, head_height_mm):
+    """Calculate volume for countersunk head using cylinder formula - FIXED: No head angle"""
+    try:
+        # For countersunk head, we use cylinder volume formula: V = 0.7853 × d² × h
+        head_volume_mm3 = 0.7853 * (head_diameter_mm ** 2) * head_height_mm
+        return head_volume_mm3
+    except Exception as e:
+        st.warning(f"Error calculating countersunk head volume: {str(e)}")
+        return 0.0
+
+# ======================================================
+# REMOVED: Socket Product Weight Calculation for ASME B18.3
+# ======================================================
+
+def calculate_countersunk_product_weight_rectified(parameters, head_diameter, head_height, original_unit):
+    """FIXED: Calculate weight for Hexagon Socket Countersunk Head Cap Screw"""
+    try:
+        # Extract parameters
+        product_type = parameters.get('product_type', 'Hexagon Socket Countersunk Head Cap Screw')
+        diameter_type = parameters.get('diameter_type', 'Blank Diameter')
+        diameter_value = parameters.get('diameter_value', 0.0)
+        diameter_unit = parameters.get('diameter_unit', 'mm')
+        length = parameters.get('length', 0.0)
+        length_unit = parameters.get('length_unit', 'mm')
+        material = parameters.get('material', 'Carbon Steel')
+        
+        # Convert dimensions to mm only if needed
+        diameter_mm = convert_to_mm(diameter_value, diameter_unit)
+        length_mm = convert_to_mm(length, length_unit)
+        
+        # Convert head dimensions to mm (they should already be in mm from database)
+        if head_diameter is not None:
+            head_diameter_mm = convert_to_mm(head_diameter, original_unit)
+        else:
+            head_diameter_mm = diameter_mm * 1.8  # Default ratio if not available
+        
+        if head_height is not None:
+            head_height_mm = convert_to_mm(head_height, original_unit)
+        else:
+            head_height_mm = diameter_mm * 0.6  # Default ratio if not available
+        
+        # Get material density in g/cm³
+        density_g_cm3 = get_material_density_rectified(material)
+        
+        # Calculate volumes in mm³
+        shank_volume_mm3 = calculate_shank_volume_rectified(diameter_mm, length_mm)
+        head_volume_mm3 = calculate_countersunk_head_volume_rectified(head_diameter_mm, head_height_mm)
+        total_volume_mm3 = shank_volume_mm3 + head_volume_mm3
+        
+        # Convert mm³ to cm³ for weight calculation
+        total_volume_cm3 = total_volume_mm3 / 1000
+        
+        # Calculate Weight in grams and kg
+        weight_g = total_volume_cm3 * density_g_cm3
+        weight_kg = weight_g / 1000
+        weight_lb = weight_kg * 2.20462
+        
+        return {
+            'weight_kg': weight_kg,
+            'weight_g': weight_g,
+            'weight_lb': weight_lb,
+            'shank_volume_mm3': shank_volume_mm3,
+            'head_volume_mm3': head_volume_mm3,
+            'total_volume_mm3': total_volume_mm3,
+            'total_volume_cm3': total_volume_cm3,
+            'diameter_mm': diameter_mm,
+            'length_mm': length_mm,
+            'head_diameter_mm': head_diameter_mm,
+            'head_height_mm': head_height_mm,
+            'density_g_cm3': density_g_cm3,
+            'original_diameter': f"{diameter_value} {diameter_unit}",
+            'original_length': f"{length} {length_unit}",
+            'original_head_diameter': f"{head_diameter} {original_unit}" if head_diameter else "N/A",
+            'original_head_height': f"{head_height} {original_unit}" if head_height else "N/A",
+            'calculation_method': 'Countersunk Head Formula',
+            'formula_details': {
+                'shank_volume_formula': '0.7853 × (diameter)² × length (mm³)',
+                'head_volume_formula': '0.7853 × (head_diameter_min)² × head_height_max (mm³)',
+                'total_volume_formula': 'shank_volume + head_volume (mm³)',
+                'volume_conversion': 'mm³ to cm³: divide by 1000',
+                'weight_formula': 'total_volume_cm³ × density_g/cm³'
+            },
+            'dimensions_used': {
+                'diameter_input': f"{diameter_value:.4f} {diameter_unit}",
+                'diameter_calculation_mm': f"{diameter_mm:.4f}",
+                'length_input': f"{length:.4f} {length_unit}",
+                'length_calculation_mm': f"{length_mm:.4f}",
+                'head_diameter_input': f"{head_diameter:.4f} {original_unit}" if head_diameter else "Estimated",
+                'head_diameter_calculation_mm': f"{head_diameter_mm:.4f}",
+                'head_height_input': f"{head_height:.4f} {original_unit}" if head_height else "Estimated",
+                'head_height_calculation_mm': f"{head_height_mm:.4f}",
+                'shank_volume_mm3': f"{shank_volume_mm3:.4f}",
+                'head_volume_mm3': f"{head_volume_mm3:.4f}",
+                'total_volume_mm3': f"{total_volume_mm3:.4f}",
+                'total_volume_cm3': f"{total_volume_cm3:.4f}",
+                'density_g_cm3': f"{density_g_cm3:.4f}"
+            }
+        }
+        
+    except Exception as e:
+        st.error(f"Countersunk product calculation error: {str(e)}")
+        return None
+
 def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit):
     """FIXED: Calculate weight for hex products with detailed parameters"""
     try:
@@ -2027,6 +2001,23 @@ def get_thread_standards_for_series(series):
     elif series == "Metric":
         return ["ISO 965-2-98 Coarse", "ISO 965-2-98 Fine"]
     return ["Select Thread Standard"]
+
+def get_material_density(material):
+    """Get density for different materials in kg/m³"""
+    density_map = {
+        "Carbon Steel": 7850,
+        "Stainless Steel": 8000,
+        "Alloy Steel": 7850,
+        "Brass": 8500,
+        "Aluminum": 2700,
+        "Copper": 8960,
+        "Titanium": 4500,
+        "Bronze": 8800,
+        "Inconel": 8200,
+        "Monel": 8800,
+        "Nickel": 8900
+    }
+    return density_map.get(material, 7850)  # Default to carbon steel
 
 def get_material_density_rectified(material):
     """RECTIFIED: Get density for different materials in g/cm³"""
@@ -2521,12 +2512,12 @@ def show_weight_calculator_rectified():
     st.markdown("""
     <div class="jsc-header">
         <h1>Weight Calculator - FIXED WORKFLOW</h1>
-        <p>Proper data fetching for DIN-7991 and ASME B18.3 with detailed parameters for all products</p>
+        <p>Proper data fetching for DIN-7991 with detailed parameters for all products</p>
         <div>
             <span class="jsc-badge">FIXED</span>
             <span class="jsc-badge-accent">DIN-7991 Corrected</span>
-            <span class="jsc-badge-secondary">ASME B18.3 Corrected</span>
-            <span class="jsc-badge-success">All Products Detailed</span>
+            <span class="jsc-badge-secondary">All Products Detailed</span>
+            <span class="jsc-badge-success">Socket Head Removed</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2534,7 +2525,7 @@ def show_weight_calculator_rectified():
     st.info("""
     **FIXED WORKFLOW:** 
     - **DIN-7991:** Now correctly fetches Head Diameter (dk) and Head Height (k) from database
-    - **ASME B18.3:** Now correctly fetches SEPARATE Head Diameter and Head Height values
+    - **REMOVED:** Hexagon Socket Head Cap Screws ASME B18.3 weight calculation and data fetching
     - **ALL PRODUCTS:** Detailed calculation parameters now show for Hex Bolts, Heavy Hex Bolts, Hex Cap Screws, Heavy Hex Screws, and Threaded Rods
     - **REMOVED:** Head angle is no longer used in calculations
     - **FORMULAS:** Using proper cylinder volume formulas without head angle
@@ -3009,6 +3000,31 @@ def show_weight_calculator_rectified():
                 - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
                 """)
             
+            elif 'Countersunk Head Formula' in calculation_method:
+                st.markdown("### 🔧 Countersunk Head Specific Details")
+                st.markdown(f"""
+                **Shank Volume Calculation:**
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
+                - Result: `{result['shank_volume_mm3']:.4f} mm³`
+                
+                **Head Volume Calculation:**
+                - Formula: 0.7853 × (head_diameter_min)² × head_height_max
+                - Head Diameter: `{result['head_diameter_mm']:.4f} mm`
+                - Head Height: `{result['head_height_mm']:.4f} mm`
+                - Result: `{result['head_volume_mm3']:.4f} mm³`
+                
+                **Total Volume:**
+                - Formula: shank_volume + head_volume
+                - Result: `{result['total_volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['total_volume_cm3']:.4f} cm³`
+                
+                **Weight Calculation:**
+                - Formula: total_volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
+                """)
+            
             elif 'Threaded Rod Cylinder Formula' in calculation_method:
                 st.markdown("### 🔧 Threaded Rod Specific Details")
                 st.markdown(f"""
@@ -3031,28 +3047,29 @@ def show_batch_calculator_rectified():
     
     st.info("""
     **FIXED BATCH PROCESSING:** 
-    - Proper data fetching for DIN-7991 and ASME B18.3
+    - Proper data fetching for DIN-7991
     - Detailed calculation parameters for all products
     - No head angle in calculations
+    - Socket Head calculations removed
     """)
     
     # Download template
     st.markdown("### Download FIXED Batch Template")
     template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
-        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
-        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
-        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Length': [50, 100, 200, 75, 60, 50, 40],
-        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
+        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Countersunk Head Cap Screw'],
+        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Metric'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'DIN-7991'],
+        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', 'M6'],
+        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A'],
+        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
+        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.0],
+        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
+        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A'],
+        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A'],
+        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A'],
+        'Length': [50, 100, 200, 75, 60, 40],
+        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm'],
+        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
     }
     template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
@@ -4003,7 +4020,7 @@ def show_rectified_home():
         <div>
             <span class="jsc-badge">FIXED Calculator</span>
             <span class="jsc-badge-accent">DIN-7991 Corrected</span>
-            <span class="jsc-badge-secondary">ASME B18.3 Corrected</span>
+            <span class="jsc-badge-secondary">Socket Head Removed</span>
             <span class="jsc-badge-success">All Products Detailed</span>
         </div>
     </div>
@@ -4100,13 +4117,14 @@ def show_rectified_home():
         
         features = [
             "DIN-7991: Correct Head Diameter (dk) and Head Height (k) fetching",
-            "ASME B18.3: SEPARATE Head Diameter and Head Height values",
+            "REMOVED: Socket Head calculations for ASME B18.3",
             "Detailed calculation parameters for ALL products",
             "No head angle in volume calculations",
             "Proper cylinder volume formulas",
             "Hex Bolt, Heavy Hex Bolt detailed parameters",
             "Hex Cap Screws, Heavy Hex Screws detailed parameters",
             "Threaded Rod detailed parameters",
+            "Countersunk head 0.7853 × d² × h formulas",
             "Professional reporting",
             "Carbon steel density: 7.85 g/cm³",
             "Batch processing capabilities",
@@ -4133,7 +4151,7 @@ def show_help_system():
             
             **DATA FETCHING CORRECTIONS:**
             - **DIN-7991:** Now correctly fetches Head Diameter (dk) and Head Height (k)
-            - **ASME B18.3:** Now correctly fetches SEPARATE Head Diameter and Head Height
+            - **REMOVED:** Socket Head calculations for ASME B18.3
             - **ALL PRODUCTS:** Detailed calculation parameters now show for all product types
             
             **REMOVED HEAD ANGLE:**
@@ -4142,6 +4160,7 @@ def show_help_system():
             
             **FIXED FORMULAS:**
             - **Shank Volume:** 0.7853 × (diameter)² × length (mm³)
+            - **Countersunk Head Volume:** 0.7853 × (head_diameter_min)² × head_height_max (mm³)
             - **Hex Head Volume:** 0.65 × side_length² × head_height (mm³)
             - **Volume Conversion:** mm³ to cm³ = divide by 1000
             - **Weight Calculation:** volume_cm³ × density_g/cm³
@@ -4220,7 +4239,7 @@ def main():
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
                 <span class="jsc-badge">FIXED Calculator</span>
                 <span class="jsc-badge-accent">DIN-7991 Corrected</span>
-                <span class="jsc-badge-secondary">ASME B18.3 Corrected</span>
+                <span class="jsc-badge-secondary">Socket Head Removed</span>
                 <span class="jsc-badge-success">All Products Detailed</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
