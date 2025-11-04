@@ -1554,186 +1554,202 @@ def convert_to_mm(value, from_unit):
         return value
 
 # ======================================================
-# FIXED: ENHANCED DATA FETCHING FOR SOCKET HEAD PRODUCTS
+# FIXED: SEPARATE DATA FETCHING FOR SOCKET HEAD PRODUCTS
 # ======================================================
 
-def get_socket_head_dimensions(standard, product, size, grade="All"):
-    """FIXED: Get head diameter and head height for socket head products from database"""
+def get_asme_b18_3_dimensions(product, size):
+    """SEPARATE FUNCTION: Get head diameter and head height for ASME B18.3 socket head cap screws"""
     try:
-        # Get the appropriate dataframe based on standard
-        if standard == "ASME B18.3":
-            temp_df = df_asme_b18_3.copy()
-            original_unit = "inch"  # ASME B18.3 data is in inches
-            
-            # Filter by product and size
-            if 'Product' in temp_df.columns and product != "All":
-                temp_df = temp_df[temp_df['Product'] == product]
-            
-            if 'Size' in temp_df.columns and size != "All":
-                # Normalize size comparison
-                temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
-            
-            if temp_df.empty:
-                return None, None, original_unit
-            
-            # FIXED: Look for SEPARATE head diameter and head height columns in ASME B18.3
-            head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
-            head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
-            
-            # Debug: Show available columns
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"ASME B18.3 Debug - Size: {size}")
-                st.sidebar.write(f"All columns: {temp_df.columns.tolist()}")
-                st.sidebar.write(f"Head diameter columns found: {head_dia_cols}")
-                st.sidebar.write(f"Head height columns found: {head_height_cols}")
-            
-            head_dia_col = None
-            head_height_col = None
-            
-            # Find head diameter column - prioritize minimum values
-            for col in head_dia_cols:
-                if 'min' in col.lower():
-                    head_dia_col = col
-                    break
-            if not head_dia_col and head_dia_cols:
-                head_dia_col = head_dia_cols[0]
-            
-            # Find head height column - prioritize minimum values  
-            for col in head_height_cols:
-                if 'min' in col.lower():
-                    head_height_col = col
-                    break
-            if not head_height_col and head_height_cols:
-                head_height_col = head_height_cols[0]
-            
-            head_diameter = None
-            head_height = None
-            
-            # Get head diameter value
-            if head_dia_col and head_dia_col in temp_df.columns:
-                head_diameter = temp_df[head_dia_col].iloc[0]
-                if pd.notna(head_diameter):
-                    head_diameter = float(head_diameter)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Head Diameter from {head_dia_col}: {head_diameter}")
-            
-            # Get head height value - SEPARATE from head diameter
-            if head_height_col and head_height_col in temp_df.columns:
-                head_height = temp_df[head_height_col].iloc[0]
-                if pd.notna(head_height):
-                    head_height = float(head_height)
-                    if st.session_state.debug_mode:
-                        st.sidebar.write(f"Head Height from {head_height_col}: {head_height}")
-            
-            # If still no values found, try alternative column names
-            if head_diameter is None:
-                # Try common ASME B18.3 column names
-                for col in temp_df.columns:
-                    col_lower = col.lower()
-                    if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
-                        if 'thread' not in col_lower and 'body' not in col_lower:
-                            head_diameter = temp_df[col].iloc[0]
-                            if pd.notna(head_diameter):
-                                head_diameter = float(head_diameter)
-                                head_dia_col = col
-                                break
-            
-            if head_height is None:
-                # Try common ASME B18.3 column names for head height
-                for col in temp_df.columns:
-                    col_lower = col.lower()
-                    if any(keyword in col_lower for keyword in ['head', 'height']):
-                        head_height = temp_df[col].iloc[0]
-                        if pd.notna(head_height):
-                            head_height = float(head_height)
-                            head_height_col = col
+        temp_df = df_asme_b18_3.copy()
+        original_unit = "inch"  # ASME B18.3 data is in inches
+        
+        # Filter by product and size
+        if 'Product' in temp_df.columns and product != "All":
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        if 'Size' in temp_df.columns and size != "All":
+            # Normalize size comparison
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        if temp_df.empty:
+            return None, None, original_unit
+        
+        # SPECIFIC COLUMN MAPPING FOR ASME B18.3
+        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
+        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
+        
+        # Debug: Show available columns
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"ASME B18.3 Debug - Size: {size}")
+            st.sidebar.write(f"All columns: {temp_df.columns.tolist()}")
+            st.sidebar.write(f"Head diameter columns found: {head_dia_cols}")
+            st.sidebar.write(f"Head height columns found: {head_height_cols}")
+        
+        head_dia_col = None
+        head_height_col = None
+        
+        # Find head diameter column - prioritize minimum values for ASME B18.3
+        for col in head_dia_cols:
+            if 'min' in col.lower():
+                head_dia_col = col
+                break
+        if not head_dia_col and head_dia_cols:
+            head_dia_col = head_dia_cols[0]
+        
+        # Find head height column - prioritize minimum values for ASME B18.3  
+        for col in head_height_cols:
+            if 'min' in col.lower():
+                head_height_col = col
+                break
+        if not head_height_col and head_height_cols:
+            head_height_col = head_height_cols[0]
+        
+        head_diameter = None
+        head_height = None
+        
+        # Get head diameter value
+        if head_dia_col and head_dia_col in temp_df.columns:
+            head_diameter = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter):
+                head_diameter = float(head_diameter)
+                if st.session_state.debug_mode:
+                    st.sidebar.write(f"ASME B18.3 Head Diameter from {head_dia_col}: {head_diameter}")
+        
+        # Get head height value - SEPARATE from head diameter
+        if head_height_col and head_height_col in temp_df.columns:
+            head_height = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height):
+                head_height = float(head_height)
+                if st.session_state.debug_mode:
+                    st.sidebar.write(f"ASME B18.3 Head Height from {head_height_col}: {head_height}")
+        
+        # If still no values found, try alternative column names for ASME B18.3
+        if head_diameter is None:
+            # Try common ASME B18.3 column names
+            for col in temp_df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
+                    if 'thread' not in col_lower and 'body' not in col_lower:
+                        head_diameter = temp_df[col].iloc[0]
+                        if pd.notna(head_diameter):
+                            head_diameter = float(head_diameter)
+                            head_dia_col = col
                             break
-            
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"Final Head Diameter: {head_diameter}")
-                st.sidebar.write(f"Final Head Height: {head_height}")
-            
-            return head_diameter, head_height, original_unit
-            
-        elif standard == "DIN-7991":
-            temp_df = df_din7991.copy()
-            original_unit = "mm"  # DIN-7991 data is in mm
-            
-            # Filter by product and size
-            if 'Product' in temp_df.columns and product != "All":
-                temp_df = temp_df[temp_df['Product'] == product]
-            
-            if 'Size' in temp_df.columns and size != "All":
-                # Normalize size comparison
-                temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
-            
-            if temp_df.empty:
-                return None, None, original_unit
-            
-            # FIXED: Look for Head Diameter (dk) - specifically dk column
-            head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['dk', 'head diameter', 'head_dia'])]
-            head_dia_col = None
-            
-            # Prioritize 'dk' column for DIN-7991
-            for col in head_dia_cols:
-                if 'dk' in col.lower():
-                    head_dia_col = col
-                    break
-            
-            # If no 'dk' found, look for other head diameter columns
-            if not head_dia_col and head_dia_cols:
-                for col in head_dia_cols:
-                    if 'min' in col.lower():
-                        head_dia_col = col
-                        break
-                if not head_dia_col:
-                    head_dia_col = head_dia_cols[0]
-            
-            # FIXED: Look for Head Height (k) - specifically k column
-            head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['k', 'head height', 'head_height'])]
-            head_height_col = None
-            
-            # Prioritize 'k' column for DIN-7991
-            for col in head_height_cols:
-                if col.lower() == 'k' or 'head height' in col.lower():
-                    head_height_col = col
-                    break
-            
-            # If no 'k' found, look for other head height columns
-            if not head_height_col and head_height_cols:
-                for col in head_height_cols:
-                    if 'max' in col.lower():
+        
+        if head_height is None:
+            # Try common ASME B18.3 column names for head height
+            for col in temp_df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['head', 'height']):
+                    head_height = temp_df[col].iloc[0]
+                    if pd.notna(head_height):
+                        head_height = float(head_height)
                         head_height_col = col
                         break
-                if not head_height_col:
-                    head_height_col = head_height_cols[0]
+        
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"ASME B18.3 Final Head Diameter: {head_diameter}")
+            st.sidebar.write(f"ASME B18.3 Final Head Height: {head_height}")
+        
+        return head_diameter, head_height, original_unit
             
-            head_diameter = None
-            head_height = None
-            
-            if head_dia_col and head_dia_col in temp_df.columns:
-                head_diameter = temp_df[head_dia_col].iloc[0]
-                if pd.notna(head_diameter):
-                    head_diameter = float(head_diameter)
-            
-            if head_height_col and head_height_col in temp_df.columns:
-                head_height = temp_df[head_height_col].iloc[0]
-                if pd.notna(head_height):
-                    head_height = float(head_height)
-            
-            # Debug information
-            if st.session_state.debug_mode:
-                st.sidebar.write(f"DIN-7991 Debug - Size: {size}")
-                st.sidebar.write(f"Head Diameter Column: {head_dia_col}, Value: {head_diameter}")
-                st.sidebar.write(f"Head Height Column: {head_height_col}, Value: {head_height}")
-                st.sidebar.write(f"Available columns: {temp_df.columns.tolist()}")
-            
-            return head_diameter, head_height, original_unit
-        else:
-            return None, None, "unknown"
+    except Exception as e:
+        st.warning(f"Error getting ASME B18.3 dimensions: {str(e)}")
+        return None, None, "inch"
+
+def get_din7991_dimensions(product, size):
+    """SEPARATE FUNCTION: Get head diameter and head height for DIN-7991 socket countersunk head cap screws"""
+    try:
+        temp_df = df_din7991.copy()
+        original_unit = "mm"  # DIN-7991 data is in mm
+        
+        # Filter by product and size
+        if 'Product' in temp_df.columns and product != "All":
+            temp_df = temp_df[temp_df['Product'] == product]
+        
+        if 'Size' in temp_df.columns and size != "All":
+            # Normalize size comparison
+            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+        
+        if temp_df.empty:
+            return None, None, original_unit
+        
+        # SPECIFIC COLUMN MAPPING FOR DIN-7991
+        # Look for Head Diameter (dk) - specifically dk column for DIN-7991
+        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['dk', 'head diameter', 'head_dia'])]
+        head_dia_col = None
+        
+        # Prioritize 'dk' column for DIN-7991
+        for col in head_dia_cols:
+            if 'dk' in col.lower():
+                head_dia_col = col
+                break
+        
+        # If no 'dk' found, look for other head diameter columns
+        if not head_dia_col and head_dia_cols:
+            for col in head_dia_cols:
+                if 'min' in col.lower():
+                    head_dia_col = col
+                    break
+            if not head_dia_col:
+                head_dia_col = head_dia_cols[0]
+        
+        # Look for Head Height (k) - specifically k column for DIN-7991
+        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['k', 'head height', 'head_height'])]
+        head_height_col = None
+        
+        # Prioritize 'k' column for DIN-7991
+        for col in head_height_cols:
+            if col.lower() == 'k' or 'head height' in col.lower():
+                head_height_col = col
+                break
+        
+        # If no 'k' found, look for other head height columns
+        if not head_height_col and head_height_cols:
+            for col in head_height_cols:
+                if 'max' in col.lower():
+                    head_height_col = col
+                    break
+            if not head_height_col:
+                head_height_col = head_height_cols[0]
+        
+        head_diameter = None
+        head_height = None
+        
+        if head_dia_col and head_dia_col in temp_df.columns:
+            head_diameter = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter):
+                head_diameter = float(head_diameter)
+        
+        if head_height_col and head_height_col in temp_df.columns:
+            head_height = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height):
+                head_height = float(head_height)
+        
+        # Debug information
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"DIN-7991 Debug - Size: {size}")
+            st.sidebar.write(f"Head Diameter Column: {head_dia_col}, Value: {head_diameter}")
+            st.sidebar.write(f"Head Height Column: {head_height_col}, Value: {head_height}")
+            st.sidebar.write(f"Available columns: {temp_df.columns.tolist()}")
+        
+        return head_diameter, head_height, original_unit
         
     except Exception as e:
-        st.warning(f"Error getting socket head dimensions: {str(e)}")
+        st.warning(f"Error getting DIN-7991 dimensions: {str(e)}")
+        return None, None, "mm"
+
+def get_socket_head_dimensions(standard, product, size, grade="All"):
+    """MAIN FUNCTION: Route to appropriate socket head dimension function based on standard"""
+    try:
+        if standard == "ASME B18.3":
+            return get_asme_b18_3_dimensions(product, size)
+        elif standard == "DIN-7991":
+            return get_din7991_dimensions(product, size)
+        else:
+            return None, None, "unknown"
+    except Exception as e:
+        st.warning(f"Error in get_socket_head_dimensions for {standard}: {str(e)}")
         return None, None, "unknown"
 
 def get_hex_head_dimensions(standard, product, size, grade="All"):
@@ -2168,7 +2184,7 @@ def calculate_weight_rectified(parameters):
         socket_head_products = ["Hexagon Socket Head Cap Screws", "Hexagon Socket Countersunk Head Cap Screw"]
         
         if product_type in socket_head_products:
-            # Get socket head dimensions from database WITH ORIGINAL UNIT
+            # Get socket head dimensions from SEPARATE functions based on standard
             head_diameter, head_height, original_unit = get_socket_head_dimensions(standard, product_type, size, grade)
             
             # Store original dimensions for display
@@ -2189,7 +2205,7 @@ def calculate_weight_rectified(parameters):
                 head_height = diameter_mm_temp * 0.65  # Default ratio
                 original_head_height = head_height
             
-            # Calculate using socket head formula
+            # Calculate using socket head formula - SAME FORMULA FOR BOTH
             return calculate_socket_product_weight_rectified(parameters, head_diameter, head_height, original_unit)
         
         # For hex products, get hex head dimensions
@@ -2576,22 +2592,22 @@ def show_weight_calculator_rectified():
     st.markdown("""
     <div class="jsc-header">
         <h1>Weight Calculator - FIXED WORKFLOW</h1>
-        <p>Proper data fetching for ALL products including Socket Head products with same formula</p>
+        <p>SEPARATE data fetching for Socket Head products with SAME formula</p>
         <div>
             <span class="jsc-badge">FIXED</span>
-            <span class="jsc-badge-accent">Socket Head Products</span>
+            <span class="jsc-badge-accent">Separate Data Fetching</span>
             <span class="jsc-badge-secondary">Same Formula</span>
-            <span class="jsc-badge-success">Different Data Fetching</span>
+            <span class="jsc-badge-success">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.info("""
-    **FIXED WORKFLOW FOR SOCKET HEAD PRODUCTS:** 
-    - **Hexagon Socket Head Cap Screws (ASME B18.3):** Separate data fetching for head dimensions
-    - **Hexagon Socket Countersunk Head Cap Screw (DIN-7991):** Separate data fetching for head dimensions  
+    **SEPARATE DATA FETCHING FOR SOCKET HEAD PRODUCTS:** 
+    - **Hexagon Socket Head Cap Screws (ASME B18.3):** Separate function `get_asme_b18_3_dimensions()`
+    - **Hexagon Socket Countersunk Head Cap Screw (DIN-7991):** Separate function `get_din7991_dimensions()`  
     - **SAME FORMULA:** Both use cylinder volume formula: 0.7853 × d² × h
-    - **DIFFERENT PRODUCTS:** Treated as separate products with different standards
+    - **DIFFERENT DATA FETCHING:** Each standard has its own dedicated function
     - **DETAILED CALCULATIONS:** Shows complete breakdown for all products
     """)
     
@@ -3111,9 +3127,9 @@ def show_batch_calculator_rectified():
     
     st.info("""
     **FIXED BATCH PROCESSING:** 
-    - Proper data fetching for ALL products including Socket Head products
+    - Separate data fetching for Socket Head products
+    - Same formula for all socket head products
     - Detailed calculation parameters for all products
-    - Same formula for Socket Head products, different data fetching
     """)
     
     # Download template
@@ -3167,7 +3183,7 @@ def show_batch_calculator_rectified():
                 st.error(f"Missing required columns: {missing_cols}")
             else:
                 if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_fixed"):
-                    st.info("FIXED batch processing with proper data fetching ready for implementation")
+                    st.info("FIXED batch processing with separate data fetching ready for implementation")
                     st.write(f"Records to process: {len(batch_df)}")
                     
         except Exception as e:
@@ -4082,9 +4098,9 @@ def show_rectified_home():
         <p>Professional Fastener Intelligence Platform v4.0 - FIXED</p>
         <div>
             <span class="jsc-badge">FIXED Calculator</span>
-            <span class="jsc-badge-accent">Socket Head Products</span>
+            <span class="jsc-badge-accent">Separate Data Fetching</span>
             <span class="jsc-badge-secondary">Same Formula</span>
-            <span class="jsc-badge-success">Different Data Fetching</span>
+            <span class="jsc-badge-success">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4137,7 +4153,7 @@ def show_rectified_home():
     cols = st.columns(3)
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
-        ("Engineering Calculator", "FIXED weight calculations with proper data fetching", "calculator"),
+        ("Engineering Calculator", "FIXED weight calculations with separate data fetching", "calculator"),
         ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("Export Reports", "Generate professional engineering reports", "export")
@@ -4179,9 +4195,9 @@ def show_rectified_home():
         st.markdown('<h3 class="section-header">FIXED Features</h3>', unsafe_allow_html=True)
         
         features = [
-            "Socket Head Products: Same formula, different data fetching",
-            "Hexagon Socket Head Cap Screws (ASME B18.3): Proper data fetching",
-            "Hexagon Socket Countersunk Head Cap Screw (DIN-7991): Proper data fetching",
+            "Socket Head Products: Same formula, separate data fetching",
+            "Hexagon Socket Head Cap Screws (ASME B18.3): Separate function get_asme_b18_3_dimensions()",
+            "Hexagon Socket Countersunk Head Cap Screw (DIN-7991): Separate function get_din7991_dimensions()",
             "Same formula: 0.7853 × d² × h for all socket head products",
             "Detailed calculation parameters for ALL products",
             "Hex Bolt, Heavy Hex Bolt detailed parameters",
@@ -4209,15 +4225,19 @@ def show_help_system():
         st.markdown("---")
         with st.expander("FIXED Weight Calculator Guide"):
             st.markdown("""
-            **FIXED WEIGHT CALCULATOR WORKFLOW:**
+            **SEPARATE DATA FETCHING FOR SOCKET HEAD PRODUCTS:**
             
-            **SOCKET HEAD PRODUCTS - SAME FORMULA, DIFFERENT DATA:**
-            - **Hexagon Socket Head Cap Screws (ASME B18.3):** Separate data fetching
-            - **Hexagon Socket Countersunk Head Cap Screw (DIN-7991):** Separate data fetching  
-            - **SAME FORMULA:** Both use cylinder volume: 0.7853 × d² × h
-            - **DIFFERENT PRODUCTS:** Treated as separate products with different standards
+            **ASME B18.3 - Hexagon Socket Head Cap Screws:**
+            - Function: `get_asme_b18_3_dimensions()`
+            - Data: Inches (converted to mm)
+            - Specific column mapping for ASME B18.3
             
-            **FIXED FORMULAS:**
+            **DIN-7991 - Hexagon Socket Countersunk Head Cap Screw:**
+            - Function: `get_din7991_dimensions()`  
+            - Data: Millimeters (no conversion needed)
+            - Specific column mapping for DIN-7991 (dk, k columns)
+            
+            **SAME FORMULA FOR BOTH:**
             - **Shank Volume:** 0.7853 × (diameter)² × length (mm³)
             - **Socket Head Volume:** 0.7853 × (head_diameter_min)² × head_height_min (mm³)
             - **Volume Conversion:** mm³ to cm³ = divide by 1000
@@ -4296,12 +4316,12 @@ def main():
         <div class="jsc-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
                 <span class="jsc-badge">FIXED Calculator</span>
-                <span class="jsc-badge-accent">Socket Head Products</span>
+                <span class="jsc-badge-accent">Separate Data Fetching</span>
                 <span class="jsc-badge-secondary">Same Formula</span>
-                <span class="jsc-badge-success">Different Data Fetching</span>
+                <span class="jsc-badge-success">Different Standards</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
-            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with proper data fetching and detailed parameters for all products</p>
+            <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with SEPARATE data fetching and SAME formula for socket head products</p>
         </div>
     """, unsafe_allow_html=True)
 
