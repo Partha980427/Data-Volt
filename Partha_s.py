@@ -177,7 +177,7 @@ def initialize_session_state():
         "section_a_current_series": "All",
         "section_a_current_standard": "All",
         "section_a_current_size": "All",
-        "section_a_current_grade": "All",  # NEW: Added for ISO 4014 grades
+        "section_a_current_grade": "All",
         "section_b_current_standard": "All",
         "section_b_current_size": "All",
         "section_b_current_class": "All",
@@ -187,12 +187,12 @@ def initialize_session_state():
         "show_professional_card": False,
         "selected_product_details": None,
         "batch_calculation_results": pd.DataFrame(),
-        # Weight calculator session states - FIXED INITIALIZATION
+        # Weight calculator session states
         "weight_calc_product": "Select Product",
         "weight_calc_series": "Select Series",
         "weight_calc_standard": "Select Standard",
         "weight_calc_size": "Select Size",
-        "weight_calc_grade": "Select Grade",  # NEW: Added for ISO 4014 grades
+        "weight_calc_grade": "Select Grade",
         "weight_calc_diameter_type": "Blank Diameter",
         "weight_calc_blank_diameter": 10.0,
         "weight_calc_blank_dia_unit": "mm",
@@ -300,7 +300,7 @@ def load_thread_data_enhanced(standard_name):
         return pd.DataFrame()
 
 def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
-    """Enhanced thread data retrieval with proper filtering - FIXED TYPO"""
+    """Enhanced thread data retrieval with proper filtering"""
     df_thread = load_thread_data_enhanced(standard)
     
     if df_thread.empty:
@@ -313,7 +313,6 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
         result_df = result_df[result_df["Thread"].astype(str).str.strip() == str(thread_size).strip()]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
-        # FIXED: Changed 'ast' to 'astype'
         result_df = result_df[
             result_df["Class"].astype(str).str.strip().str.upper() == 
             str(thread_class).strip().upper()
@@ -377,7 +376,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# JSC Group Professional CSS with Enhanced Card Design - COMPLETED
+# JSC Group Professional CSS with Enhanced Card Design
 st.markdown("""
 <style>
     :root {
@@ -394,12 +393,10 @@ st.markdown("""
         --jsc-gradient-light: linear-gradient(135deg, #00a0e3 0%, #0066b3 100%);
     }
     
-    /* Main background and text */
     .stApp {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     }
     
-    /* Headers */
     .jsc-header {
         background: var(--jsc-gradient);
         padding: 2.5rem;
@@ -436,7 +433,6 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    /* Cards */
     .jsc-card {
         background: white;
         padding: 1.5rem;
@@ -482,7 +478,6 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(0, 102, 179, 0.15);
     }
     
-    /* Badges */
     .jsc-badge {
         background: var(--jsc-gradient);
         color: white;
@@ -507,7 +502,6 @@ st.markdown("""
         background: var(--jsc-success);
     }
     
-    /* Buttons */
     .stButton>button {
         background: var(--jsc-gradient);
         color: white;
@@ -529,7 +523,6 @@ st.markdown("""
         transform: translateY(0);
     }
     
-    /* Primary button */
     .stButton>button[kind="primary"] {
         background: var(--jsc-gradient);
         color: white;
@@ -539,7 +532,6 @@ st.markdown("""
         background: var(--jsc-primary-dark);
     }
     
-    /* Secondary button */
     .stButton>button[kind="secondary"] {
         background: white;
         color: var(--jsc-primary);
@@ -551,7 +543,6 @@ st.markdown("""
         color: white;
     }
     
-    /* Sidebar */
     .css-1d391kg, .css-1lcbmhc {
         background: white;
         border-right: 1px solid #e9ecef;
@@ -561,7 +552,6 @@ st.markdown("""
         background: linear-gradient(180deg, white 0%, #f8f9fa 100%);
     }
     
-    /* Input fields */
     .stTextInput>div>div>input, 
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select {
@@ -578,7 +568,6 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(0, 102, 179, 0.1);
     }
     
-    /* Dataframes */
     .dataframe {
         border-radius: 8px;
         overflow: hidden;
@@ -586,7 +575,6 @@ st.markdown("""
         border: 1px solid #e9ecef;
     }
     
-    /* Expanders */
     .streamlit-expanderHeader {
         background: var(--jsc-light);
         border-radius: 8px;
@@ -595,7 +583,6 @@ st.markdown("""
         color: var(--jsc-primary);
     }
     
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
     }
@@ -614,12 +601,10 @@ st.markdown("""
         color: white;
     }
     
-    /* Progress bars */
     .stProgress > div > div > div {
         background: var(--jsc-gradient);
     }
     
-    /* Success, Warning, Error messages */
     .stAlert {
         border-radius: 8px;
         border: 1px solid;
@@ -629,7 +614,6 @@ st.markdown("""
         font-weight: 500;
     }
     
-    /* Section headers */
     .section-header {
         border-left: 5px solid var(--jsc-primary);
         padding-left: 1rem;
@@ -639,7 +623,6 @@ st.markdown("""
         font-size: 1.4rem;
     }
     
-    /* Quick actions grid */
     .quick-action {
         background: white;
         padding: 1.5rem 1rem;
@@ -673,7 +656,6 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     
-    /* Professional card for product details - COMPLETED */
     .professional-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 2px solid var(--jsc-primary);
@@ -726,7 +708,6 @@ st.markdown("""
         font-size: 0.9rem;
     }
     
-    /* Specification rows for professional card */
     .spec-row {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
@@ -810,7 +791,6 @@ st.markdown("""
         color: white;
     }
     
-    /* Filter sections */
     .filter-section {
         background: white;
         padding: 1.5rem;
@@ -841,7 +821,6 @@ st.markdown("""
         font-size: 1.2rem;
     }
     
-    /* Independent sections */
     .independent-section {
         border: 2px solid var(--jsc-primary);
         border-radius: 12px;
@@ -862,7 +841,6 @@ st.markdown("""
         background: var(--jsc-gradient);
     }
     
-    /* Results sections */
     .section-results {
         border: 2px solid var(--jsc-success);
         border-radius: 12px;
@@ -879,7 +857,6 @@ st.markdown("""
         background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
     }
     
-    /* Data quality indicators */
     .data-quality-indicator {
         padding: 0.8rem;
         border-radius: 8px;
@@ -906,7 +883,6 @@ st.markdown("""
         border-left-color: var(--jsc-danger);
     }
     
-    /* Calculation cards */
     .calculation-card {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 1rem;
@@ -915,7 +891,6 @@ st.markdown("""
         border-left: 4px solid var(--jsc-success);
     }
     
-    /* Grid layouts */
     .spec-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -937,7 +912,6 @@ st.markdown("""
         margin: 1.5rem 0;
     }
     
-    /* Footer */
     .jsc-footer {
         text-align: center;
         color: #6c757d;
@@ -946,7 +920,6 @@ st.markdown("""
         border-top: 1px solid #e9ecef;
     }
     
-    /* Responsive design */
     @media (max-width: 768px) {
         .jsc-header {
             padding: 1.5rem !important;
@@ -1558,103 +1531,150 @@ def convert_to_mm(value, from_unit):
 # ======================================================
 
 def get_asme_b18_3_dimensions(product, size):
-    """SEPARATE FUNCTION: Get head diameter and head height for ASME B18.3 socket head cap screws"""
+    """FIXED VERSION: Get head diameter and head height for ASME B18.3 socket head cap screws"""
     try:
         temp_df = df_asme_b18_3.copy()
         original_unit = "inch"  # ASME B18.3 data is in inches
         
         # Filter by product and size
         if 'Product' in temp_df.columns and product != "All":
-            temp_df = temp_df[temp_df['Product'] == product]
+            temp_df = temp_df[temp_df['Product'].str.contains('Socket Head', na=False, case=False)]
         
         if 'Size' in temp_df.columns and size != "All":
-            # Normalize size comparison
-            temp_df = temp_df[temp_df['Size'].astype(str).str.strip() == str(size).strip()]
+            # Normalize size comparison - handle different formats
+            temp_df['Size_Normalized'] = temp_df['Size'].astype(str).str.strip()
+            size_normalized = str(size).strip()
+            temp_df = temp_df[temp_df['Size_Normalized'] == size_normalized]
         
         if temp_df.empty:
+            st.warning(f"No ASME B18.3 data found for {product} size {size}")
             return None, None, original_unit
         
-        # SPECIFIC COLUMN MAPPING FOR ASME B18.3
-        head_dia_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'diameter', 'head_dia'])]
-        head_height_cols = [col for col in temp_df.columns if any(keyword in col.lower() for keyword in ['head', 'height', 'head_height'])]
+        # SPECIFIC ASME B18.3 COLUMN MAPPING FOR HEAD DIAMETER (MIN) AND HEAD HEIGHT (MIN)
+        head_dia_col = None
+        head_height_col = None
         
         # Debug: Show available columns
         if st.session_state.debug_mode:
             st.sidebar.write(f"ASME B18.3 Debug - Size: {size}")
             st.sidebar.write(f"All columns: {temp_df.columns.tolist()}")
-            st.sidebar.write(f"Head diameter columns found: {head_dia_cols}")
-            st.sidebar.write(f"Head height columns found: {head_height_cols}")
         
-        head_dia_col = None
-        head_height_col = None
+        # SPECIFIC COLUMN NAMES FOR ASME B18.3 - EXACT MATCHES
+        # Head Diameter (Min) - Look for exact column names
+        head_dia_columns = [
+            'Head Diameter (Min)', 'Head_Diameter_Min', 'Head Dia Min', 
+            'Head Diameter Min', 'Head_Dia_Min', 'dk_min', 'Head_D_Min'
+        ]
         
-        # Find head diameter column - prioritize minimum values for ASME B18.3
-        for col in head_dia_cols:
-            if 'min' in col.lower():
-                head_dia_col = col
+        # Head Height (Min) - Look for exact column names
+        head_height_columns = [
+            'Head Height (Min)', 'Head_Height_Min', 'Head Height Min',
+            'Head_Ht_Min', 'k_min', 'Head_H_Min'
+        ]
+        
+        # Find Head Diameter (Min) column
+        for col in temp_df.columns:
+            col_clean = str(col).strip()
+            for target_col in head_dia_columns:
+                if target_col.lower() == col_clean.lower():
+                    head_dia_col = col
+                    break
+            if head_dia_col:
                 break
-        if not head_dia_col and head_dia_cols:
-            head_dia_col = head_dia_cols[0]
         
-        # Find head height column - prioritize minimum values for ASME B18.3  
-        for col in head_height_cols:
-            if 'min' in col.lower():
-                head_height_col = col
+        # If not found with exact match, try partial match
+        if not head_dia_col:
+            for col in temp_df.columns:
+                col_lower = str(col).lower()
+                if 'head' in col_lower and 'diameter' in col_lower and 'min' in col_lower:
+                    head_dia_col = col
+                    break
+        
+        # Find Head Height (Min) column
+        for col in temp_df.columns:
+            col_clean = str(col).strip()
+            for target_col in head_height_columns:
+                if target_col.lower() == col_clean.lower():
+                    head_height_col = col
+                    break
+            if head_height_col:
                 break
-        if not head_height_col and head_height_cols:
-            head_height_col = head_height_cols[0]
+        
+        # If not found with exact match, try partial match
+        if not head_height_col:
+            for col in temp_df.columns:
+                col_lower = str(col).lower()
+                if 'head' in col_lower and 'height' in col_lower and 'min' in col_lower:
+                    head_height_col = col
+                    break
+        
+        # Debug: Show found columns
+        if st.session_state.debug_mode:
+            st.sidebar.write(f"Head Diameter Column: {head_dia_col}")
+            st.sidebar.write(f"Head Height Column: {head_height_col}")
         
         head_diameter = None
         head_height = None
         
-        # Get head diameter value
+        # Get Head Diameter (Min) value
         if head_dia_col and head_dia_col in temp_df.columns:
-            head_diameter = temp_df[head_dia_col].iloc[0]
-            if pd.notna(head_diameter):
-                head_diameter = float(head_diameter)
-                if st.session_state.debug_mode:
-                    st.sidebar.write(f"ASME B18.3 Head Diameter from {head_dia_col}: {head_diameter}")
+            head_diameter_val = temp_df[head_dia_col].iloc[0]
+            if pd.notna(head_diameter_val):
+                try:
+                    head_diameter = float(head_diameter_val)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Head Diameter from {head_dia_col}: {head_diameter}")
+                except (ValueError, TypeError) as e:
+                    st.warning(f"Could not convert head diameter value: {head_diameter_val}")
         
-        # Get head height value - SEPARATE from head diameter
+        # Get Head Height (Min) value
         if head_height_col and head_height_col in temp_df.columns:
-            head_height = temp_df[head_height_col].iloc[0]
-            if pd.notna(head_height):
-                head_height = float(head_height)
-                if st.session_state.debug_mode:
-                    st.sidebar.write(f"ASME B18.3 Head Height from {head_height_col}: {head_height}")
+            head_height_val = temp_df[head_height_col].iloc[0]
+            if pd.notna(head_height_val):
+                try:
+                    head_height = float(head_height_val)
+                    if st.session_state.debug_mode:
+                        st.sidebar.write(f"Head Height from {head_height_col}: {head_height}")
+                except (ValueError, TypeError) as e:
+                    st.warning(f"Could not convert head height value: {head_height_val}")
         
-        # If still no values found, try alternative column names for ASME B18.3
+        # If still no values found, try alternative approaches
         if head_diameter is None:
-            # Try common ASME B18.3 column names
+            # Try to find any head diameter column
             for col in temp_df.columns:
-                col_lower = col.lower()
-                if any(keyword in col_lower for keyword in ['head', 'diameter', 'max']):
+                col_lower = str(col).lower()
+                if 'head' in col_lower and 'diameter' in col_lower:
                     if 'thread' not in col_lower and 'body' not in col_lower:
-                        head_diameter = temp_df[col].iloc[0]
-                        if pd.notna(head_diameter):
-                            head_diameter = float(head_diameter)
+                        try:
+                            head_diameter = float(temp_df[col].iloc[0])
                             head_dia_col = col
                             break
+                        except:
+                            continue
         
         if head_height is None:
-            # Try common ASME B18.3 column names for head height
+            # Try to find any head height column
             for col in temp_df.columns:
-                col_lower = col.lower()
-                if any(keyword in col_lower for keyword in ['head', 'height']):
-                    head_height = temp_df[col].iloc[0]
-                    if pd.notna(head_height):
-                        head_height = float(head_height)
+                col_lower = str(col).lower()
+                if 'head' in col_lower and 'height' in col_lower:
+                    try:
+                        head_height = float(temp_df[col].iloc[0])
                         head_height_col = col
                         break
+                    except:
+                        continue
         
+        # Final debug information
         if st.session_state.debug_mode:
             st.sidebar.write(f"ASME B18.3 Final Head Diameter: {head_diameter}")
             st.sidebar.write(f"ASME B18.3 Final Head Height: {head_height}")
+            st.sidebar.write(f"Head Diameter Column Used: {head_dia_col}")
+            st.sidebar.write(f"Head Height Column Used: {head_height_col}")
         
         return head_diameter, head_height, original_unit
             
     except Exception as e:
-        st.warning(f"Error getting ASME B18.3 dimensions: {str(e)}")
+        st.error(f"Error getting ASME B18.3 dimensions: {str(e)}")
         return None, None, "inch"
 
 def get_din7991_dimensions(product, size):
@@ -2364,7 +2384,7 @@ def apply_section_a_filters():
     series = filters.get('series', 'All')
     standard = filters.get('standard', 'All')
     size = filters.get('size', 'All')
-    grade = filters.get('grade', 'All')  # NEW: Added grade filter
+    grade = filters.get('grade', 'All')
     
     # Get appropriate dataframe
     if standard == "ASME B18.2.1":
@@ -2939,7 +2959,7 @@ def show_weight_calculator_rectified():
                     'weight_lb': result['weight_lb'],
                     'timestamp': datetime.now().isoformat()
                 }
-                save_calculation_history(calculation_data)
+                st.session_state.calculation_history.append(calculation_data)
                 
                 st.success("**Weight Calculation Completed Successfully!**")
     
@@ -3189,9 +3209,6 @@ def show_batch_calculator_rectified():
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
 
-# ======================================================
-# FIXED CALCULATIONS PAGE - PROPER DATA FETCHING
-# ======================================================
 def show_rectified_calculations():
     """Fixed calculations page with proper data fetching for ALL products"""
     
@@ -3362,7 +3379,7 @@ def show_professional_product_card(product_details):
     
     # Get current date and user info
     current_date = datetime.now().strftime('%d/%m/%Y')
-    generated_by = "Partha Sharma"  # This could be dynamic based on user login
+    generated_by = "Partha Sharma"
     
     # Create the professional card HTML
     card_html = f"""
@@ -3574,7 +3591,7 @@ def extract_product_details(row):
         'Thread': row.get('Thread', '1/4-20-UNC-2A'),
         'Product Grade': row.get('Product Grade', 'N/A'),
         
-        # Map dimensional specifications - these would come from your actual data columns
+        # Map dimensional specifications
         'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
         'Body_Dia_Max': row.get('Body_Diameter_Max', row.get('Basic_Major_Diameter_Max', 'N/A')),
         
