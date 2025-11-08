@@ -162,7 +162,7 @@ def load_config():
                 'thread_files': thread_files
             },
             'ui': {
-                'theme': 'light',
+                'theme': 'oracle',
                 'page_title': 'JSC Industries - Fastener Intelligence'
             },
             'features': {
@@ -180,7 +180,7 @@ def save_user_preferences():
             'preferred_units': 'metric',
             'recent_searches': [],
             'favorite_filters': {},
-            'theme_preference': 'light'
+            'theme_preference': 'oracle'
         }
 
 def initialize_session_state():
@@ -280,10 +280,10 @@ def optimize_for_mobile():
         st.markdown("""
         <style>
         @media (max-width: 768px) {
-            .jsc-header {
+            .oracle-header {
                 padding: 1rem !important;
             }
-            .jsc-header h1 {
+            .oracle-header h1 {
                 font-size: 1.5rem !important;
             }
             .stButton > button {
@@ -506,7 +506,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# ENHANCED PAGE SETUP WITH JSC GROUP STYLING
+# ORACLE XE STYLING - COMPLETE UI TRANSFORMATION
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -515,147 +515,150 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# JSC Group Professional CSS with Enhanced Card Design
+# Oracle XE Professional CSS
 st.markdown("""
 <style>
     :root {
-        --jsc-primary: #0066b3;
-        --jsc-primary-dark: #003366;
-        --jsc-secondary: #00a0e3;
-        --jsc-accent: #ff6b00;
-        --jsc-light: #f8f9fa;
-        --jsc-dark: #343a40;
-        --jsc-success: #28a745;
-        --jsc-warning: #ffc107;
-        --jsc-danger: #dc3545;
-        --jsc-gradient: linear-gradient(135deg, #0066b3 0%, #003366 100%);
-        --jsc-gradient-light: linear-gradient(135deg, #00a0e3 0%, #0066b3 100%);
+        --oracle-red: #A30006;
+        --oracle-red-dark: #8B0000;
+        --oracle-red-light: #C4000D;
+        --oracle-gray-dark: #333333;
+        --oracle-gray: #666666;
+        --oracle-gray-light: #F8F8F8;
+        --oracle-gray-border: #DDDDDD;
+        --oracle-blue: #0072C6;
+        --oracle-green: #00A651;
+        --oracle-orange: #FF6A00;
+        --oracle-yellow: #FFC72C;
     }
     
     .stApp {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    .jsc-header {
-        background: var(--jsc-gradient);
-        padding: 2.5rem;
-        border-radius: 15px;
+    .oracle-header {
+        background: linear-gradient(135deg, var(--oracle-red) 0%, var(--oracle-red-dark) 100%);
+        padding: 2rem;
+        border-radius: 8px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 1px solid var(--oracle-red-dark);
         position: relative;
         overflow: hidden;
     }
     
-    .jsc-header::before {
+    .oracle-header::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
-        background: var(--jsc-accent);
+        height: 3px;
+        background: var(--oracle-yellow);
     }
     
-    .jsc-header h1 {
-        font-size: 2.5rem;
-        font-weight: 700;
+    .oracle-header h1 {
+        font-size: 2.2rem;
+        font-weight: 600;
         margin-bottom: 0.5rem;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        color: white;
     }
     
-    .jsc-header p {
-        font-size: 1.2rem;
+    .oracle-header p {
+        font-size: 1.1rem;
         opacity: 0.95;
         margin-bottom: 1rem;
+        color: white;
     }
     
-    .jsc-card {
+    .oracle-card {
         background: white;
         padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid var(--jsc-primary);
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--oracle-red);
         transition: all 0.3s ease;
         margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--oracle-gray-border);
         position: relative;
         overflow: hidden;
     }
     
-    .jsc-card::before {
+    .oracle-card::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
-        height: 3px;
-        background: var(--jsc-gradient);
+        height: 2px;
+        background: var(--oracle-red);
     }
     
-    .jsc-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 25px rgba(0, 102, 179, 0.15);
-        border-left-color: var(--jsc-accent);
+    .oracle-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
+        border-left-color: var(--oracle-red-dark);
     }
     
     .metric-card {
         background: white;
         padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid var(--jsc-primary);
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--oracle-red);
         transition: transform 0.3s ease;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--oracle-gray-border);
         text-align: center;
     }
     
     .metric-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0, 102, 179, 0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
     }
     
-    .jsc-badge {
-        background: var(--jsc-gradient);
+    .oracle-badge {
+        background: var(--oracle-red);
         color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
         font-size: 0.75rem;
         font-weight: 600;
         margin: 0.2rem;
         display: inline-block;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
-    .jsc-badge-accent {
-        background: var(--jsc-accent);
+    .oracle-badge-blue {
+        background: var(--oracle-blue);
     }
     
-    .jsc-badge-secondary {
-        background: var(--jsc-secondary);
+    .oracle-badge-green {
+        background: var(--oracle-green);
     }
     
-    .jsc-badge-success {
-        background: var(--jsc-success);
+    .oracle-badge-orange {
+        background: var(--oracle-orange);
     }
     
     .stButton>button {
-        background: var(--jsc-gradient);
+        background: var(--oracle-red);
         color: white;
         border: none;
-        padding: 0.7rem 1.5rem;
-        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        border-radius: 4px;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 4px rgba(0, 102, 179, 0.2);
+        box-shadow: 0 2px 4px rgba(163, 0, 6, 0.2);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0, 102, 179, 0.3);
-        background: var(--jsc-primary-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(163, 0, 6, 0.3);
+        background: var(--oracle-red-dark);
     }
     
     .stButton>button:active {
@@ -663,89 +666,91 @@ st.markdown("""
     }
     
     .stButton>button[kind="primary"] {
-        background: var(--jsc-gradient);
+        background: var(--oracle-red);
         color: white;
     }
     
     .stButton>button[kind="primary"]:hover {
-        background: var(--jsc-primary-dark);
+        background: var(--oracle-red-dark);
     }
     
     .stButton>button[kind="secondary"] {
         background: white;
-        color: var(--jsc-primary);
-        border: 2px solid var(--jsc-primary);
+        color: var(--oracle-red);
+        border: 1px solid var(--oracle-red);
     }
     
     .stButton>button[kind="secondary"]:hover {
-        background: var(--jsc-primary);
+        background: var(--oracle-red);
         color: white;
     }
     
     .css-1d391kg, .css-1lcbmhc {
         background: white;
-        border-right: 1px solid #e9ecef;
+        border-right: 1px solid var(--oracle-gray-border);
     }
     
     .sidebar .sidebar-content {
-        background: linear-gradient(180deg, white 0%, #f8f9fa 100%);
+        background: linear-gradient(180deg, white 0%, var(--oracle-gray-light) 100%);
     }
     
     .stTextInput>div>div>input, 
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select {
-        border: 2px solid #e9ecef;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
+        border: 1px solid var(--oracle-gray-border);
+        border-radius: 4px;
+        padding: 0.5rem 0.8rem;
         transition: all 0.3s ease;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     .stTextInput>div>div>input:focus, 
     .stNumberInput>div>div>input:focus,
     .stSelectbox>div>div>select:focus {
-        border-color: var(--jsc-primary);
-        box-shadow: 0 0 0 2px rgba(0, 102, 179, 0.1);
+        border-color: var(--oracle-red);
+        box-shadow: 0 0 0 2px rgba(163, 0, 6, 0.1);
     }
     
     .dataframe {
-        border-radius: 8px;
+        border-radius: 6px;
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--oracle-gray-border);
     }
     
     .streamlit-expanderHeader {
-        background: var(--jsc-light);
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
+        background: var(--oracle-gray-light);
+        border-radius: 4px;
+        border: 1px solid var(--oracle-gray-border);
         font-weight: 600;
-        color: var(--jsc-primary);
+        color: var(--oracle-red);
     }
     
     .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
+        gap: 1rem;
     }
     
     .stTabs [data-baseweb="tab"] {
         background: white;
-        border-radius: 8px 8px 0 0;
-        padding: 1rem 2rem;
-        border: 1px solid #e9ecef;
+        border-radius: 4px 4px 0 0;
+        padding: 0.8rem 1.5rem;
+        border: 1px solid var(--oracle-gray-border);
         border-bottom: none;
         font-weight: 600;
+        color: var(--oracle-gray);
     }
     
     .stTabs [aria-selected="true"] {
-        background: var(--jsc-primary);
+        background: var(--oracle-red);
         color: white;
     }
     
     .stProgress > div > div > div {
-        background: var(--jsc-gradient);
+        background: var(--oracle-red);
     }
     
     .stAlert {
-        border-radius: 8px;
+        border-radius: 6px;
         border: 1px solid;
     }
     
@@ -754,24 +759,24 @@ st.markdown("""
     }
     
     .section-header {
-        border-left: 5px solid var(--jsc-primary);
+        border-left: 4px solid var(--oracle-red);
         padding-left: 1rem;
-        margin: 2rem 0 1rem 0;
-        color: var(--jsc-primary-dark);
+        margin: 1.5rem 0 1rem 0;
+        color: var(--oracle-red);
         font-weight: 600;
-        font-size: 1.4rem;
+        font-size: 1.3rem;
     }
     
     .quick-action {
         background: white;
-        padding: 1.5rem 1rem;
-        border-radius: 12px;
+        padding: 1.2rem 0.8rem;
+        border-radius: 6px;
         text-align: center;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
-        height: 120px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid var(--oracle-gray-border);
+        height: 100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -786,22 +791,22 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 3px;
-        background: var(--jsc-gradient);
+        height: 2px;
+        background: var(--oracle-red);
     }
     
     .quick-action:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
     .professional-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid var(--jsc-primary);
-        border-radius: 15px;
-        padding: 2rem;
-        margin: 2rem 0;
-        box-shadow: 0 10px 30px rgba(0, 102, 179, 0.2);
+        background: linear-gradient(135deg, #ffffff 0%, var(--oracle-gray-light) 100%);
+        border: 1px solid var(--oracle-red);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
         position: relative;
         overflow: hidden;
     }
@@ -812,76 +817,76 @@ st.markdown("""
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
-        background: var(--jsc-gradient);
+        height: 3px;
+        background: var(--oracle-red);
     }
     
     .card-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         padding-bottom: 1rem;
-        border-bottom: 2px solid #e9ecef;
+        border-bottom: 1px solid var(--oracle-gray-border);
     }
     
     .card-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: var(--jsc-primary-dark);
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--oracle-red);
         margin: 0;
     }
     
     .card-subtitle {
-        font-size: 1.2rem;
-        color: #6c757d;
-        margin: 0.5rem 0 0 0;
+        font-size: 1rem;
+        color: var(--oracle-gray);
+        margin: 0.3rem 0 0 0;
     }
     
     .card-company {
-        background: var(--jsc-gradient);
+        background: var(--oracle-red);
         color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
         font-weight: 600;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
     
     .spec-row {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
-        gap: 1rem;
+        gap: 0.8rem;
         align-items: center;
-        margin: 0.8rem 0;
-        padding: 0.5rem;
-        border-radius: 6px;
-        background: #f8f9fa;
+        margin: 0.6rem 0;
+        padding: 0.4rem;
+        border-radius: 4px;
+        background: var(--oracle-gray-light);
     }
     
     .spec-label-min, .spec-label-max {
-        font-size: 0.85rem;
-        color: #6c757d;
+        font-size: 0.8rem;
+        color: var(--oracle-gray);
         text-align: center;
         font-weight: 500;
     }
     
     .spec-dimension {
         font-weight: 600;
-        color: var(--jsc-primary-dark);
+        color: var(--oracle-red);
         text-align: center;
-        padding: 0.3rem 1rem;
+        padding: 0.2rem 0.8rem;
         background: white;
-        border-radius: 4px;
-        border: 1px solid #e9ecef;
+        border-radius: 3px;
+        border: 1px solid var(--oracle-gray-border);
     }
     
     .spec-value {
         font-weight: 600;
-        color: var(--jsc-primary);
+        color: var(--oracle-red);
         text-align: center;
-        padding: 0.3rem;
+        padding: 0.2rem;
         background: white;
-        border-radius: 4px;
+        border-radius: 3px;
         border: 1px solid #dee2e6;
     }
     
@@ -889,54 +894,54 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-top: 2rem;
+        margin-top: 1.5rem;
         padding-top: 1rem;
-        border-top: 1px solid #e9ecef;
-        font-size: 0.9rem;
-        color: #6c757d;
+        border-top: 1px solid var(--oracle-gray-border);
+        font-size: 0.8rem;
+        color: var(--oracle-gray);
     }
     
     .card-actions {
         display: flex;
-        gap: 1rem;
-        margin-top: 1.5rem;
+        gap: 0.8rem;
+        margin-top: 1rem;
         justify-content: center;
     }
     
     .action-button {
-        background: var(--jsc-gradient);
+        background: var(--oracle-red);
         color: white;
         border: none;
-        padding: 0.7rem 1.5rem;
-        border-radius: 6px;
+        padding: 0.6rem 1.2rem;
+        border-radius: 4px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
     }
     
     .action-button:hover {
-        background: var(--jsc-primary-dark);
-        transform: translateY(-2px);
+        background: var(--oracle-red-dark);
+        transform: translateY(-1px);
     }
     
     .action-button.secondary {
         background: white;
-        color: var(--jsc-primary);
-        border: 2px solid var(--jsc-primary);
+        color: var(--oracle-red);
+        border: 1px solid var(--oracle-red);
     }
     
     .action-button.secondary:hover {
-        background: var(--jsc-primary);
+        background: var(--oracle-red);
         color: white;
     }
     
     .filter-section {
         background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        margin-bottom: 1.5rem;
-        border: 1px solid #e9ecef;
+        padding: 1.2rem;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.2rem;
+        border: 1px solid var(--oracle-gray-border);
         position: relative;
         overflow: hidden;
     }
@@ -947,25 +952,25 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 3px;
-        background: var(--jsc-gradient);
+        height: 2px;
+        background: var(--oracle-red);
     }
     
     .filter-header {
-        border-left: 4px solid var(--jsc-primary);
-        padding-left: 1rem;
-        margin-bottom: 1rem;
-        color: var(--jsc-primary-dark);
+        border-left: 3px solid var(--oracle-red);
+        padding-left: 0.8rem;
+        margin-bottom: 0.8rem;
+        color: var(--oracle-red);
         font-weight: 600;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
     }
     
     .independent-section {
-        border: 2px solid var(--jsc-primary);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 1px solid var(--oracle-red);
+        border-radius: 6px;
+        padding: 1.2rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, var(--oracle-gray-light) 0%, #ffffff 100%);
         position: relative;
         overflow: hidden;
     }
@@ -976,96 +981,96 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 3px;
-        background: var(--jsc-gradient);
+        height: 2px;
+        background: var(--oracle-red);
     }
     
     .section-results {
-        border: 2px solid var(--jsc-success);
-        border-radius: 12px;
-        padding: 1.5rem;
+        border: 1px solid var(--oracle-green);
+        border-radius: 6px;
+        padding: 1.2rem;
         margin-bottom: 1rem;
         background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
     }
     
     .combined-results {
-        border: 2px solid var(--jsc-secondary);
-        border-radius: 12px;
-        padding: 1.5rem;
+        border: 1px solid var(--oracle-blue);
+        border-radius: 6px;
+        padding: 1.2rem;
         margin-bottom: 1rem;
         background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
     }
     
     .data-quality-indicator {
-        padding: 0.8rem;
-        border-radius: 8px;
-        margin: 0.3rem 0;
-        font-size: 0.85rem;
-        border-left: 4px solid;
+        padding: 0.6rem;
+        border-radius: 4px;
+        margin: 0.2rem 0;
+        font-size: 0.8rem;
+        border-left: 3px solid;
     }
     
     .quality-good {
         background: #d4edda;
         color: #155724;
-        border-left-color: var(--jsc-success);
+        border-left-color: var(--oracle-green);
     }
     
     .quality-warning {
         background: #fff3cd;
         color: #856404;
-        border-left-color: var(--jsc-warning);
+        border-left-color: var(--oracle-orange);
     }
     
     .quality-error {
         background: #f8d7da;
         color: #721c24;
-        border-left-color: var(--jsc-danger);
+        border-left-color: var(--oracle-red);
     }
     
     .calculation-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid var(--jsc-success);
+        background: linear-gradient(135deg, var(--oracle-gray-light) 0%, #e9ecef 100%);
+        padding: 0.8rem;
+        border-radius: 6px;
+        margin: 0.4rem 0;
+        border-left: 3px solid var(--oracle-green);
     }
     
     .spec-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin: 1rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.8rem;
+        margin: 0.8rem 0;
     }
     
     .property-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 0.8rem;
-        margin: 1rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.6rem;
+        margin: 0.8rem 0;
     }
     
     .specification-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-        margin: 1.5rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.2rem;
+        margin: 1.2rem 0;
     }
     
-    .jsc-footer {
+    .oracle-footer {
         text-align: center;
-        color: #6c757d;
-        padding: 2rem;
-        margin-top: 3rem;
-        border-top: 1px solid #e9ecef;
+        color: var(--oracle-gray);
+        padding: 1.5rem;
+        margin-top: 2rem;
+        border-top: 1px solid var(--oracle-gray-border);
     }
     
     /* Loading spinner enhancements */
     .stSpinner > div {
-        border: 4px solid #f3f3f3;
+        border: 3px solid #f3f3f3;
         border-radius: 50%;
-        border-top: 4px solid var(--jsc-primary);
-        width: 40px;
-        height: 40px;
+        border-top: 3px solid var(--oracle-red);
+        width: 30px;
+        height: 30px;
         animation: spin 2s linear infinite;
         margin: 0 auto;
     }
@@ -1077,12 +1082,12 @@ st.markdown("""
     
     /* Mobile optimizations */
     @media (max-width: 768px) {
-        .jsc-header {
-            padding: 1.5rem !important;
+        .oracle-header {
+            padding: 1rem !important;
         }
         
-        .jsc-header h1 {
-            font-size: 2rem !important;
+        .oracle-header h1 {
+            font-size: 1.8rem !important;
         }
         
         .spec-grid,
@@ -1093,17 +1098,17 @@ st.markdown("""
         
         .card-header {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.8rem;
             text-align: center;
         }
         
         .stTabs [data-baseweb="tab"] {
-            padding: 0.8rem 1rem;
+            padding: 0.6rem 0.8rem;
         }
         
         .spec-row {
             grid-template-columns: 1fr;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
         
         .card-actions {
@@ -1121,8 +1126,8 @@ st.markdown("""
         }
         
         .quick-action {
-            height: 100px !important;
-            padding: 1rem 0.5rem !important;
+            height: 90px !important;
+            padding: 0.8rem 0.4rem !important;
         }
         
         .stSelectbox, .stTextInput, .stNumberInput {
@@ -2816,14 +2821,14 @@ def show_weight_calculator_rectified():
     """FIXED weight calculator with proper data fetching for ALL products"""
     
     st.markdown("""
-    <div class="jsc-header">
+    <div class="oracle-header">
         <h1>Weight Calculator - FIXED WORKFLOW</h1>
         <p>SEPARATE data fetching for Socket Head products with SAME formula</p>
         <div>
-            <span class="jsc-badge">FIXED</span>
-            <span class="jsc-badge-accent">Separate Data Fetching</span>
-            <span class="jsc-badge-secondary">Same Formula</span>
-            <span class="jsc-badge-success">Different Standards</span>
+            <span class="oracle-badge">FIXED</span>
+            <span class="oracle-badge-orange">Separate Data Fetching</span>
+            <span class="oracle-badge-blue">Same Formula</span>
+            <span class="oracle-badge-green">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3735,7 +3740,7 @@ def show_professional_product_card(product_details):
         
         <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
-            <div class="jsc-card">
+            <div class="oracle-card">
                 <div class="filter-header">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
@@ -3824,7 +3829,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Head Specifications Group -->
-            <div class="jsc-card">
+            <div class="oracle-card">
                 <div class="filter-header">Head Specifications</div>
                 
                 <!-- Head Height -->
@@ -3865,7 +3870,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Additional Specifications Group -->
-            <div class="jsc-card">
+            <div class="oracle-card">
                 <div class="filter-header">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
@@ -3882,7 +3887,7 @@ def show_professional_product_card(product_details):
                 
                 <!-- Thread Information -->
                 <div class="spec-row">
-                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--jsc-gradient); color: white; padding: 0.8rem;">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--oracle-red); color: white; padding: 0.8rem;">
                         <strong>Thread: {thread}</strong>
                     </div>
                 </div>
@@ -3894,7 +3899,7 @@ def show_professional_product_card(product_details):
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div class="jsc-badge">
+            <div class="oracle-badge">
                 Professional Specification
             </div>
         </div>
@@ -3974,14 +3979,14 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="jsc-header">
+    <div class="oracle-header">
         <h1>Product Intelligence Center - Independent Sections</h1>
         <p>Each section works completely independently - No dependencies</p>
         <div>
-            <span class="jsc-badge">Enhanced Calculator</span>
-            <span class="jsc-badge-accent">Product-Based Workflow</span>
-            <span class="jsc-badge-secondary">Dynamic Standards</span>
-            <span class="jsc-badge-success">Professional Grade</span>
+            <span class="oracle-badge">Enhanced Calculator</span>
+            <span class="oracle-badge-orange">Product-Based Workflow</span>
+            <span class="oracle-badge-blue">Dynamic Standards</span>
+            <span class="oracle-badge-green">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4421,14 +4426,14 @@ def show_rectified_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="jsc-header">
+    <div class="oracle-header">
         <h1>JSC Industries</h1>
         <p>Professional Fastener Intelligence Platform v4.0 - FIXED</p>
         <div>
-            <span class="jsc-badge">FIXED Calculator</span>
-            <span class="jsc-badge-accent">Separate Data Fetching</span>
-            <span class="jsc-badge-secondary">Same Formula</span>
-            <span class="jsc-badge-success">Different Standards</span>
+            <span class="oracle-badge">FIXED Calculator</span>
+            <span class="oracle-badge-orange">Separate Data Fetching</span>
+            <span class="oracle-badge-blue">Same Formula</span>
+            <span class="oracle-badge-green">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4443,36 +4448,36 @@ def show_rectified_home():
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Products</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_products}</h2>
-            <p style="color: #7f8c8d; margin:0;">Total Records</p>
+            <h3 style="color: var(--oracle-red); margin:0;">Products</h3>
+            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_products}</h2>
+            <p style="color: var(--oracle-gray); margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Dimensional Standards</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
-            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
+            <h3 style="color: var(--oracle-red); margin:0;">Dimensional Standards</h3>
+            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: var(--oracle-gray); margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">Thread Types</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_threads}</h2>
-            <p style="color: #7f8c8d; margin:0;">Available</p>
+            <h3 style="color: var(--oracle-red); margin:0;">Thread Types</h3>
+            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_threads}</h2>
+            <p style="color: var(--oracle-gray); margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--jsc-primary); margin:0;">ME&CERT</h3>
-            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_mecert}</h2>
-            <p style="color: #7f8c8d; margin:0;">Properties</p>
+            <h3 style="color: var(--oracle-red); margin:0;">ME&CERT</h3>
+            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_mecert}</h2>
+            <p style="color: var(--oracle-gray); margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -4503,21 +4508,21 @@ def show_rectified_home():
         st.markdown('<h3 class="section-header">System Status - FIXED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "jsc-badge-accent"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "jsc-badge-secondary"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "jsc-badge-success"),
-            ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-accent"),
-            ("Weight Calculations", True, "jsc-badge-secondary"),
-            ("FIXED Calculator", True, "jsc-badge-success"),
+            ("ASME B18.2.1 Data", not df.empty, "oracle-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "oracle-badge-orange"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "oracle-badge-blue"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "oracle-badge-green"),
+            ("ME&CERT Data", not df_mechem.empty, "oracle-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "oracle-badge-orange"),
+            ("Weight Calculations", True, "oracle-badge-blue"),
+            ("FIXED Calculator", True, "oracle-badge-green"),
         ]
         
         for item_name, status, badge_class in status_items:
             if status:
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: var(--oracle-gray);">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
         st.markdown('<h3 class="section-header">FIXED Features</h3>', unsafe_allow_html=True)
@@ -4540,7 +4545,7 @@ def show_rectified_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div class="jsc-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="oracle-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -4671,12 +4676,12 @@ def main():
     
     st.markdown("""
         <hr>
-        <div class="jsc-footer">
+        <div class="oracle-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="jsc-badge">FIXED Calculator</span>
-                <span class="jsc-badge-accent">Separate Data Fetching</span>
-                <span class="jsc-badge-secondary">Same Formula</span>
-                <span class="jsc-badge-success">Different Standards</span>
+                <span class="oracle-badge">FIXED Calculator</span>
+                <span class="oracle-badge-orange">Separate Data Fetching</span>
+                <span class="oracle-badge-blue">Same Formula</span>
+                <span class="oracle-badge-green">Different Standards</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with SEPARATE data fetching and SAME formula for socket head products</p>
