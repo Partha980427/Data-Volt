@@ -162,7 +162,7 @@ def load_config():
                 'thread_files': thread_files
             },
             'ui': {
-                'theme': 'oracle',
+                'theme': 'oracle11g',
                 'page_title': 'JSC Industries - Fastener Intelligence'
             },
             'features': {
@@ -180,7 +180,7 @@ def save_user_preferences():
             'preferred_units': 'metric',
             'recent_searches': [],
             'favorite_filters': {},
-            'theme_preference': 'oracle'
+            'theme_preference': 'oracle11g'
         }
 
 def initialize_session_state():
@@ -280,10 +280,10 @@ def optimize_for_mobile():
         st.markdown("""
         <style>
         @media (max-width: 768px) {
-            .oracle-header {
+            .oracle11g-header {
                 padding: 1rem !important;
             }
-            .oracle-header h1 {
+            .oracle11g-header h1 {
                 font-size: 1.5rem !important;
             }
             .stButton > button {
@@ -506,7 +506,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# ORACLE XE STYLING - COMPLETE UI TRANSFORMATION
+# ORACLE 11G STYLING - COMPLETE UI TRANSFORMATION
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -515,21 +515,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Oracle XE Professional CSS
+# Oracle 11g Professional CSS
 st.markdown("""
 <style>
     :root {
-        --oracle-red: #A30006;
-        --oracle-red-dark: #8B0000;
-        --oracle-red-light: #C4000D;
-        --oracle-gray-dark: #333333;
-        --oracle-gray: #666666;
-        --oracle-gray-light: #F8F8F8;
-        --oracle-gray-border: #DDDDDD;
-        --oracle-blue: #0072C6;
-        --oracle-green: #00A651;
-        --oracle-orange: #FF6A00;
-        --oracle-yellow: #FFC72C;
+        --oracle11g-blue: #1F4E78;
+        --oracle11g-blue-dark: #0D2B4A;
+        --oracle11g-blue-light: #2E75B6;
+        --oracle11g-gray-dark: #333333;
+        --oracle11g-gray: #666666;
+        --oracle11g-gray-light: #F5F5F5;
+        --oracle11g-gray-border: #CCCCCC;
+        --oracle11g-orange: #E66C37;
+        --oracle11g-green: #4CAF50;
+        --oracle11g-yellow: #FFC107;
+        --oracle11g-red: #D32F2F;
     }
     
     .stApp {
@@ -537,128 +537,136 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    .oracle-header {
-        background: linear-gradient(135deg, var(--oracle-red) 0%, var(--oracle-red-dark) 100%);
-        padding: 2rem;
+    .oracle11g-header {
+        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-dark) 100%);
+        padding: 2.5rem;
         border-radius: 8px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 1px solid var(--oracle-red-dark);
+        box-shadow: 0 6px 18px rgba(31, 78, 120, 0.3);
+        border: 1px solid var(--oracle11g-blue-light);
         position: relative;
         overflow: hidden;
     }
     
-    .oracle-header::before {
+    .oracle11g-header::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        height: 3px;
-        background: var(--oracle-yellow);
+        height: 4px;
+        background: linear-gradient(90deg, var(--oracle11g-orange) 0%, var(--oracle11g-yellow) 100%);
     }
     
-    .oracle-header h1 {
-        font-size: 2.2rem;
-        font-weight: 600;
+    .oracle11g-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
         margin-bottom: 0.5rem;
         color: white;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    .oracle-header p {
-        font-size: 1.1rem;
+    .oracle11g-header p {
+        font-size: 1.2rem;
         opacity: 0.95;
         margin-bottom: 1rem;
         color: white;
+        font-weight: 300;
     }
     
-    .oracle-card {
+    .oracle11g-card {
         background: white;
-        padding: 1.5rem;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid var(--oracle-red);
+        padding: 1.8rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid var(--oracle11g-blue);
         transition: all 0.3s ease;
-        margin-bottom: 1rem;
-        border: 1px solid var(--oracle-gray-border);
+        margin-bottom: 1.2rem;
+        border: 1px solid var(--oracle11g-gray-border);
         position: relative;
         overflow: hidden;
     }
     
-    .oracle-card::before {
+    .oracle11g-card::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
-        height: 2px;
-        background: var(--oracle-red);
+        height: 3px;
+        background: var(--oracle11g-blue);
     }
     
-    .oracle-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
-        border-left-color: var(--oracle-red-dark);
+    .oracle11g-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(31, 78, 120, 0.15);
+        border-left-color: var(--oracle11g-blue-light);
     }
     
     .metric-card {
         background: white;
-        padding: 1.5rem;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid var(--oracle-red);
+        padding: 1.8rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid var(--oracle11g-blue);
         transition: transform 0.3s ease;
-        border: 1px solid var(--oracle-gray-border);
+        border: 1px solid var(--oracle11g-gray-border);
         text-align: center;
     }
     
     .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(31, 78, 120, 0.15);
     }
     
-    .oracle-badge {
-        background: var(--oracle-red);
+    .oracle11g-badge {
+        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
         color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
         font-weight: 600;
         margin: 0.2rem;
         display: inline-block;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 6px rgba(31, 78, 120, 0.3);
+        border: 1px solid var(--oracle11g-blue-light);
     }
     
-    .oracle-badge-blue {
-        background: var(--oracle-blue);
+    .oracle11g-badge-orange {
+        background: linear-gradient(135deg, var(--oracle11g-orange) 0%, #F57C00 100%);
+        border: 1px solid var(--oracle11g-orange);
     }
     
-    .oracle-badge-green {
-        background: var(--oracle-green);
+    .oracle11g-badge-green {
+        background: linear-gradient(135deg, var(--oracle11g-green) 0%, #388E3C 100%);
+        border: 1px solid var(--oracle11g-green);
     }
     
-    .oracle-badge-orange {
-        background: var(--oracle-orange);
+    .oracle11g-badge-yellow {
+        background: linear-gradient(135deg, var(--oracle11g-yellow) 0%, #FFA000 100%);
+        color: #333;
+        border: 1px solid var(--oracle11g-yellow);
     }
     
     .stButton>button {
-        background: var(--oracle-red);
+        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
         color: white;
         border: none;
-        padding: 0.6rem 1.2rem;
-        border-radius: 4px;
+        padding: 0.8rem 1.5rem;
+        border-radius: 6px;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 4px rgba(163, 0, 6, 0.2);
+        box-shadow: 0 4px 12px rgba(31, 78, 120, 0.3);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border: 1px solid var(--oracle11g-blue-light);
     }
     
     .stButton>button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(163, 0, 6, 0.3);
-        background: var(--oracle-red-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(31, 78, 120, 0.4);
+        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
     }
     
     .stButton>button:active {
@@ -666,64 +674,67 @@ st.markdown("""
     }
     
     .stButton>button[kind="primary"] {
-        background: var(--oracle-red);
+        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
         color: white;
     }
     
     .stButton>button[kind="primary"]:hover {
-        background: var(--oracle-red-dark);
+        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
     }
     
     .stButton>button[kind="secondary"] {
         background: white;
-        color: var(--oracle-red);
-        border: 1px solid var(--oracle-red);
+        color: var(--oracle11g-blue);
+        border: 2px solid var(--oracle11g-blue);
     }
     
     .stButton>button[kind="secondary"]:hover {
-        background: var(--oracle-red);
+        background: var(--oracle11g-blue);
         color: white;
     }
     
     .css-1d391kg, .css-1lcbmhc {
-        background: white;
-        border-right: 1px solid var(--oracle-gray-border);
+        background: linear-gradient(180deg, var(--oracle11g-gray-light) 0%, white 100%);
+        border-right: 2px solid var(--oracle11g-gray-border);
     }
     
     .sidebar .sidebar-content {
-        background: linear-gradient(180deg, white 0%, var(--oracle-gray-light) 100%);
+        background: linear-gradient(180deg, white 0%, var(--oracle11g-gray-light) 100%);
     }
     
     .stTextInput>div>div>input, 
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select {
-        border: 1px solid var(--oracle-gray-border);
-        border-radius: 4px;
-        padding: 0.5rem 0.8rem;
+        border: 2px solid var(--oracle11g-gray-border);
+        border-radius: 6px;
+        padding: 0.7rem 1rem;
         transition: all 0.3s ease;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: white;
     }
     
     .stTextInput>div>div>input:focus, 
     .stNumberInput>div>div>input:focus,
     .stSelectbox>div>div>select:focus {
-        border-color: var(--oracle-red);
-        box-shadow: 0 0 0 2px rgba(163, 0, 6, 0.1);
+        border-color: var(--oracle11g-blue);
+        box-shadow: 0 0 0 3px rgba(31, 78, 120, 0.1);
+        background: white;
     }
     
     .dataframe {
-        border-radius: 6px;
+        border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid var(--oracle-gray-border);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 1px solid var(--oracle11g-gray-border);
     }
     
     .streamlit-expanderHeader {
-        background: var(--oracle-gray-light);
-        border-radius: 4px;
-        border: 1px solid var(--oracle-gray-border);
+        background: var(--oracle11g-gray-light);
+        border-radius: 6px;
+        border: 2px solid var(--oracle11g-gray-border);
         font-weight: 600;
-        color: var(--oracle-red);
+        color: var(--oracle11g-blue);
+        padding: 1rem;
     }
     
     .stTabs [data-baseweb="tab-list"] {
@@ -732,26 +743,29 @@ st.markdown("""
     
     .stTabs [data-baseweb="tab"] {
         background: white;
-        border-radius: 4px 4px 0 0;
-        padding: 0.8rem 1.5rem;
-        border: 1px solid var(--oracle-gray-border);
+        border-radius: 6px 6px 0 0;
+        padding: 1rem 2rem;
+        border: 2px solid var(--oracle11g-gray-border);
         border-bottom: none;
         font-weight: 600;
-        color: var(--oracle-gray);
+        color: var(--oracle11g-gray);
+        transition: all 0.3s ease;
     }
     
     .stTabs [aria-selected="true"] {
-        background: var(--oracle-red);
+        background: var(--oracle11g-blue);
         color: white;
+        border-color: var(--oracle11g-blue);
     }
     
     .stProgress > div > div > div {
-        background: var(--oracle-red);
+        background: linear-gradient(90deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
     }
     
     .stAlert {
-        border-radius: 6px;
-        border: 1px solid;
+        border-radius: 8px;
+        border: 2px solid;
+        padding: 1rem;
     }
     
     .stAlert [data-testid="stMarkdownContainer"] {
@@ -759,24 +773,25 @@ st.markdown("""
     }
     
     .section-header {
-        border-left: 4px solid var(--oracle-red);
-        padding-left: 1rem;
-        margin: 1.5rem 0 1rem 0;
-        color: var(--oracle-red);
-        font-weight: 600;
-        font-size: 1.3rem;
+        border-left: 5px solid var(--oracle11g-blue);
+        padding-left: 1.2rem;
+        margin: 2rem 0 1.5rem 0;
+        color: var(--oracle11g-blue);
+        font-weight: 700;
+        font-size: 1.5rem;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     .quick-action {
         background: white;
-        padding: 1.2rem 0.8rem;
-        border-radius: 6px;
+        padding: 1.5rem 1rem;
+        border-radius: 8px;
         text-align: center;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid var(--oracle-gray-border);
-        height: 100px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: 2px solid var(--oracle11g-gray-border);
+        height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -791,22 +806,23 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 2px;
-        background: var(--oracle-red);
+        height: 4px;
+        background: var(--oracle11g-blue);
     }
     
     .quick-action:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        border-color: var(--oracle11g-blue);
     }
     
     .professional-card {
-        background: linear-gradient(135deg, #ffffff 0%, var(--oracle-gray-light) 100%);
-        border: 1px solid var(--oracle-red);
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin: 1.5rem 0;
-        box-shadow: 0 4px 15px rgba(163, 0, 6, 0.1);
+        background: linear-gradient(135deg, #ffffff 0%, var(--oracle11g-gray-light) 100%);
+        border: 2px solid var(--oracle11g-blue);
+        border-radius: 10px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 8px 30px rgba(31, 78, 120, 0.2);
         position: relative;
         overflow: hidden;
     }
@@ -817,131 +833,140 @@ st.markdown("""
         top: 0;
         left: 0;
         right: 0;
-        height: 3px;
-        background: var(--oracle-red);
+        height: 4px;
+        background: linear-gradient(90deg, var(--oracle11g-blue) 0%, var(--oracle11g-orange) 100%);
     }
     
     .card-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--oracle-gray-border);
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid var(--oracle11g-gray-border);
     }
     
     .card-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: var(--oracle-red);
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--oracle11g-blue);
         margin: 0;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     .card-subtitle {
-        font-size: 1rem;
-        color: var(--oracle-gray);
-        margin: 0.3rem 0 0 0;
+        font-size: 1.1rem;
+        color: var(--oracle11g-gray);
+        margin: 0.5rem 0 0 0;
+        font-weight: 400;
     }
     
     .card-company {
-        background: var(--oracle-red);
+        background: var(--oracle11g-blue);
         color: white;
-        padding: 0.4rem 0.8rem;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.8rem;
+        padding: 0.6rem 1.2rem;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 8px rgba(31, 78, 120, 0.3);
     }
     
     .spec-row {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
-        gap: 0.8rem;
+        gap: 1rem;
         align-items: center;
-        margin: 0.6rem 0;
-        padding: 0.4rem;
-        border-radius: 4px;
-        background: var(--oracle-gray-light);
+        margin: 0.8rem 0;
+        padding: 0.8rem;
+        border-radius: 6px;
+        background: var(--oracle11g-gray-light);
+        border: 1px solid var(--oracle11g-gray-border);
     }
     
     .spec-label-min, .spec-label-max {
-        font-size: 0.8rem;
-        color: var(--oracle-gray);
+        font-size: 0.9rem;
+        color: var(--oracle11g-gray);
         text-align: center;
-        font-weight: 500;
+        font-weight: 600;
     }
     
     .spec-dimension {
-        font-weight: 600;
-        color: var(--oracle-red);
+        font-weight: 700;
+        color: var(--oracle11g-blue);
         text-align: center;
-        padding: 0.2rem 0.8rem;
+        padding: 0.5rem 1rem;
         background: white;
-        border-radius: 3px;
-        border: 1px solid var(--oracle-gray-border);
+        border-radius: 4px;
+        border: 2px solid var(--oracle11g-gray-border);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .spec-value {
-        font-weight: 600;
-        color: var(--oracle-red);
+        font-weight: 700;
+        color: var(--oracle11g-blue);
         text-align: center;
-        padding: 0.2rem;
+        padding: 0.5rem;
         background: white;
-        border-radius: 3px;
-        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        border: 2px solid var(--oracle11g-gray-border);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .card-footer {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-top: 1.5rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--oracle-gray-border);
-        font-size: 0.8rem;
-        color: var(--oracle-gray);
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 2px solid var(--oracle11g-gray-border);
+        font-size: 0.9rem;
+        color: var(--oracle11g-gray);
     }
     
     .card-actions {
         display: flex;
-        gap: 0.8rem;
-        margin-top: 1rem;
+        gap: 1rem;
+        margin-top: 1.5rem;
         justify-content: center;
     }
     
     .action-button {
-        background: var(--oracle-red);
+        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
         color: white;
         border: none;
-        padding: 0.6rem 1.2rem;
-        border-radius: 4px;
+        padding: 0.8rem 1.5rem;
+        border-radius: 6px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(31, 78, 120, 0.3);
+        border: 1px solid var(--oracle11g-blue-light);
     }
     
     .action-button:hover {
-        background: var(--oracle-red-dark);
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(31, 78, 120, 0.4);
     }
     
     .action-button.secondary {
         background: white;
-        color: var(--oracle-red);
-        border: 1px solid var(--oracle-red);
+        color: var(--oracle11g-blue);
+        border: 2px solid var(--oracle11g-blue);
     }
     
     .action-button.secondary:hover {
-        background: var(--oracle-red);
+        background: var(--oracle11g-blue);
         color: white;
     }
     
     .filter-section {
         background: white;
-        padding: 1.2rem;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        margin-bottom: 1.2rem;
-        border: 1px solid var(--oracle-gray-border);
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+        border: 2px solid var(--oracle11g-gray-border);
         position: relative;
         overflow: hidden;
     }
@@ -952,25 +977,25 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 2px;
-        background: var(--oracle-red);
+        height: 4px;
+        background: var(--oracle11g-blue);
     }
     
     .filter-header {
-        border-left: 3px solid var(--oracle-red);
-        padding-left: 0.8rem;
-        margin-bottom: 0.8rem;
-        color: var(--oracle-red);
-        font-weight: 600;
-        font-size: 1.1rem;
+        border-left: 4px solid var(--oracle11g-blue);
+        padding-left: 1rem;
+        margin-bottom: 1rem;
+        color: var(--oracle11g-blue);
+        font-weight: 700;
+        font-size: 1.3rem;
     }
     
     .independent-section {
-        border: 1px solid var(--oracle-red);
-        border-radius: 6px;
-        padding: 1.2rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, var(--oracle-gray-light) 0%, #ffffff 100%);
+        border: 2px solid var(--oracle11g-blue);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, var(--oracle11g-gray-light) 0%, #ffffff 100%);
         position: relative;
         overflow: hidden;
     }
@@ -981,96 +1006,101 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 2px;
-        background: var(--oracle-red);
+        height: 4px;
+        background: var(--oracle11g-blue);
     }
     
     .section-results {
-        border: 1px solid var(--oracle-green);
-        border-radius: 6px;
-        padding: 1.2rem;
-        margin-bottom: 1rem;
+        border: 2px solid var(--oracle11g-green);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
         background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
     }
     
     .combined-results {
-        border: 1px solid var(--oracle-blue);
-        border-radius: 6px;
-        padding: 1.2rem;
-        margin-bottom: 1rem;
-        background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
+        border: 2px solid var(--oracle11g-orange);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, #fff8f0 0%, #ffffff 100%);
     }
     
     .data-quality-indicator {
-        padding: 0.6rem;
-        border-radius: 4px;
-        margin: 0.2rem 0;
-        font-size: 0.8rem;
-        border-left: 3px solid;
+        padding: 0.8rem;
+        border-radius: 6px;
+        margin: 0.3rem 0;
+        font-size: 0.9rem;
+        border-left: 4px solid;
+        background: white;
+        border: 1px solid var(--oracle11g-gray-border);
     }
     
     .quality-good {
-        background: #d4edda;
-        color: #155724;
-        border-left-color: var(--oracle-green);
+        background: #e8f5e8;
+        color: #2e7d32;
+        border-left-color: var(--oracle11g-green);
     }
     
     .quality-warning {
-        background: #fff3cd;
-        color: #856404;
-        border-left-color: var(--oracle-orange);
+        background: #fff8e1;
+        color: #f57c00;
+        border-left-color: var(--oracle11g-yellow);
     }
     
     .quality-error {
-        background: #f8d7da;
-        color: #721c24;
-        border-left-color: var(--oracle-red);
+        background: #ffebee;
+        color: #c62828;
+        border-left-color: var(--oracle11g-red);
     }
     
     .calculation-card {
-        background: linear-gradient(135deg, var(--oracle-gray-light) 0%, #e9ecef 100%);
-        padding: 0.8rem;
-        border-radius: 6px;
-        margin: 0.4rem 0;
-        border-left: 3px solid var(--oracle-green);
+        background: linear-gradient(135deg, var(--oracle11g-gray-light) 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        border-left: 4px solid var(--oracle11g-green);
+        border: 1px solid var(--oracle11g-gray-border);
     }
     
     .spec-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 0.8rem;
-        margin: 0.8rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
     }
     
     .property-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 0.6rem;
-        margin: 0.8rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
+        margin: 1rem 0;
     }
     
     .specification-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1.2rem;
-        margin: 1.2rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 1.5rem 0;
     }
     
-    .oracle-footer {
+    .oracle11g-footer {
         text-align: center;
-        color: var(--oracle-gray);
-        padding: 1.5rem;
-        margin-top: 2rem;
-        border-top: 1px solid var(--oracle-gray-border);
+        color: var(--oracle11g-gray);
+        padding: 2rem;
+        margin-top: 3rem;
+        border-top: 2px solid var(--oracle11g-gray-border);
+        background: var(--oracle11g-gray-light);
+        border-radius: 8px;
     }
     
     /* Loading spinner enhancements */
     .stSpinner > div {
-        border: 3px solid #f3f3f3;
+        border: 4px solid #f3f3f3;
         border-radius: 50%;
-        border-top: 3px solid var(--oracle-red);
-        width: 30px;
-        height: 30px;
+        border-top: 4px solid var(--oracle11g-blue);
+        width: 40px;
+        height: 40px;
         animation: spin 2s linear infinite;
         margin: 0 auto;
     }
@@ -1082,12 +1112,12 @@ st.markdown("""
     
     /* Mobile optimizations */
     @media (max-width: 768px) {
-        .oracle-header {
-            padding: 1rem !important;
+        .oracle11g-header {
+            padding: 1.5rem !important;
         }
         
-        .oracle-header h1 {
-            font-size: 1.8rem !important;
+        .oracle11g-header h1 {
+            font-size: 2rem !important;
         }
         
         .spec-grid,
@@ -1098,17 +1128,17 @@ st.markdown("""
         
         .card-header {
             flex-direction: column;
-            gap: 0.8rem;
+            gap: 1rem;
             text-align: center;
         }
         
         .stTabs [data-baseweb="tab"] {
-            padding: 0.6rem 0.8rem;
+            padding: 0.8rem 1rem;
         }
         
         .spec-row {
             grid-template-columns: 1fr;
-            gap: 0.4rem;
+            gap: 0.5rem;
         }
         
         .card-actions {
@@ -1116,18 +1146,18 @@ st.markdown("""
         }
         
         .stButton > button {
-            padding: 0.5rem 1rem !important;
+            padding: 0.7rem 1.2rem !important;
             font-size: 0.9rem !important;
         }
         
         .metric-card {
-            padding: 1rem !important;
-            margin-bottom: 0.5rem !important;
+            padding: 1.2rem !important;
+            margin-bottom: 0.8rem !important;
         }
         
         .quick-action {
-            height: 90px !important;
-            padding: 0.8rem 0.4rem !important;
+            height: 100px !important;
+            padding: 1rem 0.6rem !important;
         }
         
         .stSelectbox, .stTextInput, .stNumberInput {
@@ -2821,14 +2851,14 @@ def show_weight_calculator_rectified():
     """FIXED weight calculator with proper data fetching for ALL products"""
     
     st.markdown("""
-    <div class="oracle-header">
+    <div class="oracle11g-header">
         <h1>Weight Calculator - FIXED WORKFLOW</h1>
         <p>SEPARATE data fetching for Socket Head products with SAME formula</p>
         <div>
-            <span class="oracle-badge">FIXED</span>
-            <span class="oracle-badge-orange">Separate Data Fetching</span>
-            <span class="oracle-badge-blue">Same Formula</span>
-            <span class="oracle-badge-green">Different Standards</span>
+            <span class="oracle11g-badge">FIXED</span>
+            <span class="oracle11g-badge-orange">Separate Data Fetching</span>
+            <span class="oracle11g-badge-green">Same Formula</span>
+            <span class="oracle11g-badge-yellow">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3740,7 +3770,7 @@ def show_professional_product_card(product_details):
         
         <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
-            <div class="oracle-card">
+            <div class="oracle11g-card">
                 <div class="filter-header">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
@@ -3829,7 +3859,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Head Specifications Group -->
-            <div class="oracle-card">
+            <div class="oracle11g-card">
                 <div class="filter-header">Head Specifications</div>
                 
                 <!-- Head Height -->
@@ -3870,7 +3900,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Additional Specifications Group -->
-            <div class="oracle-card">
+            <div class="oracle11g-card">
                 <div class="filter-header">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
@@ -3887,7 +3917,7 @@ def show_professional_product_card(product_details):
                 
                 <!-- Thread Information -->
                 <div class="spec-row">
-                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--oracle-red); color: white; padding: 0.8rem;">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--oracle11g-blue); color: white; padding: 0.8rem;">
                         <strong>Thread: {thread}</strong>
                     </div>
                 </div>
@@ -3899,7 +3929,7 @@ def show_professional_product_card(product_details):
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div class="oracle-badge">
+            <div class="oracle11g-badge">
                 Professional Specification
             </div>
         </div>
@@ -3979,14 +4009,14 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="oracle-header">
+    <div class="oracle11g-header">
         <h1>Product Intelligence Center - Independent Sections</h1>
         <p>Each section works completely independently - No dependencies</p>
         <div>
-            <span class="oracle-badge">Enhanced Calculator</span>
-            <span class="oracle-badge-orange">Product-Based Workflow</span>
-            <span class="oracle-badge-blue">Dynamic Standards</span>
-            <span class="oracle-badge-green">Professional Grade</span>
+            <span class="oracle11g-badge">Enhanced Calculator</span>
+            <span class="oracle11g-badge-orange">Product-Based Workflow</span>
+            <span class="oracle11g-badge-green">Dynamic Standards</span>
+            <span class="oracle11g-badge-yellow">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4426,14 +4456,14 @@ def show_rectified_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="oracle-header">
+    <div class="oracle11g-header">
         <h1>JSC Industries</h1>
         <p>Professional Fastener Intelligence Platform v4.0 - FIXED</p>
         <div>
-            <span class="oracle-badge">FIXED Calculator</span>
-            <span class="oracle-badge-orange">Separate Data Fetching</span>
-            <span class="oracle-badge-blue">Same Formula</span>
-            <span class="oracle-badge-green">Different Standards</span>
+            <span class="oracle11g-badge">FIXED Calculator</span>
+            <span class="oracle11g-badge-orange">Separate Data Fetching</span>
+            <span class="oracle11g-badge-green">Same Formula</span>
+            <span class="oracle11g-badge-yellow">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4448,36 +4478,36 @@ def show_rectified_home():
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle-red); margin:0;">Products</h3>
-            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_products}</h2>
-            <p style="color: var(--oracle-gray); margin:0;">Total Records</p>
+            <h3 style="color: var(--oracle11g-blue); margin:0;">Products</h3>
+            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_products}</h2>
+            <p style="color: var(--oracle11g-gray); margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle-red); margin:0;">Dimensional Standards</h3>
-            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
-            <p style="color: var(--oracle-gray); margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
+            <h3 style="color: var(--oracle11g-blue); margin:0;">Dimensional Standards</h3>
+            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: var(--oracle11g-gray); margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle-red); margin:0;">Thread Types</h3>
-            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_threads}</h2>
-            <p style="color: var(--oracle-gray); margin:0;">Available</p>
+            <h3 style="color: var(--oracle11g-blue); margin:0;">Thread Types</h3>
+            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_threads}</h2>
+            <p style="color: var(--oracle11g-gray); margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle-red); margin:0;">ME&CERT</h3>
-            <h2 style="color: var(--oracle-red-dark); margin:0.5rem 0;">{total_mecert}</h2>
-            <p style="color: var(--oracle-gray); margin:0;">Properties</p>
+            <h3 style="color: var(--oracle11g-blue); margin:0;">ME&CERT</h3>
+            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_mecert}</h2>
+            <p style="color: var(--oracle11g-gray); margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -4508,21 +4538,21 @@ def show_rectified_home():
         st.markdown('<h3 class="section-header">System Status - FIXED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "oracle-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "oracle-badge-orange"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "oracle-badge-blue"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "oracle-badge-green"),
-            ("ME&CERT Data", not df_mechem.empty, "oracle-badge"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "oracle-badge-orange"),
-            ("Weight Calculations", True, "oracle-badge-blue"),
-            ("FIXED Calculator", True, "oracle-badge-green"),
+            ("ASME B18.2.1 Data", not df.empty, "oracle11g-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "oracle11g-badge-orange"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "oracle11g-badge-green"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "oracle11g-badge-yellow"),
+            ("ME&CERT Data", not df_mechem.empty, "oracle11g-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "oracle11g-badge-orange"),
+            ("Weight Calculations", True, "oracle11g-badge-green"),
+            ("FIXED Calculator", True, "oracle11g-badge-yellow"),
         ]
         
         for item_name, status, badge_class in status_items:
             if status:
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: var(--oracle-gray);">{item_name} - Limited</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: var(--oracle11g-gray);">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
         st.markdown('<h3 class="section-header">FIXED Features</h3>', unsafe_allow_html=True)
@@ -4545,7 +4575,7 @@ def show_rectified_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div class="oracle-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="oracle11g-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -4676,12 +4706,12 @@ def main():
     
     st.markdown("""
         <hr>
-        <div class="oracle-footer">
+        <div class="oracle11g-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="oracle-badge">FIXED Calculator</span>
-                <span class="oracle-badge-orange">Separate Data Fetching</span>
-                <span class="oracle-badge-blue">Same Formula</span>
-                <span class="oracle-badge-green">Different Standards</span>
+                <span class="oracle11g-badge">FIXED Calculator</span>
+                <span class="oracle11g-badge-orange">Separate Data Fetching</span>
+                <span class="oracle11g-badge-green">Same Formula</span>
+                <span class="oracle11g-badge-yellow">Different Standards</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with SEPARATE data fetching and SAME formula for socket head products</p>
