@@ -13,7 +13,23 @@ import json
 import numpy as np
 import math
 import warnings
+import logging
+from typing import Dict, List, Optional, Any
+import io
 warnings.filterwarnings('ignore')
+
+# ======================================================
+# LOGGING CONFIGURATION
+# ======================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('fastener_app.log')
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # ======================================================
 # PATHS & FILES - UPDATED WITH GOOGLE SHEETS LINKS
@@ -43,6 +59,32 @@ thread_files = {
     "ISO 965-2-98 Coarse": "https://docs.google.com/spreadsheets/d/1be5eEy9hbVfMg2sl1-Cz1NNCGGF8EB-L/export?format=xlsx",
     "ISO 965-2-98 Fine": "https://docs.google.com/spreadsheets/d/1QGQ6SMWBSTsah-vq3zYnhOC3NXaBdKPe/export?format=xlsx",
 }
+
+# ======================================================
+# LOADING INDICATORS MANAGEMENT
+# ======================================================
+class LoadingManager:
+    """Manage loading states and progress indicators"""
+    
+    @staticmethod
+    def show_loading_spinner(text="Processing..."):
+        """Display a loading spinner"""
+        return st.spinner(text)
+    
+    @staticmethod
+    def show_progress_bar(step, total_steps, text="Processing"):
+        """Display a progress bar"""
+        progress = st.progress(0)
+        for i in range(total_steps):
+            progress.progress((i + 1) / total_steps, text=f"{text}... {i+1}/{total_steps}")
+            time.sleep(0.1)
+        progress.empty()
+    
+    @staticmethod
+    def log_operation(operation_name, success=True, details=""):
+        """Log operations with details"""
+        status = "SUCCESS" if success else "FAILED"
+        logger.info(f"{operation_name} - {status} - {details}")
 
 # ======================================================
 # ENHANCED CONFIGURATION & ERROR HANDLING
@@ -86,11 +128,13 @@ def safe_load_excel_file_enhanced(path_or_url, max_retries=3, timeout=30):
                 st.warning(f"Dataframe has too few columns: {path_or_url}")
                 return pd.DataFrame()
                 
+            LoadingManager.log_operation(f"Load Excel File: {path_or_url}", True, f"Rows: {len(df)}, Columns: {len(df.columns)}")
             return df
             
         except Exception as e:
             if attempt == max_retries - 1:
                 st.error(f"Error loading {path_or_url}: {str(e)}")
+                LoadingManager.log_operation(f"Load Excel File: {path_or_url}", False, str(e))
                 return pd.DataFrame()
             time.sleep(1)
 
@@ -205,7 +249,9 @@ def initialize_session_state():
         "weight_calc_result": None,
         "weight_calculation_performed": False,
         "pitch_diameter_value": None,
-        "weight_form_submitted": False
+        "weight_form_submitted": False,
+        # Mobile view state
+        "mobile_view_optimized": False
     }
     
     for key, value in defaults.items():
@@ -214,6 +260,97 @@ def initialize_session_state():
     
     load_config()
     save_user_preferences()
+
+# ======================================================
+# MOBILE OPTIMIZATION
+# ======================================================
+def detect_mobile_device():
+    """Detect if the user is on a mobile device"""
+    try:
+        user_agent = st.query_params.get('user_agent', '')
+        mobile_indicators = ['Mobile', 'Android', 'iPhone', 'iPad']
+        return any(indicator in user_agent for indicator in mobile_indicators)
+    except:
+        return False
+
+def optimize_for_mobile():
+    """Apply mobile-specific optimizations"""
+    if detect_mobile_device() or st.session_state.mobile_view_optimized:
+        st.session_state.mobile_view_optimized = True
+        st.markdown("""
+        <style>
+        @media (max-width: 768px) {
+            .jsc-header {
+                padding: 1rem !important;
+            }
+            .jsc-header h1 {
+                font-size: 1.5rem !important;
+            }
+            .stButton > button {
+                padding: 0.5rem 1rem !important;
+                font-size: 0.9rem !important;
+            }
+            .stSelectbox, .stTextInput, .stNumberInput {
+                font-size: 0.9rem !important;
+            }
+            .metric-card {
+                padding: 1rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .quick-action {
+                height: 100px !important;
+                padding: 1rem 0.5rem !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+# ======================================================
+# ENHANCED DATA EXPORT TEMPLATES
+# ======================================================
+class ExportTemplateManager:
+    """Manage export templates for different data types"""
+    
+    @staticmethod
+    def get_weight_calc_template():
+        """Get template for weight calculations"""
+        template_data = {
+            'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
+            'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
+            'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
+            'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
+            'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
+            'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
+            'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
+            'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
+            'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
+            'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
+            'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
+            'Length': [50, 100, 200, 75, 60, 50, 40],
+            'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
+            'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
+        }
+        return pd.DataFrame(template_data)
+    
+    @staticmethod
+    def get_product_database_template():
+        """Get template for product database exports"""
+        template_data = {
+            'Product': ['Hex Bolt', 'Heavy Hex Bolt', 'Hex Cap Screw'],
+            'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.3'],
+            'Size': ['1/4', '5/16', '1/4'],
+            'Thread': ['1/4-20-UNC-2A', '5/16-18-UNC-2A', '1/4-20-UNC-2A'],
+            'Material_Grade': ['N/A', 'N/A', 'N/A'],
+            'Quantity': [100, 50, 200],
+            'Notes': ['Standard hex bolt', 'Heavy hex pattern', 'Socket head cap screw']
+        }
+        return pd.DataFrame(template_data)
+    
+    @staticmethod
+    def export_to_pdf(data, title="Fastener Report"):
+        """Export data to PDF format (placeholder for future implementation)"""
+        st.info("PDF export feature will be available in the next update")
+        return None
 
 # ======================================================
 # FIXED THREAD DATA LOADING - PROPER DATA TYPES
@@ -293,10 +430,12 @@ def load_thread_data_enhanced(standard_name):
         # Add standard identifier
         df_thread['Standard'] = standard_name
         
+        LoadingManager.log_operation(f"Load Thread Data: {standard_name}", True, f"Records: {len(df_thread)}")
         return df_thread
         
     except Exception as e:
         st.error(f"Error loading thread data for {standard_name}: {str(e)}")
+        LoadingManager.log_operation(f"Load Thread Data: {standard_name}", False, str(e))
         return pd.DataFrame()
 
 def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
@@ -920,6 +1059,23 @@ st.markdown("""
         border-top: 1px solid #e9ecef;
     }
     
+    /* Loading spinner enhancements */
+    .stSpinner > div {
+        border: 4px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 4px solid var(--jsc-primary);
+        width: 40px;
+        height: 40px;
+        animation: spin 2s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Mobile optimizations */
     @media (max-width: 768px) {
         .jsc-header {
             padding: 1.5rem !important;
@@ -953,43 +1109,68 @@ st.markdown("""
         .card-actions {
             flex-direction: column;
         }
+        
+        .stButton > button {
+            padding: 0.5rem 1rem !important;
+            font-size: 0.9rem !important;
+        }
+        
+        .metric-card {
+            padding: 1rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .quick-action {
+            height: 100px !important;
+            padding: 1rem 0.5rem !important;
+        }
+        
+        .stSelectbox, .stTextInput, .stNumberInput {
+            font-size: 0.9rem !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
 initialize_session_state()
+optimize_for_mobile()
 
 # ======================================================
 # ENHANCED DATA LOADING WITH PRODUCT MAPPING
 # ======================================================
 
 # Load main data
-df = safe_load_excel_file_enhanced(url) if url else safe_load_excel_file_enhanced(local_excel_path)
+with LoadingManager.show_loading_spinner("Loading main fastener data..."):
+    df = safe_load_excel_file_enhanced(url) if url else safe_load_excel_file_enhanced(local_excel_path)
 
 # Load Mechanical and Chemical data
-df_mechem = safe_load_excel_file_enhanced(me_chem_google_url)
-if df_mechem.empty:
-    st.info("Online Mechanical & Chemical file not accessible, trying local version...")
-    df_mechem = safe_load_excel_file_enhanced(me_chem_path)
+with LoadingManager.show_loading_spinner("Loading mechanical & chemical data..."):
+    df_mechem = safe_load_excel_file_enhanced(me_chem_google_url)
+    if df_mechem.empty:
+        st.info("Online Mechanical & Chemical file not accessible, trying local version...")
+        df_mechem = safe_load_excel_file_enhanced(me_chem_path)
 
 # Load ISO 4014 data
-df_iso4014 = safe_load_excel_file_enhanced(iso4014_file_url)
-if df_iso4014.empty:
-    st.info("Online ISO 4014 file not accessible, trying local version...")
-    df_iso4014 = safe_load_excel_file_enhanced(iso4014_local_path)
+with LoadingManager.show_loading_spinner("Loading ISO 4014 data..."):
+    df_iso4014 = safe_load_excel_file_enhanced(iso4014_file_url)
+    if df_iso4014.empty:
+        st.info("Online ISO 4014 file not accessible, trying local version...")
+        df_iso4014 = safe_load_excel_file_enhanced(iso4014_local_path)
 
 # Load DIN-7991 data
-df_din7991 = safe_load_excel_file_enhanced(din7991_file_url)
-if df_din7991.empty:
-    st.info("Online DIN-7991 file not accessible, trying local version...")
-    df_din7991 = safe_load_excel_file_enhanced(din7991_local_path)
+with LoadingManager.show_loading_spinner("Loading DIN-7991 data..."):
+    df_din7991 = safe_load_excel_file_enhanced(din7991_file_url)
+    if df_din7991.empty:
+        st.info("Online DIN-7991 file not accessible, trying local version...")
+        df_din7991 = safe_load_excel_file_enhanced(din7991_local_path)
 
 # Load ASME B18.3 data
-df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_file_url)
-if df_asme_b18_3.empty:
-    st.info("Online ASME B18.3 file not accessible, trying local version...")
-    df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_local_path)
+with LoadingManager.show_loading_spinner("Loading ASME B18.3 data..."):
+    df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_file_url)
+    if df_asme_b18_3.empty:
+        st.info("Online ASME B18.3 file not accessible, trying local version...")
+        df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_local_path)
 
 # ======================================================
 # FIXED DATA PROCESSING - CORRECT PRODUCT NAMES
@@ -1075,7 +1256,8 @@ def process_standard_data():
     return standard_products, standard_series
 
 # Process all standards data
-standard_products, standard_series = process_standard_data()
+with LoadingManager.show_loading_spinner("Processing standards data..."):
+    standard_products, standard_series = process_standard_data()
 
 # Process DIN-7991 data if loaded
 if not df_din7991.empty:
@@ -1172,10 +1354,12 @@ def process_mechanical_chemical_data():
             st.sidebar.write(f"Found {len(property_classes)} property classes")
             st.sidebar.write(f"Property class columns: {property_class_cols}")
         
+        LoadingManager.log_operation("Process Mechanical & Chemical Data", True, f"Property Classes: {len(property_classes)}")
         return me_chem_columns, property_classes
         
     except Exception as e:
         st.error(f"Error processing Mechanical & Chemical data: {str(e)}")
+        LoadingManager.log_operation("Process Mechanical & Chemical Data", False, str(e))
         return [], []
 
 def get_standards_for_property_class(property_class):
@@ -1346,7 +1530,8 @@ def show_mechanical_chemical_details(property_class):
         st.error(f"Error displaying mechanical/chemical details: {str(e)}")
 
 # Initialize Mechanical & Chemical data processing
-me_chem_columns, property_classes = process_mechanical_chemical_data()
+with LoadingManager.show_loading_spinner("Processing mechanical & chemical properties..."):
+    me_chem_columns, property_classes = process_mechanical_chemical_data()
 
 # ======================================================
 # COMPLETELY BULLETPROOF SIZE HANDLING - FIXED VERSION
@@ -1542,7 +1727,7 @@ def get_asme_b18_3_dimensions(product, size):
         
         if 'Size' in temp_df.columns and size != "All":
             # Normalize size comparison - handle different formats
-            temp_df['Size_Normalized'] = temp_df['Size'].astype(str).str.strip()
+            temp_df['Size_Normalized'] = temp_df['Size'].ast(str).str.strip()
             size_normalized = str(size).strip()
             temp_df = temp_df[temp_df['Size_Normalized'] == size_normalized]
         
@@ -1671,10 +1856,12 @@ def get_asme_b18_3_dimensions(product, size):
             st.sidebar.write(f"Head Diameter Column Used: {head_dia_col}")
             st.sidebar.write(f"Head Height Column Used: {head_height_col}")
         
+        LoadingManager.log_operation(f"Get ASME B18.3 Dimensions", True, f"Head Dia: {head_diameter}, Head Height: {head_height}")
         return head_diameter, head_height, original_unit
             
     except Exception as e:
         st.error(f"Error getting ASME B18.3 dimensions: {str(e)}")
+        LoadingManager.log_operation("Get ASME B18.3 Dimensions", False, str(e))
         return None, None, "inch"
 
 def get_din7991_dimensions(product, size):
@@ -1753,10 +1940,12 @@ def get_din7991_dimensions(product, size):
             st.sidebar.write(f"Head Height Column: {head_height_col}, Value: {head_height}")
             st.sidebar.write(f"Available columns: {temp_df.columns.tolist()}")
         
+        LoadingManager.log_operation(f"Get DIN-7991 Dimensions", True, f"Head Dia: {head_diameter}, Head Height: {head_height}")
         return head_diameter, head_height, original_unit
         
     except Exception as e:
         st.warning(f"Error getting DIN-7991 dimensions: {str(e)}")
+        LoadingManager.log_operation("Get DIN-7991 Dimensions", False, str(e))
         return None, None, "mm"
 
 def get_socket_head_dimensions(standard, product, size, grade="All"):
@@ -1839,10 +2028,12 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
             if pd.notna(head_height):
                 head_height = float(head_height)
         
+        LoadingManager.log_operation(f"Get Hex Head Dimensions", True, f"Width: {width_across_flats}, Height: {head_height}")
         return width_across_flats, head_height, original_unit
         
     except Exception as e:
         st.warning(f"Error getting hex head dimensions: {str(e)}")
+        LoadingManager.log_operation("Get Hex Head Dimensions", False, str(e))
         return None, None, "unknown"
 
 # ======================================================
@@ -1912,7 +2103,7 @@ def calculate_socket_product_weight_rectified(parameters, head_diameter, head_he
         weight_kg = weight_g / 1000
         weight_lb = weight_kg * 2.20462
         
-        return {
+        result = {
             'weight_kg': weight_kg,
             'weight_g': weight_g,
             'weight_lb': weight_lb,
@@ -1954,8 +2145,12 @@ def calculate_socket_product_weight_rectified(parameters, head_diameter, head_he
             }
         }
         
+        LoadingManager.log_operation("Socket Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
+        return result
+        
     except Exception as e:
         st.error(f"Socket product calculation error: {str(e)}")
+        LoadingManager.log_operation("Socket Product Weight Calculation", False, str(e))
         return None
 
 def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit):
@@ -2006,7 +2201,7 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
         weight_kg = weight_g / 1000
         weight_lb = weight_kg * 2.20462
         
-        return {
+        result = {
             'weight_kg': weight_kg,
             'weight_g': weight_g,
             'weight_lb': weight_lb,
@@ -2051,8 +2246,12 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
             }
         }
         
+        LoadingManager.log_operation("Hex Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
+        return result
+        
     except Exception as e:
         st.error(f"Hex product calculation error: {str(e)}")
+        LoadingManager.log_operation("Hex Product Weight Calculation", False, str(e))
         return None
 
 # ======================================================
@@ -2282,7 +2481,7 @@ def calculate_weight_rectified(parameters):
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
             
-            return {
+            result = {
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
@@ -2304,6 +2503,9 @@ def calculate_weight_rectified(parameters):
                     'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
             }
+            
+            LoadingManager.log_operation("Threaded Rod Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
+            return result
         
         # For hex products, use rectified hex product formula in mm³
         elif product_type in hex_products:
@@ -2317,7 +2519,7 @@ def calculate_weight_rectified(parameters):
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
             
-            return {
+            result = {
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
@@ -2340,8 +2542,12 @@ def calculate_weight_rectified(parameters):
                 }
             }
             
+            LoadingManager.log_operation("Standard Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
+            return result
+            
     except Exception as e:
         st.error(f"Calculation error: {str(e)}")
+        LoadingManager.log_operation("Weight Calculation", False, str(e))
         import traceback
         st.error(f"Detailed error: {traceback.format_exc()}")
         return None
@@ -2807,7 +3013,8 @@ def show_weight_calculator_rectified():
                     
                     # Show pitch diameter information for ALL products using Pitch Diameter
                     if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
-                        pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
+                        with LoadingManager.show_loading_spinner("Fetching thread data..."):
+                            pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter is not None:
                             # Store the pitch diameter in session state for calculation
                             st.session_state.pitch_diameter_value = pitch_diameter
@@ -2940,7 +3147,8 @@ def show_weight_calculator_rectified():
                     return
             
             # Perform calculation using FIXED function
-            result = calculate_weight_rectified(calculation_params)
+            with LoadingManager.show_loading_spinner("Calculating weight..."):
+                result = calculate_weight_rectified(calculation_params)
             
             if result:
                 st.session_state.weight_calc_result = result
@@ -3154,23 +3362,7 @@ def show_batch_calculator_rectified():
     
     # Download template
     st.markdown("### Download FIXED Batch Template")
-    template_data = {
-        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
-        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
-        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
-        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
-        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
-        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
-        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
-        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
-        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
-        'Length': [50, 100, 200, 75, 60, 50, 40],
-        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
-        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
-    }
-    template_df = pd.DataFrame(template_data)
+    template_df = ExportTemplateManager.get_weight_calc_template()
     csv_template = template_df.to_csv(index=False)
     st.download_button(
         label="Download FIXED Batch Template (CSV)",
@@ -3203,11 +3395,14 @@ def show_batch_calculator_rectified():
                 st.error(f"Missing required columns: {missing_cols}")
             else:
                 if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_fixed"):
-                    st.info("FIXED batch processing with separate data fetching ready for implementation")
-                    st.write(f"Records to process: {len(batch_df)}")
+                    with LoadingManager.show_loading_spinner("Processing batch calculations..."):
+                        LoadingManager.show_progress_bar(1, 5, "Processing batch")
+                        st.info("FIXED batch processing with separate data fetching ready for implementation")
+                        st.write(f"Records to process: {len(batch_df)}")
                     
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
+            LoadingManager.log_operation("Batch File Upload", False, str(e))
 
 def show_rectified_calculations():
     """Fixed calculations page with proper data fetching for ALL products"""
@@ -3302,9 +3497,11 @@ def export_to_excel(df, filename_prefix):
                     adjusted_width = min(max_length + 2, 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
             
+            LoadingManager.log_operation("Export to Excel", True, f"Rows: {len(df)}")
             return tmp.name
     except Exception as e:
         st.error(f"Export error: {str(e)}")
+        LoadingManager.log_operation("Export to Excel", False, str(e))
         return None
 
 def enhanced_export_data(filtered_df, export_format):
@@ -3312,7 +3509,8 @@ def enhanced_export_data(filtered_df, export_format):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     if export_format == "Excel":
-        excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
+        with LoadingManager.show_loading_spinner("Generating Excel file..."):
+            excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
         if excel_file:
             with open(excel_file, 'rb') as f:
                 st.download_button(
@@ -3347,6 +3545,8 @@ def save_calculation_history(calculation_data):
     
     if len(st.session_state.calculation_history) > 20:
         st.session_state.calculation_history = st.session_state.calculation_history[-20:]
+    
+    LoadingManager.log_operation("Save Calculation History", True, f"Total calculations: {len(st.session_state.calculation_history)}")
 
 def show_calculation_history():
     """Display calculation history"""
@@ -3365,16 +3565,157 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# COMPLETED: PROFESSIONAL PRODUCT CARD DISPLAY
+# COMPLETELY FIXED: PROFESSIONAL PRODUCT CARD DISPLAY
 # ======================================================
+def extract_product_details(row):
+    """Extract product details from dataframe row and map to card format - COMPLETELY FIXED VERSION"""
+    try:
+        # Convert row to dictionary if it's a Series
+        if hasattr(row, 'to_dict'):
+            row_dict = row.to_dict()
+        else:
+            row_dict = dict(row)
+        
+        # Safely extract basic product information with multiple fallbacks
+        details = {
+            'Product': row_dict.get('Product', 'Hex Bolt'),
+            'Size': row_dict.get('Size', 'N/A'),
+            'Standards': row_dict.get('Standards', row_dict.get('Standard', 'ASME B18.2.1')),
+            'Thread': row_dict.get('Thread', row_dict.get('Thread_Size', 'N/A')),
+            'Product Grade': row_dict.get('Product Grade', row_dict.get('Grade', 'N/A')),
+        }
+        
+        # Helper function to safely get values with multiple possible column names
+        def get_value(row_dict, possible_keys, default='N/A'):
+            for key in possible_keys:
+                value = row_dict.get(key)
+                if value is not None and pd.notna(value) and str(value).strip() != '':
+                    return str(value).strip()
+            return default
+        
+        # Map ALL possible dimensional specifications with comprehensive column name variations
+        details.update({
+            # Body Diameter - comprehensive column name variations
+            'Body_Dia_Min': get_value(row_dict, [
+                'Body_Diameter_Min', 'Body_Dia_Min', 'Basic_Major_Diameter_Min', 'Major_Dia_Min',
+                'Body Diameter Min', 'Body Dia Min', 'Body_D_Min', 'Body_Dia_Min'
+            ]),
+            'Body_Dia_Max': get_value(row_dict, [
+                'Body_Diameter_Max', 'Body_Dia_Max', 'Basic_Major_Diameter_Max', 'Major_Dia_Max',
+                'Body Diameter Max', 'Body Dia Max', 'Body_D_Max', 'Body_Dia_Max'
+            ]),
+            
+            # Width Across Flats - comprehensive column name variations
+            'Width_Across_Flats_Min': get_value(row_dict, [
+                'Width_Across_Flats_Min', 'W_Across_Flats_Min', 'Width_Min', 'W_Min',
+                'Width Across Flats Min', 'W Across Flats Min', 'Width_Flats_Min', 'W_Flats_Min',
+                'Width_Across_Flats', 'W_Across_Flats', 'Width_Flats', 'W_Flats'
+            ]),
+            'Width_Across_Flats_Max': get_value(row_dict, [
+                'Width_Across_Flats_Max', 'W_Across_Flats_Max', 'Width_Max', 'W_Max',
+                'Width Across Flats Max', 'W Across Flats Max', 'Width_Flats_Max', 'W_Flats_Max'
+            ]),
+            
+            # Width Across Corners - comprehensive column name variations
+            'Width_Across_Corners_Min': get_value(row_dict, [
+                'Width_Across_Corners_Min', 'W_Across_Corners_Min', 'Width_Across_Corners_Min',
+                'Width Across Corners Min', 'W Across Corners Min', 'Width_Corners_Min', 'W_Corners_Min',
+                'Width_Across_Corners', 'W_Across_Corners', 'Width_Corners', 'W_Corners'
+            ]),
+            'Width_Across_Corners_Max': get_value(row_dict, [
+                'Width_Across_Corners_Max', 'W_Across_Corners_Max', 'Width_Across_Corners_Max',
+                'Width Across Corners Max', 'W Across Corners Max', 'Width_Corners_Max', 'W_Corners_Max'
+            ]),
+            
+            # Head Height - comprehensive column name variations
+            'Head_Height_Min': get_value(row_dict, [
+                'Head_Height_Min', 'Head_Ht_Min', 'Head_Height', 'k_min', 'Head Height Min',
+                'Head_H_Min', 'Head_Ht', 'Head_Height_Min', 'Head_H_Min', 'k'
+            ]),
+            'Head_Height_Max': get_value(row_dict, [
+                'Head_Height_Max', 'Head_Ht_Max', 'Head_Height_Max', 'k_max',
+                'Head Height Max', 'Head_H_Max', 'Head_Ht_Max'
+            ]),
+            
+            # Radius of Fillet - comprehensive column name variations
+            'Radius_Fillet_Min': get_value(row_dict, [
+                'Radius_Fillet_Min', 'Fillet_Radius_Min', 'Radius_Fillet', 'Fillet_Radius',
+                'Radius Fillet Min', 'Fillet Radius Min', 'Radius_F_Min', 'Fillet_R_Min',
+                'Radius_Fillet', 'Fillet_Radius', 'Radius_F', 'Fillet_R'
+            ]),
+            'Radius_Fillet_Max': get_value(row_dict, [
+                'Radius_Fillet_Max', 'Fillet_Radius_Max', 'Radius_Fillet_Max',
+                'Radius Fillet Max', 'Fillet Radius Max', 'Radius_F_Max', 'Fillet_R_Max'
+            ]),
+            
+            # Washer Face Thickness - comprehensive column name variations
+            'Washer_Face_Thickness_Min': get_value(row_dict, [
+                'Washer_Face_Thickness_Min', 'Washer_Face_Min', 'Washer_Thickness_Min',
+                'Washer Face Thickness Min', 'Washer Face Min', 'Washer_Thickness_Min',
+                'Washer_Face_Thickness', 'Washer_Face', 'Washer_Thickness'
+            ]),
+            'Washer_Face_Thickness_Max': get_value(row_dict, [
+                'Washer_Face_Thickness_Max', 'Washer_Face_Max', 'Washer_Thickness_Max',
+                'Washer Face Thickness Max', 'Washer Face Max', 'Washer_Thickness_Max'
+            ]),
+            
+            # Wrenching Height - comprehensive column name variations
+            'Wrenching_Height_Min': get_value(row_dict, [
+                'Wrenching_Height_Min', 'Wrenching_Ht_Min', 'Wrenching_Height',
+                'Wrenching Height Min', 'Wrenching_H_Min', 'Wrenching_Ht',
+                'Wrenching_Height_Min', 'Wrenching_H_Min'
+            ]),
+            
+            # Total Runout - comprehensive column name variations
+            'Total_Runout_Max': get_value(row_dict, [
+                'Total_Runout_Max', 'Runout_Max', 'Total_Runout',
+                'Total Runout Max', 'Runout Max', 'Total_Runout_Max',
+                'Runout', 'Total_Runout'
+            ])
+        })
+        
+        # Debug information
+        if st.session_state.debug_mode:
+            st.sidebar.write("Extracted Product Details:")
+            for key, value in details.items():
+                if value != 'N/A':
+                    st.sidebar.write(f"  {key}: {value}")
+        
+        return details
+        
+    except Exception as e:
+        st.error(f"Error extracting product details: {str(e)}")
+        # Return basic details even if extraction fails
+        return {
+            'Product': 'Hex Bolt',
+            'Size': 'N/A',
+            'Standards': 'ASME B18.2.1',
+            'Thread': 'N/A',
+            'Product Grade': 'N/A',
+            'Body_Dia_Min': 'N/A',
+            'Body_Dia_Max': 'N/A',
+            'Width_Across_Flats_Min': 'N/A',
+            'Width_Across_Flats_Max': 'N/A',
+            'Width_Across_Corners_Min': 'N/A',
+            'Width_Across_Corners_Max': 'N/A',
+            'Head_Height_Min': 'N/A',
+            'Head_Height_Max': 'N/A',
+            'Radius_Fillet_Min': 'N/A',
+            'Radius_Fillet_Max': 'N/A',
+            'Washer_Face_Thickness_Min': 'N/A',
+            'Washer_Face_Thickness_Max': 'N/A',
+            'Wrenching_Height_Min': 'N/A',
+            'Total_Runout_Max': 'N/A'
+        }
+
 def show_professional_product_card(product_details):
-    """Display a beautiful professional product specification card"""
+    """Display a beautiful professional product specification card - COMPLETELY FIXED"""
     
-    # Extract product details
+    # Extract product details with safe defaults
     product_name = product_details.get('Product', 'Hex Bolt')
-    size = product_details.get('Size', '1/4 x 10')
+    size = product_details.get('Size', 'N/A')
     standard = product_details.get('Standards', 'ASME B18.2.1')
-    thread = product_details.get('Thread', '1/4-20-UNC-2A')
+    thread = product_details.get('Thread', 'N/A')
     grade = product_details.get('Product Grade', 'N/A')
     
     # Get current date and user info
@@ -3572,49 +3913,15 @@ def show_professional_product_card(product_details):
     # Add some action buttons below the card
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("View Raw Data", use_container_width=True):
+        if st.button("View Raw Data", use_container_width=True, key="view_raw_pro_card"):
             st.dataframe(pd.DataFrame([product_details]))
     with col2:
-        if st.button("Compare Products", use_container_width=True):
+        if st.button("Compare Products", use_container_width=True, key="compare_pro_card"):
             st.info("Product comparison feature coming soon!")
     with col3:
-        if st.button("Close Card", use_container_width=True):
+        if st.button("Close Card", use_container_width=True, key="close_pro_card"):
             st.session_state.show_professional_card = False
             st.rerun()
-
-def extract_product_details(row):
-    """Extract product details from dataframe row and map to card format"""
-    details = {
-        'Product': row.get('Product', 'Hex Bolt'),
-        'Size': row.get('Size', 'N/A'),
-        'Standards': row.get('Standards', 'ASME B18.2.1'),
-        'Thread': row.get('Thread', '1/4-20-UNC-2A'),
-        'Product Grade': row.get('Product Grade', 'N/A'),
-        
-        # Map dimensional specifications
-        'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
-        'Body_Dia_Max': row.get('Body_Diameter_Max', row.get('Basic_Major_Diameter_Max', 'N/A')),
-        
-        'Width_Across_Flats_Min': row.get('Width_Across_Flats_Min', row.get('W_Across_Flats_Min', 'N/A')),
-        'Width_Across_Flats_Max': row.get('Width_Across_Flats_Max', row.get('W_Across_Flats_Max', 'N/A')),
-        
-        'Width_Across_Corners_Min': row.get('Width_Across_Corners_Min', row.get('W_Across_Corners_Min', 'N/A')),
-        'Width_Across_Corners_Max': row.get('Width_Across_Corners_Max', row.get('W_Across_Corners_Max', 'N/A')),
-        
-        'Head_Height_Min': row.get('Head_Height_Min', 'N/A'),
-        'Head_Height_Max': row.get('Head_Height_Max', 'N/A'),
-        
-        'Radius_Fillet_Min': row.get('Radius_Fillet_Min', row.get('Fillet_Radius_Min', 'N/A')),
-        'Radius_Fillet_Max': row.get('Radius_Fillet_Max', row.get('Fillet_Radius_Max', 'N/A')),
-        
-        'Washer_Face_Thickness_Min': row.get('Washer_Face_Thickness_Min', 'N/A'),
-        'Washer_Face_Thickness_Max': row.get('Washer_Face_Thickness_Max', 'N/A'),
-        
-        'Wrenching_Height_Min': row.get('Wrenching_Height_Min', 'N/A'),
-        'Total_Runout_Max': row.get('Total_Runout_Max', 'N/A')
-    }
-    
-    return details
 
 # ======================================================
 # FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE-GRADE RELATIONSHIP
@@ -3808,15 +4115,16 @@ def show_enhanced_product_database():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("APPLY SECTION A FILTERS", use_container_width=True, type="primary", key="apply_section_a"):
-                st.session_state.section_a_filters = {
-                    'product': dimensional_product,
-                    'series': dimensional_series,
-                    'standard': dimensional_standard,
-                    'size': dimensional_size,
-                    'grade': dimensional_grade if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt" else "All"
-                }
-                # Apply filters and store results
-                st.session_state.section_a_results = apply_section_a_filters()
+                with LoadingManager.show_loading_spinner("Applying filters..."):
+                    st.session_state.section_a_filters = {
+                        'product': dimensional_product,
+                        'series': dimensional_series,
+                        'standard': dimensional_standard,
+                        'size': dimensional_size,
+                        'grade': dimensional_grade if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt" else "All"
+                    }
+                    # Apply filters and store results
+                    st.session_state.section_a_results = apply_section_a_filters()
                 st.rerun()
         
         st.markdown("</div>", unsafe_allow_html=True)
@@ -3922,13 +4230,14 @@ def show_enhanced_product_database():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("APPLY SECTION B FILTERS", use_container_width=True, type="primary", key="apply_section_b"):
-                st.session_state.section_b_filters = {
-                    'standard': thread_standard,
-                    'size': thread_size,
-                    'class': tolerance_class
-                }
-                # Apply filters and store results
-                st.session_state.section_b_results = apply_section_b_filters()
+                with LoadingManager.show_loading_spinner("Applying thread filters..."):
+                    st.session_state.section_b_filters = {
+                        'standard': thread_standard,
+                        'size': thread_size,
+                        'class': tolerance_class
+                    }
+                    # Apply filters and store results
+                    st.session_state.section_b_results = apply_section_b_filters()
                 st.rerun()
         
         st.markdown("</div>", unsafe_allow_html=True)
@@ -4015,12 +4324,13 @@ def show_enhanced_product_database():
                 if property_class == "All" or property_class == "No data available":
                     st.warning("Please select a valid property class")
                 else:
-                    st.session_state.section_c_filters = {
-                        'property_class': property_class,
-                        'standard': material_standard
-                    }
-                    # Apply filters and store results
-                    st.session_state.section_c_results = apply_section_c_filters()
+                    with LoadingManager.show_loading_spinner("Applying material filters..."):
+                        st.session_state.section_c_filters = {
+                            'property_class': property_class,
+                            'standard': material_standard
+                        }
+                        # Apply filters and store results
+                        st.session_state.section_c_results = apply_section_c_filters()
                     
                     # Show immediate feedback
                     if st.session_state.section_c_results.empty:
@@ -4042,7 +4352,8 @@ def show_enhanced_product_database():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("COMBINE ALL SECTION RESULTS", use_container_width=True, type="secondary", key="combine_all"):
-            st.session_state.combined_results = combine_all_results()
+            with LoadingManager.show_loading_spinner("Combining results..."):
+                st.session_state.combined_results = combine_all_results()
             st.rerun()
     
     # Show Combined Results
@@ -4322,6 +4633,36 @@ def main():
         # Debug mode toggle
         st.markdown("---")
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
+        
+        # Mobile optimization toggle
+        st.session_state.mobile_view_optimized = st.checkbox("Mobile Optimized View", value=st.session_state.mobile_view_optimized)
+        
+        # Export templates section
+        st.markdown("---")
+        with st.expander("Export Templates"):
+            st.markdown("### Download Templates")
+            
+            if st.button("Weight Calculator Template"):
+                template_df = ExportTemplateManager.get_weight_calc_template()
+                csv_template = template_df.to_csv(index=False)
+                st.download_button(
+                    label="Download CSV Template",
+                    data=csv_template,
+                    file_name="weight_calculator_template.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            
+            if st.button("Product Database Template"):
+                template_df = ExportTemplateManager.get_product_database_template()
+                csv_template = template_df.to_csv(index=False)
+                st.download_button(
+                    label="Download CSV Template",
+                    data=csv_template,
+                    file_name="product_database_template.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
     
     if st.session_state.selected_section is None:
         show_rectified_home()
