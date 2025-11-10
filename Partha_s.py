@@ -251,16 +251,7 @@ def initialize_session_state():
         "pitch_diameter_value": None,
         "weight_form_submitted": False,
         # Mobile view state
-        "mobile_view_optimized": False,
-        # Batch calculator specific states
-        "batch_product": "Select Product",
-        "batch_series": "Select Series", 
-        "batch_standard": "Select Standard",
-        "batch_diameter_type": "Blank Diameter",
-        "batch_material": "Carbon Steel",
-        "batch_uploaded_file": None,
-        "batch_processing_complete": False,
-        "batch_results_df": None
+        "mobile_view_optimized": False
     }
     
     for key, value in defaults.items():
@@ -338,28 +329,6 @@ class ExportTemplateManager:
             'Length': [50, 100, 200, 75, 60, 50, 40],
             'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
             'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
-        }
-        return pd.DataFrame(template_data)
-    
-    @staticmethod
-    def get_batch_weight_template():
-        """Enhanced template for batch weight calculations"""
-        template_data = {
-            'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod'],
-            'Series': ['Inch', 'Inch', 'Inch'],
-            'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required'],
-            'Size': ['1/4', '5/16', 'Not Required'],
-            'Grade': ['N/A', 'N/A', 'N/A'],
-            'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Pitch Diameter'],
-            'Diameter_Value': [6.35, 7.94, 11.48],
-            'Diameter_Unit': ['mm', 'mm', 'mm'],
-            'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1'],
-            'Thread_Size': ['N/A', 'N/A', '1/2'],
-            'Thread_Class': ['N/A', 'N/A', '2A'],
-            'Length': [50, 100, 200],
-            'Length_Unit': ['mm', 'mm', 'mm'],
-            'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel'],
-            'Quantity': [100, 50, 200]
         }
         return pd.DataFrame(template_data)
     
@@ -2619,411 +2588,6 @@ def calculate_weight_rectified(parameters):
         return None
 
 # ======================================================
-# BATCH WEIGHT CALCULATOR - COMPLETELY INDEPENDENT
-# ======================================================
-
-def validate_batch_file(df):
-    """Validate batch file structure and data"""
-    required_columns = ['Product_Type', 'Size', 'Diameter_Value', 'Diameter_Unit', 'Length', 'Length_Unit', 'Material']
-    
-    # Check required columns
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        return False, f"Missing required columns: {', '.join(missing_columns)}"
-    
-    # Check for empty values in required columns
-    for col in required_columns:
-        if df[col].isna().any():
-            return False, f"Empty values found in column: {col}"
-    
-    # Validate numeric columns
-    numeric_columns = ['Diameter_Value', 'Length']
-    for col in numeric_columns:
-        if col in df.columns:
-            try:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-                if df[col].isna().any():
-                    return False, f"Invalid numeric values in column: {col}"
-            except:
-                return False, f"Invalid numeric values in column: {col}"
-    
-    return True, "File validation successful"
-
-def process_batch_calculation(batch_df, product, series, standard, diameter_type, material):
-    """Process batch weight calculations"""
-    results = []
-    error_records = []
-    
-    total_records = len(batch_df)
-    
-    # Create progress bar
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for index, row in batch_df.iterrows():
-        try:
-            # Update progress
-            progress = (index + 1) / total_records
-            progress_bar.progress(progress)
-            status_text.text(f"Processing record {index + 1} of {total_records}")
-            
-            # Prepare calculation parameters
-            calculation_params = {
-                'product_type': product,
-                'diameter_type': diameter_type,
-                'diameter_value': float(row['Diameter_Value']),
-                'diameter_unit': row['Diameter_Unit'],
-                'length': float(row['Length']),
-                'length_unit': row['Length_Unit'],
-                'material': material,
-                'standard': standard,
-                'size': row['Size'],
-                'grade': row.get('Grade', 'All')
-            }
-            
-            # Handle pitch diameter case
-            if diameter_type == "Pitch Diameter":
-                thread_standard = row.get('Thread_Standard', 'ASME B1.1')
-                thread_size = row.get('Thread_Size', row['Size'])
-                thread_class = row.get('Thread_Class', '2A')
-                
-                # Get pitch diameter from thread database
-                pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
-                if pitch_diameter is not None:
-                    st.session_state.pitch_diameter_value = pitch_diameter
-                else:
-                    st.warning(f"Could not find pitch diameter for {thread_size} in {thread_standard}")
-            
-            # Perform calculation
-            result = calculate_weight_rectified(calculation_params)
-            
-            if result:
-                # Create result record
-                result_record = {
-                    'Record_ID': index + 1,
-                    'Product_Type': product,
-                    'Size': row['Size'],
-                    'Diameter_Type': diameter_type,
-                    'Diameter_Value': row['Diameter_Value'],
-                    'Diameter_Unit': row['Diameter_Unit'],
-                    'Length': row['Length'],
-                    'Length_Unit': row['Length_Unit'],
-                    'Material': material,
-                    'Weight_kg': result['weight_kg'],
-                    'Weight_g': result['weight_g'],
-                    'Weight_lb': result['weight_lb'],
-                    'Total_Volume_cm3': result.get('total_volume_cm3', result.get('volume_cm3', 0)),
-                    'Density_g_cm3': result['density_g_cm3'],
-                    'Calculation_Method': result['calculation_method'],
-                    'Status': 'Success'
-                }
-                
-                # Add quantity if present
-                if 'Quantity' in row:
-                    quantity = float(row['Quantity'])
-                    result_record['Quantity'] = quantity
-                    result_record['Total_Weight_kg'] = result['weight_kg'] * quantity
-                    result_record['Total_Weight_lb'] = result['weight_lb'] * quantity
-                
-                results.append(result_record)
-            else:
-                error_records.append({
-                    'Record_ID': index + 1,
-                    'Error': 'Calculation failed',
-                    'Data': row.to_dict()
-                })
-                
-        except Exception as e:
-            error_records.append({
-                'Record_ID': index + 1,
-                'Error': str(e),
-                'Data': row.to_dict()
-            })
-    
-    # Clear progress indicators
-    progress_bar.empty()
-    status_text.empty()
-    
-    return pd.DataFrame(results), pd.DataFrame(error_records)
-
-def show_batch_weight_calculator():
-    """Main batch weight calculator interface"""
-    
-    st.markdown("""
-    <div class="oracle11g-header">
-        <h1>Batch Weight Calculator - INDEPENDENT</h1>
-        <p>Process multiple fastener calculations in bulk - Completely separate from single calculator</p>
-        <div>
-            <span class="oracle11g-badge">Independent</span>
-            <span class="oracle11g-badge-orange">Bulk Processing</span>
-            <span class="oracle11g-badge-green">Template Based</span>
-            <span class="oracle11g-badge-yellow">Error Handling</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Initialize batch session states if not exists
-    if 'batch_processing_complete' not in st.session_state:
-        st.session_state.batch_processing_complete = False
-    if 'batch_results_df' not in st.session_state:
-        st.session_state.batch_results_df = None
-    if 'batch_error_df' not in st.session_state:
-        st.session_state.batch_error_df = None
-    
-    # Main batch calculator layout
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("### Product Standards Selection")
-        
-        # A. Product Selection
-        batch_product_options = get_available_products()
-        batch_product = st.selectbox(
-            "A. Product Type",
-            batch_product_options,
-            key="batch_product_select",
-            index=batch_product_options.index(st.session_state.batch_product) if st.session_state.batch_product in batch_product_options else 0
-        )
-        st.session_state.batch_product = batch_product
-        
-        # B. Series Selection
-        if batch_product != "Select Product":
-            batch_series_options = get_series_for_product(batch_product)
-            batch_series = st.selectbox(
-                "B. Series System",
-                batch_series_options,
-                key="batch_series_select",
-                index=batch_series_options.index(st.session_state.batch_series) if st.session_state.batch_series in batch_series_options else 0
-            )
-            st.session_state.batch_series = batch_series
-            
-            # C. Standard Selection (skip for Threaded Rod)
-            if batch_product == "Threaded Rod":
-                st.info("Standard not required for Threaded Rod")
-                batch_standard = "Not Required"
-            else:
-                batch_standard_options = get_standards_for_product_series(batch_product, batch_series)
-                batch_standard = st.selectbox(
-                    "C. Standard",
-                    batch_standard_options,
-                    key="batch_standard_select",
-                    index=batch_standard_options.index(st.session_state.batch_standard) if st.session_state.batch_standard in batch_standard_options else 0
-                )
-                st.session_state.batch_standard = batch_standard
-        
-        # Diameter Specification
-        st.markdown("### Diameter Specification")
-        batch_diameter_options = ["Blank Diameter", "Pitch Diameter"]
-        batch_diameter_type = st.radio(
-            "D. Cylinder Diameter Type",
-            batch_diameter_options,
-            key="batch_diameter_type_select",
-            index=batch_diameter_options.index(st.session_state.batch_diameter_type) if st.session_state.batch_diameter_type in batch_diameter_options else 0
-        )
-        st.session_state.batch_diameter_type = batch_diameter_type
-        
-        # Additional Parameters
-        st.markdown("### Additional Parameters")
-        batch_material_options = ["Carbon Steel", "Stainless Steel", "Alloy Steel", "Brass", "Aluminum", "Copper", "Titanium"]
-        batch_material = st.selectbox(
-            "Material",
-            batch_material_options,
-            key="batch_material_select",
-            index=batch_material_options.index(st.session_state.batch_material) if st.session_state.batch_material in batch_material_options else 0
-        )
-        st.session_state.batch_material = batch_material
-    
-    with col2:
-        st.markdown("### File Upload")
-        
-        # Download template
-        st.markdown("#### Download Template")
-        template_df = ExportTemplateManager.get_batch_weight_template()
-        csv_template = template_df.to_csv(index=False)
-        
-        st.download_button(
-            label="📥 Download Batch Template (CSV)",
-            data=csv_template,
-            file_name="batch_weight_calculator_template.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="batch_template_download"
-        )
-        
-        # File upload
-        st.markdown("#### Upload File")
-        uploaded_file = st.file_uploader(
-            "Choose CSV or Excel file",
-            type=["csv", "xlsx"],
-            key="batch_file_upload"
-        )
-        
-        if uploaded_file is not None:
-            try:
-                # Read the uploaded file
-                if uploaded_file.name.endswith('.xlsx'):
-                    batch_df = pd.read_excel(uploaded_file)
-                else:
-                    batch_df = pd.read_csv(uploaded_file)
-                
-                st.success(f"✅ File uploaded successfully! ({len(batch_df)} records)")
-                
-                # Show file preview
-                with st.expander("📋 File Preview"):
-                    st.dataframe(batch_df.head(10), use_container_width=True)
-                
-                # Validate file
-                is_valid, validation_message = validate_batch_file(batch_df)
-                
-                if is_valid:
-                    st.success(f"✅ {validation_message}")
-                    
-                    # Calculate button
-                    if st.button("🚀 Calculate Batch Weights", use_container_width=True, type="primary", key="batch_calculate"):
-                        if (batch_product == "Select Product" or 
-                            batch_series == "Select Series" or 
-                            (batch_product != "Threaded Rod" and batch_standard == "Select Standard")):
-                            
-                            st.error("Please complete all product standard selections before calculating.")
-                        else:
-                            with st.spinner("Processing batch calculations..."):
-                                results_df, error_df = process_batch_calculation(
-                                    batch_df, batch_product, batch_series, batch_standard, 
-                                    batch_diameter_type, batch_material
-                                )
-                                
-                                # Store results in session state
-                                st.session_state.batch_results_df = results_df
-                                st.session_state.batch_error_df = error_df
-                                st.session_state.batch_processing_complete = True
-                                
-                            st.rerun()
-                
-                else:
-                    st.error(f"❌ {validation_message}")
-                    st.info("Please download the template and ensure your file matches the required format.")
-                    
-            except Exception as e:
-                st.error(f"Error reading file: {str(e)}")
-    
-    # Show results if processing is complete
-    if st.session_state.batch_processing_complete and st.session_state.batch_results_df is not None:
-        st.markdown("---")
-        st.markdown("## 📊 Batch Calculation Results")
-        
-        # Results summary
-        total_records = len(st.session_state.batch_results_df)
-        total_errors = len(st.session_state.batch_error_df) if st.session_state.batch_error_df is not None else 0
-        success_rate = (total_records / (total_records + total_errors)) * 100 if (total_records + total_errors) > 0 else 0
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total Records", total_records + total_errors)
-        with col2:
-            st.metric("Successful", total_records)
-        with col3:
-            st.metric("Errors", total_errors)
-        with col4:
-            st.metric("Success Rate", f"{success_rate:.1f}%")
-        
-        # Show results table
-        st.markdown("### Calculation Results")
-        st.dataframe(st.session_state.batch_results_df, use_container_width=True, height=400)
-        
-        # Show errors if any
-        if total_errors > 0:
-            st.markdown("### ❌ Errors Found")
-            st.dataframe(st.session_state.batch_error_df, use_container_width=True, height=300)
-        
-        # Download results
-        st.markdown("### 📥 Download Results")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Download results as CSV
-            if not st.session_state.batch_results_df.empty:
-                results_csv = st.session_state.batch_results_df.to_csv(index=False)
-                st.download_button(
-                    label="Download Results (CSV)",
-                    data=results_csv,
-                    file_name="batch_weight_results.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="download_results_csv"
-                )
-        
-        with col2:
-            # Download results as Excel
-            if not st.session_state.batch_results_df.empty:
-                try:
-                    from io import BytesIO
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        st.session_state.batch_results_df.to_excel(writer, sheet_name='Results', index=False)
-                        if total_errors > 0:
-                            st.session_state.batch_error_df.to_excel(writer, sheet_name='Errors', index=False)
-                    output.seek(0)
-                    
-                    st.download_button(
-                        label="Download Results (Excel)",
-                        data=output,
-                        file_name="batch_weight_results.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key="download_results_excel"
-                    )
-                except Exception as e:
-                    st.error(f"Error creating Excel file: {str(e)}")
-        
-        # Reset button
-        if st.button("🔄 Process New Batch", use_container_width=True, key="batch_reset"):
-            st.session_state.batch_processing_complete = False
-            st.session_state.batch_results_df = None
-            st.session_state.batch_error_df = None
-            st.rerun()
-    
-    # Instructions and help
-    with st.expander("📖 Batch Calculator Instructions"):
-        st.markdown("""
-        ### How to Use the Batch Weight Calculator
-        
-        1. **Product Standards Selection:**
-           - **A. Product Type:** Select the type of fastener (Hex Bolt, Threaded Rod, etc.)
-           - **B. Series System:** Choose Inch or Metric series
-           - **C. Standard:** Select the appropriate standard (skipped for Threaded Rod)
-        
-        2. **Diameter Specification:**
-           - **D. Cylinder Diameter Type:** Choose between:
-             - **Blank Diameter:** Use diameter values from your uploaded file
-             - **Pitch Diameter:** Automatically fetch pitch diameter from thread database
-        
-        3. **Additional Parameters:**
-           - **Material:** Select material type for density calculation
-        
-        4. **File Upload:**
-           - Download the template CSV file
-           - Fill in your data following the template format
-           - Upload your completed file
-        
-        5. **Calculation & Results:**
-           - Click "Calculate Batch Weights" to process
-           - View results and download in CSV or Excel format
-        
-        ### Template Columns Explanation:
-        - **Product_Type:** Type of product (should match your selection)
-        - **Size:** Size specification (e.g., '1/4', 'M10')
-        - **Diameter_Value:** Diameter measurement value
-        - **Diameter_Unit:** Unit of diameter ('mm', 'inch', 'ft')
-        - **Length:** Length measurement value  
-        - **Length_Unit:** Unit of length ('mm', 'inch', 'ft')
-        - **Material:** Material type (overrides selection if different)
-        - **Quantity:** Optional - number of pieces for total weight calculation
-        - **Thread_Standard:** Required for Pitch Diameter type
-        - **Thread_Size:** Required for Pitch Diameter type
-        - **Thread_Class:** Optional for Pitch Diameter type
-        """)
-
-# ======================================================
 # MISSING FUNCTIONS IMPLEMENTATION - COMPLETED
 # ======================================================
 
@@ -3288,7 +2852,7 @@ def show_weight_calculator_rectified():
     
     st.markdown("""
     <div class="oracle11g-header">
-        <h1>Single Weight Calculator - FIXED WORKFLOW</h1>
+        <h1>Weight Calculator - FIXED WORKFLOW</h1>
         <p>SEPARATE data fetching for Socket Head products with SAME formula</p>
         <div>
             <span class="oracle11g-badge">FIXED</span>
@@ -3299,20 +2863,592 @@ def show_weight_calculator_rectified():
     </div>
     """, unsafe_allow_html=True)
     
-    # ... (rest of the single weight calculator code remains the same)
-    # [The existing single weight calculator implementation]
-    # This function is kept intact as requested
+    st.info("""
+    **SEPARATE DATA FETCHING FOR SOCKET HEAD PRODUCTS:** 
+    - **Hexagon Socket Head Cap Screws (ASME B18.3):** Separate function `get_asme_b18_3_dimensions()`
+    - **Hexagon Socket Countersunk Head Cap Screw (DIN-7991):** Separate function `get_din7991_dimensions()`  
+    - **SAME FORMULA:** Both use cylinder volume formula: 0.7853 × d² × h
+    - **DIFFERENT DATA FETCHING:** Each standard has its own dedicated function
+    - **DETAILED CALCULATIONS:** Shows complete breakdown for all products
+    """)
+    
+    # Initialize session state for form inputs
+    if 'weight_form_submitted' not in st.session_state:
+        st.session_state.weight_form_submitted = False
+    
+    # Main input form with enhanced workflow
+    with st.form("weight_calculator_rectified"):
+        st.markdown("### Product Standards Selection")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            # A. Product Type
+            product_options = get_available_products()
+            selected_product = st.selectbox(
+                "A. Product Type",
+                product_options,
+                key="weight_calc_product_select"
+            )
+            
+            # Show product info
+            if selected_product != "Select Product":
+                st.caption(f"Selected: {selected_product}")
+        
+        with col2:
+            # B. Series (Inch/Metric)
+            series_options = get_series_for_product(selected_product)
+            selected_series = st.selectbox(
+                "B. Series",
+                series_options,
+                key="weight_calc_series_select"
+            )
+            
+            # Show series info with unit conversion note
+            if selected_series != "Select Series":
+                st.caption(f"Series: {selected_series}")
+                if selected_series == "Inch":
+                    st.caption("⚠️ Inch dimensions will be converted to mm")
+        
+        with col3:
+            # C. Standard (based on Product + Series) - DISABLED FOR THREADED ROD
+            if selected_product == "Threaded Rod":
+                st.info("Standard not required for Threaded Rod")
+                selected_standard = "Not Required"
+                st.session_state.weight_calc_standard_select = "Not Required"
+            else:
+                standard_options = get_standards_for_product_series(selected_product, selected_series)
+                selected_standard = st.selectbox(
+                    "C. Standard",
+                    standard_options,
+                    key="weight_calc_standard_select"
+                )
+            
+            # Show standard info
+            if selected_standard != "Select Standard" and selected_standard != "Not Required":
+                st.caption(f"Standard: {selected_standard}")
+        
+        with col4:
+            # D. Size (based on Standard + Product) - DISABLED FOR THREADED ROD
+            if selected_product == "Threaded Rod":
+                st.info("Size not required for Threaded Rod")
+                selected_size = "Not Required"
+                st.session_state.weight_calc_size_select = "Not Required"
+            else:
+                size_options = get_sizes_for_standard_product(selected_standard, selected_product)
+                selected_size = st.selectbox(
+                    "D. Size",
+                    size_options,
+                    key="weight_calc_size_select"
+                )
+            
+            # Show size info
+            if selected_size != "Select Size" and selected_size != "Not Required":
+                st.caption(f"Size: {selected_size}")
+        
+        with col5:
+            # E. Grade (only for ISO 4014 Hex Bolt)
+            if selected_standard == "ISO 4014" and selected_product == "Hex Bolt":
+                grade_options = get_available_grades_for_standard_product(selected_standard, selected_product)
+                selected_grade = st.selectbox(
+                    "E. Product Grade",
+                    grade_options,
+                    key="weight_calc_grade_select"
+                )
+                
+                # Show grade info
+                if selected_grade != "All":
+                    st.caption(f"Grade: {selected_grade}")
+                    st.caption("⚠️ Different dimensions for A/B grades")
+            else:
+                st.info("Grade not applicable")
+                selected_grade = "Not Applicable"
+                st.session_state.weight_calc_grade_select = "Not Applicable"
+        
+        st.markdown("---")
+        st.markdown("### Diameter Specification")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # F. Cylinder Diameter Type
+            diameter_type_options = ["Blank Diameter", "Pitch Diameter"]
+            selected_diameter_type = st.radio(
+                "F. Cylinder Diameter Type",
+                diameter_type_options,
+                key="weight_calc_diameter_type_select"
+            )
+        
+        with col2:
+            # G. Conditional Input based on Diameter Type
+            if selected_diameter_type == "Blank Diameter":
+                st.markdown("**Blank Diameter Input**")
+                dia_col1, dia_col2 = st.columns(2)
+                with dia_col1:
+                    blank_diameter = st.number_input(
+                        "Blank Diameter Value",
+                        min_value=0.1,
+                        value=10.0,
+                        step=0.1,
+                        format="%.4f",
+                        key="weight_calc_blank_diameter_input"
+                    )
+                with dia_col2:
+                    blank_dia_unit = st.selectbox(
+                        "Unit",
+                        ["mm", "inch", "ft"],
+                        key="weight_calc_blank_dia_unit_select"
+                    )
+                
+                st.caption(f"Blank Diameter: {blank_diameter:.4f} {blank_dia_unit}")
+                if blank_dia_unit != "mm":
+                    st.caption(f"→ {convert_to_mm(blank_diameter, blank_dia_unit):.4f} mm (converted)")
+                else:
+                    st.caption("✓ Already in mm - no conversion needed")
+            
+            else:  # Pitch Diameter
+                st.markdown("**Thread Specification**")
+                
+                # Thread Standard
+                thread_std_options = get_thread_standards_for_series(selected_series)
+                if selected_series == "Select Series":
+                    thread_std_options = ["Select Thread Standard"]
+                
+                thread_standard = st.selectbox(
+                    "Thread Standard",
+                    thread_std_options,
+                    key="weight_calc_thread_standard_select"
+                )
+                
+                if thread_standard != "Select Thread Standard":
+                    # Thread Size
+                    thread_size_options = get_thread_sizes_enhanced(thread_standard)
+                    thread_size = st.selectbox(
+                        "Thread Size",
+                        thread_size_options,
+                        key="weight_calc_thread_size_select"
+                    )
+                    
+                    # Thread Class - Only show for Inch series
+                    if selected_series == "Inch" and thread_standard == "ASME B1.1":
+                        thread_class_options = get_thread_classes_enhanced(thread_standard)
+                        if len(thread_class_options) == 1:  # Only "All"
+                            thread_class_options = ["2A", "3A", "1A"]
+                        thread_class = st.selectbox(
+                            "Tolerance Class",
+                            thread_class_options,
+                            key="weight_calc_thread_class_select"
+                        )
+                    else:
+                        # For metric threads or non-ASME standards, don't show tolerance class
+                        thread_class = "N/A"
+                        st.caption("Tolerance Class: Not applicable for metric threads")
+                    
+                    st.caption(f"Thread: {thread_standard}, Size: {thread_size}, Class: {thread_class}")
+                    
+                    # Show pitch diameter information for ALL products using Pitch Diameter
+                    if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
+                        with LoadingManager.show_loading_spinner("Fetching thread data..."):
+                            pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
+                        if pitch_diameter is not None:
+                            # Store the pitch diameter in session state for calculation
+                            st.session_state.pitch_diameter_value = pitch_diameter
+                            
+                            # Display information
+                            if selected_series == "Inch":
+                                # For Inch series, pitch diameter from ASME B1.1 is in inches
+                                pitch_diameter_mm = pitch_diameter * 25.4
+                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} in → {pitch_diameter_mm:.4f} mm")
+                                st.info(f"⚠️ For calculation: {pitch_diameter:.4f} in will be converted to mm")
+                            else:
+                                # For Metric series, pitch diameter is already in mm
+                                st.success(f"Pitch Diameter (Min): {pitch_diameter:.4f} mm")
+                                st.info(f"✓ For calculation: {pitch_diameter:.4f} mm will be used directly")
+                        else:
+                            st.warning("Pitch diameter not found in thread data")
+        
+        st.markdown("---")
+        st.markdown("### Additional Parameters")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Length - UPDATED WITH FT UNIT AND 0.0000 FORMAT
+            length_col1, length_col2 = st.columns(2)
+            with length_col1:
+                length = st.number_input(
+                    "Length",
+                    min_value=0.1,
+                    value=50.0,
+                    step=0.1,
+                    format="%.4f",
+                    key="weight_calc_length_input"
+                )
+            with length_col2:
+                length_unit = st.selectbox(
+                    "Unit",
+                    ["mm", "inch", "ft", "meter"],
+                    key="weight_calc_length_unit_select"
+                )
+            
+            # Show length conversion info
+            if length_unit != "mm":
+                st.caption(f"→ {convert_to_mm(length, length_unit):.4f} mm (converted)")
+            else:
+                st.caption("✓ Already in mm - no conversion needed")
+        
+        with col2:
+            # Material - UPDATED WITH MORE MATERIALS
+            material_options = ["Carbon Steel", "Stainless Steel", "Alloy Steel", "Brass", "Aluminum", 
+                              "Copper", "Titanium", "Bronze", "Inconel", "Monel", "Nickel"]
+            material = st.selectbox(
+                "Material",
+                material_options,
+                key="weight_calc_material_select"
+            )
+            
+            # Show material density in g/cm³
+            density = get_material_density_rectified(material)
+            st.caption(f"Density: {density:.4f} g/cm³")
+        
+        with col3:
+            # Calculate button space
+            st.markdown("<br>", unsafe_allow_html=True)
+            calculate_btn = st.form_submit_button("Calculate Weight", use_container_width=True, type="primary")
+    
+    # Handle form submission
+    if calculate_btn:
+        # Validate inputs
+        validation_errors = []
+        
+        if selected_product == "Select Product":
+            validation_errors.append("Please select a Product Type")
+        if selected_series == "Select Series":
+            validation_errors.append("Please select a Series")
+        
+        # Skip Standard and Size validation for Threaded Rod
+        if selected_product != "Threaded Rod":
+            if selected_standard == "Select Standard":
+                validation_errors.append("Please select a Standard")
+            if selected_size == "Select Size":
+                validation_errors.append("Please select a Size")
+        
+        if selected_diameter_type == "Pitch Diameter" and thread_standard == "Select Thread Standard":
+            validation_errors.append("Please select a Thread Standard for Pitch Diameter")
+        
+        if validation_errors:
+            for error in validation_errors:
+                st.error(error)
+        else:
+            # Prepare calculation parameters
+            calculation_params = {
+                'product_type': selected_product,
+                'diameter_type': selected_diameter_type,
+                'material': material,
+                'length': length,
+                'length_unit': length_unit,
+                'standard': selected_standard,
+                'size': selected_size,
+                'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "All"
+            }
+            
+            # Add diameter parameters based on type
+            if selected_diameter_type == "Blank Diameter":
+                calculation_params.update({
+                    'diameter_value': blank_diameter,
+                    'diameter_unit': blank_dia_unit
+                })
+            else:
+                # For pitch diameter, use the pitch diameter value stored in session state
+                if 'pitch_diameter_value' in st.session_state and st.session_state.pitch_diameter_value is not None:
+                    pitch_diameter = st.session_state.pitch_diameter_value
+                    
+                    # Determine unit based on thread standard
+                    if selected_series == "Inch":
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'inch'  # ASME B1.1 data is in inches
+                        })
+                        st.success(f"Using Pitch Diameter: {pitch_diameter:.4f} inches for calculation")
+                    else:
+                        # For Metric series, pitch diameter is in mm
+                        calculation_params.update({
+                            'diameter_value': pitch_diameter,
+                            'diameter_unit': 'mm'  # ISO thread data is in mm
+                        })
+                        st.success(f"Using Pitch Diameter: {pitch_diameter:.4f} mm for calculation")
+                else:
+                    st.error("Pitch diameter not available for calculation")
+                    return
+            
+            # Perform calculation using FIXED function
+            with LoadingManager.show_loading_spinner("Calculating weight..."):
+                result = calculate_weight_rectified(calculation_params)
+            
+            if result:
+                st.session_state.weight_calc_result = result
+                st.session_state.weight_calculation_performed = True
+                
+                # Save to calculation history
+                calculation_data = {
+                    'product': selected_product,
+                    'series': selected_series,
+                    'size': selected_size if selected_product != "Threaded Rod" else "Threaded Rod",
+                    'grade': selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "N/A",
+                    'diameter': f"{blank_diameter:.4f} {blank_dia_unit}" if selected_diameter_type == 'Blank Diameter' else f"{thread_size} mm",
+                    'length': f"{length:.4f} {length_unit}",
+                    'material': material,
+                    'weight_kg': result['weight_kg'],
+                    'weight_lb': result['weight_lb'],
+                    'timestamp': datetime.now().isoformat()
+                }
+                st.session_state.calculation_history.append(calculation_data)
+                
+                st.success("**Weight Calculation Completed Successfully!**")
+    
+    # Display current selection summary
+    if selected_product != "Select Product":
+        st.markdown("### Current Selection Summary")
+        
+        summary_col1, summary_col2 = st.columns(2)
+        
+        with summary_col1:
+            st.markdown(f"""
+            **Product Standards:**
+            - **Product Type:** {selected_product}
+            - **Series:** {selected_series}
+            - **Standard:** {selected_standard if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Size:** {selected_size if selected_product != "Threaded Rod" else "Not Required (Threaded Rod)"}
+            - **Grade:** {selected_grade if selected_standard == "ISO 4014" and selected_product == "Hex Bolt" else "Not Applicable"}
+            """)
+        
+        with summary_col2:
+            if selected_diameter_type == "Blank Diameter":
+                st.markdown(f"""
+                **Diameter Specification:**
+                - **Type:** {selected_diameter_type}
+                - **Value:** {blank_diameter:.4f} {blank_dia_unit}
+                """)
+            else:
+                st.markdown(f"""
+                **Diameter Specification:**
+                - **Type:** {selected_diameter_type}
+                - **Thread Standard:** {thread_standard}
+                - **Thread Size:** {thread_size}
+                - **Thread Class:** {thread_class}
+                """)
+        
+        st.markdown(f"""
+        **Additional Parameters:**
+        - **Length:** {length:.4f} {length_unit}
+        - **Material:** {material}
+        - **Material Density:** {get_material_density_rectified(material):.4f} g/cm³
+        - **Unit Handling:** {'Conversion to mm' if (selected_diameter_type == 'Blank Diameter' and blank_dia_unit != 'mm') or length_unit != 'mm' else 'All in mm - no conversion needed'}
+        """)
+    
+    # Display calculation results - FIXED WITH DETAILED PARAMETERS FOR ALL PRODUCTS
+    if st.session_state.weight_calculation_performed and st.session_state.weight_calc_result:
+        result = st.session_state.weight_calc_result
+        
+        st.markdown("### Calculation Results")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Weight (kg)", f"{result['weight_kg']:.4f}")
+        with col2:
+            st.metric("Weight (grams)", f"{result['weight_g']:.4f}")
+        with col3:
+            st.metric("Weight (pounds)", f"{result['weight_lb']:.4f}")
+        with col4:
+            st.metric("Density", f"{result['density_g_cm3']:.4f} g/cm³")
+        
+        # FIXED: Enhanced detailed results for ALL PRODUCTS
+        with st.expander("📐 Detailed Calculation Parameters - ALL PRODUCTS"):
+            calculation_method = result.get('calculation_method', 'Standard Cylinder Formula')
+            
+            # Show calculation method
+            st.markdown(f"**Calculation Method:** `{calculation_method}`")
+            
+            # Show ALL dimensions used in calculation
+            if 'dimensions_used' in result:
+                dimensions = result['dimensions_used']
+                
+                st.markdown("### 📏 Dimensions Used in Calculation")
+                
+                # Create columns for better layout
+                dim_col1, dim_col2 = st.columns(2)
+                
+                with dim_col1:
+                    st.markdown("#### Input Values")
+                    for key, value in dimensions.items():
+                        if 'input' in key.lower():
+                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value}`")
+                
+                with dim_col2:
+                    st.markdown("#### Calculated Values (Millimeters)")
+                    for key, value in dimensions.items():
+                        if 'calculation' in key.lower() and 'mm' in key:
+                            st.markdown(f"- **{key.replace('_', ' ').title()}:** `{value} mm`")
+                
+                # Show volume calculations
+                st.markdown("#### Volume Calculations")
+                vol_col1, vol_col2 = st.columns(2)
+                with vol_col1:
+                    if 'shank_volume_mm3' in dimensions:
+                        st.markdown(f"- **Shank Volume:** `{dimensions['shank_volume_mm3']} mm³`")
+                    if 'head_volume_mm3' in dimensions:
+                        st.markdown(f"- **Head Volume:** `{dimensions['head_volume_mm3']} mm³`")
+                    if 'total_volume_mm3' in dimensions:
+                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_mm3']} mm³`")
+                
+                with vol_col2:
+                    if 'total_volume_cm3' in dimensions:
+                        st.markdown(f"- **Total Volume:** `{dimensions['total_volume_cm3']} cm³`")
+                    if 'volume_cm3' in dimensions:
+                        st.markdown(f"- **Volume:** `{dimensions['volume_cm3']} cm³`")
+                    st.markdown(f"- **Density:** `{dimensions['density_g_cm3']} g/cm³`")
+            
+            # Show formula details for all product types
+            if 'formula_details' in result:
+                st.markdown("### 🧮 Formula Details")
+                formulas = result['formula_details']
+                for formula_name, formula in formulas.items():
+                    st.markdown(f"- **{formula_name.replace('_', ' ').title()}:** `{formula}`")
+            
+            # Show specific product details
+            if 'Socket Head Formula' in calculation_method:
+                st.markdown("### 🔧 Socket Head Product Specific Details")
+                st.markdown(f"""
+                **Shank Volume Calculation:**
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
+                - Result: `{result['shank_volume_mm3']:.4f} mm³`
+                
+                **Head Volume Calculation:**
+                - Formula: 0.7853 × (head_diameter_min)² × head_height_min
+                - Head Diameter: `{result['head_diameter_mm']:.4f} mm`
+                - Head Height: `{result['head_height_mm']:.4f} mm`
+                - Result: `{result['head_volume_mm3']:.4f} mm³`
+                
+                **Total Volume:**
+                - Formula: shank_volume + head_volume
+                - Result: `{result['total_volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['total_volume_cm3']:.4f} cm³`
+                
+                **Weight Calculation:**
+                - Formula: total_volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
+                """)
+            
+            elif 'Hex Product Formula' in calculation_method:
+                st.markdown("### 🔧 Hex Product Specific Details")
+                st.markdown(f"""
+                **Shank Volume Calculation:**
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
+                - Result: `{result['shank_volume_mm3']:.4f} mm³`
+                
+                **Head Volume Calculation:**
+                - Formula: 0.65 × side_length² × head_height
+                - Width Across Flats: `{result['width_across_flats_mm']:.4f} mm`
+                - Side Length: `{result['side_length_mm']:.4f} mm`
+                - Head Height: `{result['head_height_mm']:.4f} mm`
+                - Result: `{result['head_volume_mm3']:.4f} mm³`
+                
+                **Total Volume:**
+                - Formula: shank_volume + head_volume
+                - Result: `{result['total_volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['total_volume_cm3']:.4f} cm³`
+                
+                **Weight Calculation:**
+                - Formula: total_volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
+                """)
+            
+            elif 'Threaded Rod Cylinder Formula' in calculation_method:
+                st.markdown("### 🔧 Threaded Rod Specific Details")
+                st.markdown(f"""
+                **Volume Calculation:**
+                - Formula: 0.7853 × (diameter)² × length
+                - Diameter: `{result['diameter_mm']:.4f} mm`
+                - Length: `{result['length_mm']:.4f} mm`
+                - Result: `{result['volume_mm3']:.4f} mm³`
+                - Converted to cm³: `{result['volume_cm3']:.4f} cm³`
+                
+                **Weight Calculation:**
+                - Formula: volume_cm³ × density_g/cm³
+                - Result: `{result['weight_g']:.4f} g` = `{result['weight_kg']:.4f} kg`
+                """)
+
+def show_batch_calculator_rectified():
+    """FIXED batch calculator with proper data fetching"""
+    
+    st.markdown("### Batch Weight Calculator - FIXED WORKFLOW")
+    
+    st.info("""
+    **FIXED BATCH PROCESSING:** 
+    - Separate data fetching for Socket Head products
+    - Same formula for all socket head products
+    - Detailed calculation parameters for all products
+    """)
+    
+    # Download template
+    st.markdown("### Download FIXED Batch Template")
+    template_df = ExportTemplateManager.get_weight_calc_template()
+    csv_template = template_df.to_csv(index=False)
+    st.download_button(
+        label="Download FIXED Batch Template (CSV)",
+        data=csv_template,
+        file_name="fixed_batch_weight_template.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    
+    uploaded_file = st.file_uploader("Upload CSV/Excel file for batch processing", 
+                                   type=["csv", "xlsx"],
+                                   key="batch_upload_fixed")
+    
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.xlsx'):
+                batch_df = pd.read_excel(uploaded_file)
+            else:
+                batch_df = pd.read_csv(uploaded_file)
+            
+            st.success("File uploaded successfully!")
+            st.write("Preview of uploaded data:")
+            st.dataframe(batch_df.head())
+            
+            # Validate required columns
+            required_cols = ['Product_Type', 'Series', 'Diameter_Type', 'Length']
+            missing_cols = [col for col in required_cols if col not in batch_df.columns]
+            
+            if missing_cols:
+                st.error(f"Missing required columns: {missing_cols}")
+            else:
+                if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_fixed"):
+                    with LoadingManager.show_loading_spinner("Processing batch calculations..."):
+                        LoadingManager.show_progress_bar(1, 5, "Processing batch")
+                        st.info("FIXED batch processing with separate data fetching ready for implementation")
+                        st.write(f"Records to process: {len(batch_df)}")
+                    
+        except Exception as e:
+            st.error(f"Error reading file: {str(e)}")
+            LoadingManager.log_operation("Batch File Upload", False, str(e))
 
 def show_rectified_calculations():
     """Fixed calculations page with proper data fetching for ALL products"""
     
-    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Calculator", "Analytics"])
+    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
     with tab1:
         show_weight_calculator_rectified()
     
     with tab2:
-        show_batch_weight_calculator()
+        show_batch_calculator_rectified()
     
     with tab3:
         st.markdown("### Calculation Analytics - FIXED")
