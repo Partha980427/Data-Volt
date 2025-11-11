@@ -14,7 +14,7 @@ import numpy as np
 import math
 import warnings
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import io
 warnings.filterwarnings('ignore')
 
@@ -251,7 +251,15 @@ def initialize_session_state():
         "pitch_diameter_value": None,
         "weight_form_submitted": False,
         # Mobile view state
-        "mobile_view_optimized": False
+        "mobile_view_optimized": False,
+        # Batch calculator session states - NEW
+        "batch_uploaded_file": None,
+        "batch_processing": False,
+        "batch_results": None,
+        "batch_summary": None,
+        "batch_errors": [],
+        "batch_processing_complete": False,
+        "batch_mode": "basic",  # 'basic' or 'advanced'
     }
     
     for key, value in defaults.items():
@@ -351,6 +359,750 @@ class ExportTemplateManager:
         """Export data to PDF format (placeholder for future implementation)"""
         st.info("PDF export feature will be available in the next update")
         return None
+
+# ======================================================
+# BATCH CALCULATOR TEMPLATES - NEW SECTION
+# ======================================================
+class BatchTemplateManager:
+    """Manage batch calculator templates and processing"""
+    
+    @staticmethod
+    def get_basic_template():
+        """Get basic template with only Size and Length"""
+        template_data = {
+            'Size': ['1/4', 'M10', '5/16', '1/2', 'M12'],
+            'Length': [50, 75, 100, 150, 200],
+            'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+            'Material': ['Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel'],
+            'Quantity': [100, 50, 200, 75, 150]
+        }
+        return pd.DataFrame(template_data)
+    
+    @staticmethod
+    def get_advanced_template():
+        """Get advanced template with all parameters"""
+        template_data = {
+            'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hexagon Socket Head Cap Screws', 'Hex Bolt'],
+            'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
+            'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
+            'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
+            'Grade': ['N/A', 'A', 'N/A', 'N/A', 'B'],
+            'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
+            'Diameter_Value': [6.35, 10.0, 12.7, 6.35, 12.0],
+            'Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+            'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1', 'N/A', 'N/A'],
+            'Thread_Size': ['N/A', 'N/A', '1/2', 'N/A', 'N/A'],
+            'Thread_Class': ['N/A', 'N/A', '2A', 'N/A', 'N/A'],
+            'Length': [50, 75, 200, 50, 100],
+            'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+            'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel'],
+            'Quantity': [100, 50, 25, 75, 150]
+        }
+        return pd.DataFrame(template_data)
+    
+    @staticmethod
+    def detect_input_mode(row):
+        """Detect whether row is in basic or advanced mode"""
+        basic_columns = ['Size', 'Length']
+        advanced_columns = ['Product_Type', 'Series', 'Standard', 'Diameter_Type']
+        
+        # Check if advanced columns are populated
+        advanced_mode = any(pd.notna(row.get(col, None)) for col in advanced_columns if col in row)
+        
+        # Check if basic columns are populated
+        basic_mode = all(pd.notna(row.get(col, None)) for col in basic_columns if col in row)
+        
+        if advanced_mode:
+            return "advanced"
+        elif basic_mode:
+            return "basic"
+        else:
+            return "invalid"
+    
+    @staticmethod
+    def infer_parameters_basic_mode(size, length, length_unit="mm", material="Carbon Steel"):
+        """Intelligently infer parameters from size and length only"""
+        try:
+            # Initialize default parameters
+            params = {
+                'product_type': 'Hex Bolt',
+                'series': 'Inch',
+                'standard': 'ASME B18.2.1',
+                'size': str(size),
+                'grade': 'N/A',
+                'diameter_type': 'Blank Diameter',
+                'material': material,
+                'length': length,
+                'length_unit': length_unit,
+                'thread_standard': 'N/A',
+                'thread_size': 'N/A',
+                'thread_class': 'N/A'
+            }
+            
+            # Analyze size pattern
+            size_str = str(size).strip().upper()
+            
+            # Metric detection (M10, M12, M16, etc.)
+            if size_str.startswith('M'):
+                params['series'] = 'Metric'
+                params['standard'] = 'ISO 4014'
+                params['product_type'] = 'Hex Bolt'
+                
+                # Extract diameter from metric size (M10 -> 10.0 mm)
+                try:
+                    diameter_value = float(size_str[1:])
+                    params['diameter_value'] = diameter_value
+                    params['diameter_unit'] = 'mm'
+                    
+                    # For metric hex bolts, set appropriate grade
+                    if params['standard'] == 'ISO 4014' and params['product_type'] == 'Hex Bolt':
+                        params['grade'] = 'A'  # Default grade
+                        
+                except ValueError:
+                    params['diameter_value'] = 10.0  # Default fallback
+                    params['diameter_unit'] = 'mm'
+            
+            # Inch detection (fractions or numbers)
+            elif '/' in size_str or any(char.isdigit() for char in size_str):
+                params['series'] = 'Inch'
+                params['standard'] = 'ASME B18.2.1'
+                
+                try:
+                    # Handle fractions
+                    if '/' in size_str:
+                        if '-' in size_str:
+                            # Handle cases like "1-1/2"
+                            parts = size_str.split('-')
+                            whole = float(parts[0]) if parts[0] else 0
+                            fraction = float(Fraction(parts[1]))
+                            decimal_inches = whole + fraction
+                        else:
+                            decimal_inches = float(Fraction(size_str))
+                    else:
+                        decimal_inches = float(size_str)
+                    
+                    # Convert inches to mm for calculation
+                    params['diameter_value'] = decimal_inches * 25.4
+                    params['diameter_unit'] = 'mm'
+                    
+                except (ValueError, ZeroDivisionError):
+                    params['diameter_value'] = 6.35  # 1/4" default
+                    params['diameter_unit'] = 'mm'
+            
+            else:
+                # Default fallback
+                params['diameter_value'] = 10.0
+                params['diameter_unit'] = 'mm'
+            
+            return params
+            
+        except Exception as e:
+            st.error(f"Error inferring parameters for size {size}: {str(e)}")
+            # Return safe defaults
+            return {
+                'product_type': 'Hex Bolt',
+                'series': 'Inch',
+                'standard': 'ASME B18.2.1',
+                'size': str(size),
+                'grade': 'N/A',
+                'diameter_type': 'Blank Diameter',
+                'diameter_value': 10.0,
+                'diameter_unit': 'mm',
+                'material': material,
+                'length': length,
+                'length_unit': length_unit,
+                'thread_standard': 'N/A',
+                'thread_size': 'N/A',
+                'thread_class': 'N/A'
+            }
+
+# ======================================================
+# BATCH PROCESSING ENGINE - NEW SECTION
+# ======================================================
+class BatchProcessor:
+    """Handle batch weight calculations"""
+    
+    @staticmethod
+    def validate_batch_file(df, mode="basic"):
+        """Validate batch file structure and data"""
+        errors = []
+        warnings = []
+        
+        if df.empty:
+            errors.append("Uploaded file is empty")
+            return False, errors, warnings
+        
+        # Basic mode validation
+        if mode == "basic":
+            required_columns = ['Size', 'Length']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                errors.append(f"Missing required columns for basic mode: {', '.join(missing_columns)}")
+            
+            # Check for empty values in required columns
+            for col in required_columns:
+                if col in df.columns and df[col].isna().any():
+                    empty_count = df[col].isna().sum()
+                    warnings.append(f"Column '{col}' has {empty_count} empty values")
+        
+        # Advanced mode validation
+        elif mode == "advanced":
+            required_columns = ['Product_Type', 'Size', 'Length', 'Diameter_Type']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                errors.append(f"Missing required columns for advanced mode: {', '.join(missing_columns)}")
+        
+        # Check data types
+        if 'Length' in df.columns:
+            try:
+                pd.to_numeric(df['Length'], errors='coerce')
+            except:
+                errors.append("Length column contains non-numeric values")
+        
+        if 'Quantity' in df.columns:
+            try:
+                pd.to_numeric(df['Quantity'], errors='coerce')
+            except:
+                warnings.append("Quantity column contains non-numeric values - will use default of 1")
+        
+        return len(errors) == 0, errors, warnings
+    
+    @staticmethod
+    def process_batch_calculations(batch_df, progress_callback=None):
+        """Process batch calculations for all rows"""
+        results = []
+        errors = []
+        summary = {
+            'total_rows': len(batch_df),
+            'successful_calculations': 0,
+            'failed_calculations': 0,
+            'total_weight_kg': 0.0,
+            'total_weight_lb': 0.0,
+            'start_time': datetime.now()
+        }
+        
+        for index, row in batch_df.iterrows():
+            try:
+                # Determine input mode and prepare parameters
+                input_mode = BatchTemplateManager.detect_input_mode(row)
+                
+                if input_mode == "invalid":
+                    errors.append({
+                        'row_index': index,
+                        'input_data': row.to_dict(),
+                        'error': 'Invalid input - missing required columns',
+                        'status': 'failed'
+                    })
+                    continue
+                
+                # Prepare calculation parameters based on mode
+                if input_mode == "basic":
+                    params = BatchTemplateManager.infer_parameters_basic_mode(
+                        size=row.get('Size'),
+                        length=row.get('Length'),
+                        length_unit=row.get('Length_Unit', 'mm'),
+                        material=row.get('Material', 'Carbon Steel')
+                    )
+                else:  # advanced mode
+                    params = {
+                        'product_type': row.get('Product_Type', 'Hex Bolt'),
+                        'series': row.get('Series', 'Inch'),
+                        'standard': row.get('Standard', 'ASME B18.2.1'),
+                        'size': row.get('Size'),
+                        'grade': row.get('Grade', 'N/A'),
+                        'diameter_type': row.get('Diameter_Type', 'Blank Diameter'),
+                        'diameter_value': row.get('Diameter_Value', 10.0),
+                        'diameter_unit': row.get('Diameter_Unit', 'mm'),
+                        'thread_standard': row.get('Thread_Standard', 'N/A'),
+                        'thread_size': row.get('Thread_Size', 'N/A'),
+                        'thread_class': row.get('Thread_Class', 'N/A'),
+                        'length': row.get('Length'),
+                        'length_unit': row.get('Length_Unit', 'mm'),
+                        'material': row.get('Material', 'Carbon Steel')
+                    }
+                
+                # Handle pitch diameter thread data
+                if params['diameter_type'] == 'Pitch Diameter' and params['thread_standard'] != 'N/A':
+                    with st.session_state.thread_data_cache as cache:
+                        thread_key = f"{params['thread_standard']}_{params['thread_size']}_{params['thread_class']}"
+                        if thread_key not in cache:
+                            pitch_diameter = get_pitch_diameter_from_thread_data(
+                                params['thread_standard'],
+                                params['thread_size'],
+                                params['thread_class']
+                            )
+                            cache[thread_key] = pitch_diameter
+                        params['pitch_diameter_value'] = cache[thread_key]
+                
+                # Perform calculation using existing function
+                calculation_result = calculate_weight_rectified(params)
+                
+                if calculation_result:
+                    # Add batch-specific information
+                    result_record = {
+                        'row_index': index,
+                        'input_data': row.to_dict(),
+                        'calculation_result': calculation_result,
+                        'status': 'success',
+                        'input_mode': input_mode,
+                        'quantity': row.get('Quantity', 1)
+                    }
+                    
+                    results.append(result_record)
+                    summary['successful_calculations'] += 1
+                    summary['total_weight_kg'] += calculation_result['weight_kg'] * result_record['quantity']
+                    summary['total_weight_lb'] += calculation_result['weight_lb'] * result_record['quantity']
+                    
+                    # Update progress
+                    if progress_callback and index % max(1, len(batch_df) // 10) == 0:
+                        progress = (index + 1) / len(batch_df)
+                        progress_callback(progress, f"Processed {index + 1}/{len(batch_df)} rows")
+                
+                else:
+                    errors.append({
+                        'row_index': index,
+                        'input_data': row.to_dict(),
+                        'error': 'Calculation returned no result',
+                        'status': 'failed',
+                        'input_mode': input_mode
+                    })
+                    summary['failed_calculations'] += 1
+                    
+            except Exception as e:
+                errors.append({
+                    'row_index': index,
+                    'input_data': row.to_dict(),
+                    'error': str(e),
+                    'status': 'failed',
+                    'input_mode': input_mode if 'input_mode' in locals() else 'unknown'
+                })
+                summary['failed_calculations'] += 1
+        
+        summary['end_time'] = datetime.now()
+        summary['processing_time'] = (summary['end_time'] - summary['start_time']).total_seconds()
+        
+        return results, errors, summary
+
+# ======================================================
+# BATCH RESULTS DISPLAY - NEW SECTION
+# ======================================================
+class BatchResultsDisplay:
+    """Display batch calculation results"""
+    
+    @staticmethod
+    def show_processing_summary(summary):
+        """Show batch processing summary"""
+        st.markdown("### 📊 Batch Processing Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Records", summary['total_rows'])
+        with col2:
+            success_rate = (summary['successful_calculations'] / summary['total_rows']) * 100
+            st.metric("Successful", f"{summary['successful_calculations']} ({success_rate:.1f}%)")
+        with col3:
+            st.metric("Failed", summary['failed_calculations'])
+        with col4:
+            st.metric("Processing Time", f"{summary['processing_time']:.2f}s")
+        
+        st.markdown("---")
+    
+    @staticmethod
+    def show_weight_summary(summary):
+        """Show weight summary"""
+        st.markdown("### ⚖️ Total Weight Summary")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Weight (kg)", f"{summary['total_weight_kg']:.4f}")
+        with col2:
+            st.metric("Total Weight (lb)", f"{summary['total_weight_lb']:.4f}")
+        with col3:
+            st.metric("Total Weight (grams)", f"{summary['total_weight_kg'] * 1000:.2f}")
+    
+    @staticmethod
+    def show_detailed_results(results):
+        """Show detailed results table"""
+        if not results:
+            return
+        
+        st.markdown("### 📋 Detailed Results")
+        
+        # Prepare data for display
+        display_data = []
+        for result in results:
+            calc = result['calculation_result']
+            input_data = result['input_data']
+            quantity = result.get('quantity', 1)
+            
+            display_record = {
+                'Row': result['row_index'] + 1,
+                'Product': input_data.get('Product_Type', 'Auto-detected'),
+                'Size': input_data.get('Size', 'N/A'),
+                'Length': f"{input_data.get('Length', 'N/A')} {input_data.get('Length_Unit', 'mm')}",
+                'Material': input_data.get('Material', 'Carbon Steel'),
+                'Input Mode': result.get('input_mode', 'basic').title(),
+                'Weight (kg)': f"{calc['weight_kg']:.4f}",
+                'Weight (lb)': f"{calc['weight_lb']:.4f}",
+                'Quantity': quantity,
+                'Total Weight (kg)': f"{calc['weight_kg'] * quantity:.4f}",
+                'Total Weight (lb)': f"{calc['weight_lb'] * quantity:.4f}",
+                'Status': '✅ Success'
+            }
+            display_data.append(display_record)
+        
+        results_df = pd.DataFrame(display_data)
+        st.dataframe(results_df, use_container_width=True)
+    
+    @staticmethod
+    def show_error_report(errors):
+        """Show error report"""
+        if not errors:
+            return
+        
+        st.markdown("### ❌ Error Report")
+        st.warning(f"Found {len(errors)} calculation errors")
+        
+        for error in errors[:10]:  # Show first 10 errors
+            with st.expander(f"Row {error['row_index'] + 1} - {error['error']}"):
+                st.write("**Input Data:**", error['input_data'])
+                st.write("**Error:**", error['error'])
+        
+        if len(errors) > 10:
+            st.info(f"Showing first 10 of {len(errors)} errors. Download full report for complete details.")
+    
+    @staticmethod
+    def export_batch_results(results, errors, summary, filename_prefix="batch_weight_results"):
+        """Export batch results to Excel"""
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{filename_prefix}_{timestamp}.xlsx"
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+                    # Sheet 1: Summary
+                    summary_df = pd.DataFrame([summary])
+                    summary_df.to_excel(writer, sheet_name='Summary', index=False)
+                    
+                    # Sheet 2: Detailed Results
+                    if results:
+                        detailed_data = []
+                        for result in results:
+                            calc = result['calculation_result']
+                            input_data = result['input_data']
+                            quantity = result.get('quantity', 1)
+                            
+                            detailed_record = {
+                                'Row_Index': result['row_index'] + 1,
+                                'Product_Type': input_data.get('Product_Type', 'Auto-detected'),
+                                'Series': input_data.get('Series', 'Auto-detected'),
+                                'Standard': input_data.get('Standard', 'Auto-detected'),
+                                'Size': input_data.get('Size', 'N/A'),
+                                'Grade': input_data.get('Grade', 'N/A'),
+                                'Diameter_Type': input_data.get('Diameter_Type', 'Auto-detected'),
+                                'Diameter_Value': input_data.get('Diameter_Value', 'Auto-calculated'),
+                                'Diameter_Unit': input_data.get('Diameter_Unit', 'mm'),
+                                'Length': input_data.get('Length', 'N/A'),
+                                'Length_Unit': input_data.get('Length_Unit', 'mm'),
+                                'Material': input_data.get('Material', 'Carbon Steel'),
+                                'Input_Mode': result.get('input_mode', 'basic'),
+                                'Weight_kg': calc['weight_kg'],
+                                'Weight_lb': calc['weight_lb'],
+                                'Quantity': quantity,
+                                'Total_Weight_kg': calc['weight_kg'] * quantity,
+                                'Total_Weight_lb': calc['weight_lb'] * quantity,
+                                'Status': 'Success'
+                            }
+                            detailed_data.append(detailed_record)
+                        
+                        detailed_df = pd.DataFrame(detailed_data)
+                        detailed_df.to_excel(writer, sheet_name='Detailed_Results', index=False)
+                    
+                    # Sheet 3: Error Report
+                    if errors:
+                        error_df = pd.DataFrame(errors)
+                        error_df.to_excel(writer, sheet_name='Error_Report', index=False)
+                    
+                    # Sheet 4: Processing Log
+                    log_data = {
+                        'Timestamp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                        'Total_Rows': [summary['total_rows']],
+                        'Successful': [summary['successful_calculations']],
+                        'Failed': [summary['failed_calculations']],
+                        'Success_Rate': [f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%"],
+                        'Total_Weight_kg': [summary['total_weight_kg']],
+                        'Total_Weight_lb': [summary['total_weight_lb']],
+                        'Processing_Time_seconds': [summary['processing_time']]
+                    }
+                    log_df = pd.DataFrame(log_data)
+                    log_df.to_excel(writer, sheet_name='Processing_Log', index=False)
+                
+                return tmp.name, filename
+                
+        except Exception as e:
+            st.error(f"Error exporting results: {str(e)}")
+            return None, None
+
+# ======================================================
+# BATCH CALCULATOR UI - NEW SECTION
+# ======================================================
+def show_batch_weight_calculator():
+    """Main batch weight calculator interface"""
+    
+    st.markdown("""
+    <div class="oracle11g-header">
+        <h1>Industrial Batch Weight Calculator</h1>
+        <p>Process 1000+ products simultaneously • Auto-detection & Manual modes</p>
+        <div>
+            <span class="oracle11g-badge">Batch Processing</span>
+            <span class="oracle11g-badge-orange">Smart Auto-Detection</span>
+            <span class="oracle11g-badge-green">Advanced Manual Mode</span>
+            <span class="oracle11g-badge-yellow">Enterprise Scale</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Mode selection
+    st.markdown("### 🎯 Select Input Mode")
+    mode_col1, mode_col2 = st.columns(2)
+    
+    with mode_col1:
+        basic_mode = st.checkbox(
+            "Basic Mode (Auto-Detection)", 
+            value=st.session_state.batch_mode == "basic",
+            help="Provide only Size and Length - system auto-detects other parameters"
+        )
+    
+    with mode_col2:
+        advanced_mode = st.checkbox(
+            "Advanced Mode (Manual Specification)", 
+            value=st.session_state.batch_mode == "advanced",
+            help="Provide complete product specifications for precise control"
+        )
+    
+    # Set mode
+    if basic_mode and not advanced_mode:
+        st.session_state.batch_mode = "basic"
+    elif advanced_mode and not basic_mode:
+        st.session_state.batch_mode = "advanced"
+    elif not basic_mode and not advanced_mode:
+        st.session_state.batch_mode = "basic"  # Default
+    
+    st.markdown("---")
+    
+    # Template download section
+    st.markdown("### 📥 Download Template")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Download Basic Template", use_container_width=True):
+            template_df = BatchTemplateManager.get_basic_template()
+            csv_data = template_df.to_csv(index=False)
+            st.download_button(
+                label="Download CSV Template",
+                data=csv_data,
+                file_name="batch_weight_calculator_basic_template.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    with col2:
+        if st.button("Download Advanced Template", use_container_width=True):
+            template_df = BatchTemplateManager.get_advanced_template()
+            csv_data = template_df.to_csv(index=False)
+            st.download_button(
+                label="Download CSV Template", 
+                data=csv_data,
+                file_name="batch_weight_calculator_advanced_template.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    st.info(f"""
+    **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected:**
+    - **Basic Mode**: Upload CSV with Size, Length, Material, Quantity → System auto-detects other parameters
+    - **Advanced Mode**: Upload CSV with complete product specifications for precise control
+    """)
+    
+    st.markdown("---")
+    
+    # File upload section
+    st.markdown("### 📤 Upload Batch File")
+    
+    uploaded_file = st.file_uploader(
+        f"Upload your {'Basic' if st.session_state.batch_mode == 'basic' else 'Advanced'} CSV file",
+        type=['csv', 'xlsx'],
+        key="batch_file_uploader"
+    )
+    
+    if uploaded_file:
+        st.session_state.batch_uploaded_file = uploaded_file
+        
+        try:
+            # Load the file
+            if uploaded_file.name.endswith('.xlsx'):
+                batch_df = pd.read_excel(uploaded_file)
+            else:
+                batch_df = pd.read_csv(uploaded_file)
+            
+            st.success(f"✅ File uploaded successfully! Loaded {len(batch_df)} records")
+            
+            # Show preview
+            with st.expander("📋 Preview Uploaded Data"):
+                st.dataframe(batch_df.head(10), use_container_width=True)
+                st.write(f"Total rows: {len(batch_df)}")
+            
+            # Validate file
+            is_valid, validation_errors, validation_warnings = BatchProcessor.validate_batch_file(
+                batch_df, st.session_state.batch_mode
+            )
+            
+            if validation_warnings:
+                for warning in validation_warnings:
+                    st.warning(warning)
+            
+            if not is_valid:
+                for error in validation_errors:
+                    st.error(error)
+                st.stop()
+            
+            # Show inferred parameters example for basic mode
+            if st.session_state.batch_mode == "basic" and len(batch_df) > 0:
+                with st.expander("🔍 Auto-Detection Preview"):
+                    sample_row = batch_df.iloc[0]
+                    inferred_params = BatchTemplateManager.infer_parameters_basic_mode(
+                        sample_row['Size'], sample_row['Length']
+                    )
+                    st.write("**Sample Auto-detected Parameters:**")
+                    st.json(inferred_params)
+                    st.caption("The system will automatically determine these parameters for all rows")
+            
+            # Process batch button
+            st.markdown("---")
+            st.markdown("### ⚙️ Process Batch Calculations")
+            
+            if st.button(
+                f"🚀 Process {len(batch_df)} Records", 
+                type="primary", 
+                use_container_width=True,
+                key="process_batch_calculations"
+            ):
+                st.session_state.batch_processing = True
+                st.session_state.batch_processing_complete = False
+                
+                # Process batch calculations
+                with st.spinner(f"Processing {len(batch_df)} records..."):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    def update_progress(progress, status):
+                        progress_bar.progress(progress)
+                        status_text.text(status)
+                    
+                    results, errors, summary = BatchProcessor.process_batch_calculations(
+                        batch_df, update_progress
+                    )
+                    
+                    # Store results in session state
+                    st.session_state.batch_results = results
+                    st.session_state.batch_errors = errors
+                    st.session_state.batch_summary = summary
+                    st.session_state.batch_processing = False
+                    st.session_state.batch_processing_complete = True
+                
+                progress_bar.empty()
+                status_text.empty()
+                
+                st.rerun()
+        
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+            LoadingManager.log_operation("Batch File Processing", False, str(e))
+    
+    # Display results if processing is complete
+    if st.session_state.batch_processing_complete and st.session_state.batch_summary:
+        st.markdown("---")
+        st.markdown("## 📊 Batch Processing Results")
+        
+        # Show summary
+        BatchResultsDisplay.show_processing_summary(st.session_state.batch_summary)
+        
+        # Show weight summary
+        BatchResultsDisplay.show_weight_summary(st.session_state.batch_summary)
+        
+        # Show detailed results
+        if st.session_state.batch_results:
+            BatchResultsDisplay.show_detailed_results(st.session_state.batch_results)
+        
+        # Show errors
+        if st.session_state.batch_errors:
+            BatchResultsDisplay.show_error_report(st.session_state.batch_errors)
+        
+        # Export section
+        st.markdown("---")
+        st.markdown("### 💾 Export Results")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📥 Export to Excel", use_container_width=True):
+                with st.spinner("Generating Excel report..."):
+                    file_path, filename = BatchResultsDisplay.export_batch_results(
+                        st.session_state.batch_results,
+                        st.session_state.batch_errors,
+                        st.session_state.batch_summary
+                    )
+                    
+                    if file_path:
+                        with open(file_path, 'rb') as f:
+                            st.download_button(
+                                label="Download Excel Report",
+                                data=f,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+        
+        with col2:
+            # Export successful results only
+            if st.session_state.batch_results:
+                successful_df = pd.DataFrame([
+                    {
+                        'Product': r['input_data'].get('Product_Type', 'Auto-detected'),
+                        'Size': r['input_data'].get('Size', 'N/A'),
+                        'Length': f"{r['input_data'].get('Length', 'N/A')} {r['input_data'].get('Length_Unit', 'mm')}",
+                        'Material': r['input_data'].get('Material', 'Carbon Steel'),
+                        'Weight_kg': r['calculation_result']['weight_kg'],
+                        'Weight_lb': r['calculation_result']['weight_lb'],
+                        'Quantity': r.get('quantity', 1),
+                        'Total_Weight_kg': r['calculation_result']['weight_kg'] * r.get('quantity', 1),
+                        'Total_Weight_lb': r['calculation_result']['weight_lb'] * r.get('quantity', 1)
+                    }
+                    for r in st.session_state.batch_results
+                ])
+                
+                csv_data = successful_df.to_csv(index=False)
+                st.download_button(
+                    label="📊 Download CSV Summary",
+                    data=csv_data,
+                    file_name="batch_weight_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        with col3:
+            if st.button("🔄 Process New Batch", use_container_width=True):
+                # Reset batch state
+                st.session_state.batch_uploaded_file = None
+                st.session_state.batch_processing = False
+                st.session_state.batch_results = None
+                st.session_state.batch_errors = []
+                st.session_state.batch_summary = None
+                st.session_state.batch_processing_complete = False
+                st.rerun()
 
 # ======================================================
 # FIXED THREAD DATA LOADING - PROPER DATA TYPES
@@ -3442,13 +4194,13 @@ def show_batch_calculator_rectified():
 def show_rectified_calculations():
     """Fixed calculations page with proper data fetching for ALL products"""
     
-    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
+    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Calculator", "Analytics"])
     
     with tab1:
         show_weight_calculator_rectified()
     
     with tab2:
-        show_batch_calculator_rectified()
+        show_batch_weight_calculator()
     
     with tab3:
         st.markdown("### Calculation Analytics - FIXED")
@@ -4517,7 +5269,7 @@ def show_rectified_home():
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
         ("Engineering Calculator", "FIXED weight calculations with separate data fetching", "calculator"),
-        ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
+        ("Batch Calculator", "Industrial-scale processing for 1000+ products", "batch"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("Export Reports", "Generate professional engineering reports", "export")
     ]
@@ -4527,7 +5279,8 @@ def show_rectified_home():
             if st.button(f"**{title}**\n\n{description}", key=f"home_{key}"):
                 section_map = {
                     "database": "Product Database",
-                    "calculator": "Calculations"
+                    "calculator": "Calculations",
+                    "batch": "Batch Calculator"
                 }
                 st.session_state.selected_section = section_map.get(key, "Product Database")
                 st.rerun()
@@ -4546,6 +5299,7 @@ def show_rectified_home():
             ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "oracle11g-badge-orange"),
             ("Weight Calculations", True, "oracle11g-badge-green"),
             ("FIXED Calculator", True, "oracle11g-badge-yellow"),
+            ("Batch Calculator", True, "oracle11g-badge"),
         ]
         
         for item_name, status, badge_class in status_items:
@@ -4621,6 +5375,34 @@ def show_help_system():
             - Volume calculations for each component
             """)
 
+        with st.expander("Batch Calculator Guide"):
+            st.markdown("""
+            **BATCH CALCULATOR FEATURES:**
+            
+            **Two Input Modes:**
+            - **Basic Mode:** Provide only Size + Length → System auto-detects other parameters
+            - **Advanced Mode:** Provide complete specifications for precise control
+            
+            **Auto-Detection Logic:**
+            - **Metric Sizes (M10, M12):** Auto-detects as ISO 4014 Hex Bolt
+            - **Inch Sizes (1/4, 5/16):** Auto-detects as ASME B18.2.1 Hex Bolt
+            - **Diameter Calculation:** Automatically calculates from size
+            - **Material Default:** Carbon Steel (can be overridden)
+            
+            **Processing Capabilities:**
+            - Process 1000+ records simultaneously
+            - Real-time progress tracking
+            - Continue processing on errors
+            - Comprehensive error reporting
+            - Multiple export formats
+            
+            **Output Features:**
+            - Individual item weights
+            - Total weight summaries
+            - Error diagnostics
+            - Professional Excel reports
+            """)
+
 # ======================================================
 # SECTION DISPATCHER
 # ======================================================
@@ -4629,6 +5411,8 @@ def show_section(title):
         show_enhanced_product_database()
     elif title == "Calculations":
         show_rectified_calculations()
+    elif title == "Batch Calculator":
+        show_batch_weight_calculator()
     else:
         st.info(f"Section {title} is coming soon!")
     
@@ -4654,7 +5438,8 @@ def main():
         sections = [
             "Home Dashboard",
             "Product Database", 
-            "Calculations"
+            "Calculations",
+            "Batch Calculator"
         ]
         
         for section in sections:
@@ -4698,6 +5483,29 @@ def main():
                     mime="text/csv",
                     use_container_width=True
                 )
+            
+            if st.button("Batch Calculator Template"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    basic_template = BatchTemplateManager.get_basic_template()
+                    csv_basic = basic_template.to_csv(index=False)
+                    st.download_button(
+                        label="Basic Template",
+                        data=csv_basic,
+                        file_name="batch_calculator_basic_template.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                with col2:
+                    advanced_template = BatchTemplateManager.get_advanced_template()
+                    csv_advanced = advanced_template.to_csv(index=False)
+                    st.download_button(
+                        label="Advanced Template",
+                        data=csv_advanced,
+                        file_name="batch_calculator_advanced_template.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
     
     if st.session_state.selected_section is None:
         show_rectified_home()
@@ -4711,7 +5519,7 @@ def main():
                 <span class="oracle11g-badge">FIXED Calculator</span>
                 <span class="oracle11g-badge-orange">Separate Data Fetching</span>
                 <span class="oracle11g-badge-green">Same Formula</span>
-                <span class="oracle11g-badge-yellow">Different Standards</span>
+                <span class="oracle11g-badge-yellow">Batch Processing</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with SEPARATE data fetching and SAME formula for socket head products</p>
