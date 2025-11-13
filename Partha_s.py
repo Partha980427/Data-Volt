@@ -421,11 +421,11 @@ class BatchTemplateManager:
     
     @staticmethod
     def infer_parameters_basic_mode(size, length, length_unit="mm", material="Carbon Steel"):
-        """Intelligently infer parameters from size and length only - ENHANCED PRODUCT DETECTION"""
+        """Intelligently infer parameters from size and length only"""
         try:
             # Initialize default parameters
             params = {
-                'product_type': 'Hex Bolt',  # Default product
+                'product_type': 'Hex Bolt',
                 'series': 'Inch',
                 'standard': 'ASME B18.2.1',
                 'size': str(size),
@@ -439,14 +439,14 @@ class BatchTemplateManager:
                 'thread_class': 'N/A'
             }
             
-            # Analyze size pattern for product type detection
+            # Analyze size pattern
             size_str = str(size).strip().upper()
             
             # Metric detection (M10, M12, M16, etc.)
             if size_str.startswith('M'):
                 params['series'] = 'Metric'
                 params['standard'] = 'ISO 4014'
-                params['product_type'] = 'Hex Bolt'  # Default for metric
+                params['product_type'] = 'Hex Bolt'
                 
                 # Extract diameter from metric size (M10 -> 10.0 mm)
                 try:
@@ -467,11 +467,9 @@ class BatchTemplateManager:
                 params['series'] = 'Inch'
                 params['standard'] = 'ASME B18.2.1'
                 
-                # ENHANCED PRODUCT DETECTION FOR INCH SIZES
-                # Check for common inch patterns to determine product type
-                if '/' in size_str:
-                    try:
-                        # Handle fractions to get decimal value
+                try:
+                    # Handle fractions
+                    if '/' in size_str:
                         if '-' in size_str:
                             # Handle cases like "1-1/2"
                             parts = size_str.split('-')
@@ -480,74 +478,21 @@ class BatchTemplateManager:
                             decimal_inches = whole + fraction
                         else:
                             decimal_inches = float(Fraction(size_str))
-                        
-                        # Determine product type based on size range
-                        if decimal_inches <= 0.5:  # Smaller sizes typically hex bolts
-                            params['product_type'] = 'Hex Bolt'
-                        elif decimal_inches <= 1.0:  # Medium sizes
-                            params['product_type'] = 'Heavy Hex Bolt'
-                        else:  # Larger sizes
-                            params['product_type'] = 'Hex Cap Screws'
-                            
-                        # Convert inches to mm for calculation
-                        params['diameter_value'] = decimal_inches * 25.4
-                        params['diameter_unit'] = 'mm'
-                        
-                    except (ValueError, ZeroDivisionError):
-                        params['diameter_value'] = 6.35  # 1/4" default
-                        params['diameter_unit'] = 'mm'
-                else:
-                    # Simple numeric inch size
-                    try:
-                        decimal_inches = float(size_str)
-                        params['diameter_value'] = decimal_inches * 25.4
-                        params['diameter_unit'] = 'mm'
-                        
-                        # Determine product type
-                        if decimal_inches <= 0.5:
-                            params['product_type'] = 'Hex Bolt'
-                        elif decimal_inches <= 1.0:
-                            params['product_type'] = 'Heavy Hex Bolt'
-                        else:
-                            params['product_type'] = 'Hex Cap Screws'
-                    except ValueError:
-                        params['diameter_value'] = 6.35
-                        params['diameter_unit'] = 'mm'
-            
-            # Threaded Rod detection
-            elif any(keyword in size_str.lower() for keyword in ['rod', 'threaded', 'tr', 'stud']):
-                params['product_type'] = 'Threaded Rod'
-                params['series'] = 'Inch'  # Default for threaded rod
-                params['standard'] = 'Not Required'
-                params['diameter_value'] = 10.0  # Default diameter
-                params['diameter_unit'] = 'mm'
-            
-            # Socket Head detection
-            elif any(keyword in size_str.lower() for keyword in ['socket', 'cap', 'shcs']):
-                params['product_type'] = 'Hexagon Socket Head Cap Screws'
-                params['series'] = 'Inch'
-                params['standard'] = 'ASME B18.3'
-                params['diameter_value'] = 6.35  # 1/4" default
-                params['diameter_unit'] = 'mm'
-            
-            else:
-                # Default fallback - try to extract any numeric value
-                try:
-                    # Extract numbers from string
-                    numbers = re.findall(r'\d+\.?\d*', size_str)
-                    if numbers:
-                        diameter_value = float(numbers[0])
-                        params['diameter_value'] = diameter_value
-                        params['diameter_unit'] = 'mm'
                     else:
-                        params['diameter_value'] = 10.0
-                        params['diameter_unit'] = 'mm'
-                except:
-                    params['diameter_value'] = 10.0
+                        decimal_inches = float(size_str)
+                    
+                    # Convert inches to mm for calculation
+                    params['diameter_value'] = decimal_inches * 25.4
+                    params['diameter_unit'] = 'mm'
+                    
+                except (ValueError, ZeroDivisionError):
+                    params['diameter_value'] = 6.35  # 1/4" default
                     params['diameter_unit'] = 'mm'
             
-            # Log the inference for debugging
-            logger.info(f"Basic mode inference - Size: {size}, Product: {params['product_type']}, Series: {params['series']}")
+            else:
+                # Default fallback
+                params['diameter_value'] = 10.0
+                params['diameter_unit'] = 'mm'
             
             return params
             
@@ -830,60 +775,18 @@ class BatchResultsDisplay:
     
     @staticmethod
     def export_batch_results(results, errors, summary, filename_prefix="batch_weight_results"):
-        """Export batch results to Excel with PROFESSIONAL FORMATTING"""
+        """Export batch results to Excel"""
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"{filename_prefix}_{timestamp}.xlsx"
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
                 with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-                    # Sheet 1: Summary - PROFESSIONAL FORMATTING
-                    summary_data = {
-                        'Parameter': [
-                            'Total Records Processed',
-                            'Successful Calculations',
-                            'Failed Calculations',
-                            'Success Rate',
-                            'Total Weight (kg)',
-                            'Total Weight (lb)',
-                            'Total Weight (grams)',
-                            'Processing Time (seconds)',
-                            'Processing Date',
-                            'Generated By'
-                        ],
-                        'Value': [
-                            summary['total_rows'],
-                            summary['successful_calculations'],
-                            summary['failed_calculations'],
-                            f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%",
-                            f"{summary['total_weight_kg']:.4f}",
-                            f"{summary['total_weight_lb']:.4f}",
-                            f"{summary['total_weight_kg'] * 1000:.2f}",
-                            f"{summary['processing_time']:.2f}",
-                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'JSC Industries - Fastener Intelligence Platform'
-                        ]
-                    }
-                    summary_df = pd.DataFrame(summary_data)
+                    # Sheet 1: Summary
+                    summary_df = pd.DataFrame([summary])
                     summary_df.to_excel(writer, sheet_name='Summary', index=False)
                     
-                    # Format Summary Sheet
-                    workbook = writer.book
-                    summary_sheet = writer.sheets['Summary']
-                    
-                    # Add header formatting
-                    header_fill = openpyxl.styles.PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
-                    header_font = openpyxl.styles.Font(color='FFFFFF', bold=True)
-                    
-                    for cell in summary_sheet[1]:
-                        cell.fill = header_fill
-                        cell.font = header_font
-                    
-                    # Adjust column widths
-                    summary_sheet.column_dimensions['A'].width = 30
-                    summary_sheet.column_dimensions['B'].width = 25
-                    
-                    # Sheet 2: Detailed Results - PROFESSIONAL FORMATTING
+                    # Sheet 2: Detailed Results
                     if results:
                         detailed_data = []
                         for result in results:
@@ -916,81 +819,25 @@ class BatchResultsDisplay:
                         
                         detailed_df = pd.DataFrame(detailed_data)
                         detailed_df.to_excel(writer, sheet_name='Detailed_Results', index=False)
-                        
-                        # Format Detailed Results Sheet
-                        detailed_sheet = writer.sheets['Detailed_Results']
-                        
-                        # Format headers
-                        for cell in detailed_sheet[1]:
-                            cell.fill = header_fill
-                            cell.font = header_font
-                        
-                        # Adjust column widths
-                        for col in detailed_sheet.columns:
-                            max_length = 0
-                            column = col[0].column_letter
-                            for cell in col:
-                                try:
-                                    if len(str(cell.value)) > max_length:
-                                        max_length = len(str(cell.value))
-                                except:
-                                    pass
-                            adjusted_width = min(max_length + 2, 20)
-                            detailed_sheet.column_dimensions[column].width = adjusted_width
                     
                     # Sheet 3: Error Report
                     if errors:
-                        error_data = []
-                        for error in errors:
-                            error_record = {
-                                'Row_Index': error['row_index'] + 1,
-                                'Input_Data': str(error['input_data']),
-                                'Error_Message': error['error'],
-                                'Input_Mode': error.get('input_mode', 'unknown'),
-                                'Status': 'Failed'
-                            }
-                            error_data.append(error_record)
-                        
-                        error_df = pd.DataFrame(error_data)
+                        error_df = pd.DataFrame(errors)
                         error_df.to_excel(writer, sheet_name='Error_Report', index=False)
-                        
-                        # Format Error Report Sheet
-                        error_sheet = writer.sheets['Error_Report']
-                        for cell in error_sheet[1]:
-                            cell.fill = header_fill
-                            cell.font = header_font
                     
                     # Sheet 4: Processing Log
                     log_data = {
-                        'Parameter': [
-                            'Timestamp',
-                            'Total_Rows',
-                            'Successful',
-                            'Failed',
-                            'Success_Rate',
-                            'Total_Weight_kg',
-                            'Total_Weight_lb',
-                            'Processing_Time_seconds'
-                        ],
-                        'Value': [
-                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            summary['total_rows'],
-                            summary['successful_calculations'],
-                            summary['failed_calculations'],
-                            f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%",
-                            summary['total_weight_kg'],
-                            summary['total_weight_lb'],
-                            summary['processing_time']
-                        ]
+                        'Timestamp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                        'Total_Rows': [summary['total_rows']],
+                        'Successful': [summary['successful_calculations']],
+                        'Failed': [summary['failed_calculations']],
+                        'Success_Rate': [f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%"],
+                        'Total_Weight_kg': [summary['total_weight_kg']],
+                        'Total_Weight_lb': [summary['total_weight_lb']],
+                        'Processing_Time_seconds': [summary['processing_time']]
                     }
                     log_df = pd.DataFrame(log_data)
                     log_df.to_excel(writer, sheet_name='Processing_Log', index=False)
-                    
-                    # Format Processing Log Sheet
-                    log_sheet = writer.sheets['Processing_Log']
-                    for cell in log_sheet[1]:
-                        cell.fill = header_fill
-                        cell.font = header_font
                 
                 return tmp.name, filename
                 
@@ -1025,7 +872,7 @@ def show_batch_weight_calculator():
         basic_mode = st.checkbox(
             "Basic Mode (Auto-Detection)", 
             value=st.session_state.batch_mode == "basic",
-            help="Provide only Size and Length - system auto-detects other parameters including product type"
+            help="Provide only Size and Length - system auto-detects other parameters"
         )
     
     with mode_col2:
@@ -1076,40 +923,9 @@ def show_batch_weight_calculator():
     
     st.info(f"""
     **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected:**
-    - **Basic Mode**: Upload CSV with Size, Length, Material, Quantity → System auto-detects product type, series, standard, and other parameters
+    - **Basic Mode**: Upload CSV with Size, Length, Material, Quantity → System auto-detects other parameters
     - **Advanced Mode**: Upload CSV with complete product specifications for precise control
     """)
-    
-    # Show product detection logic for basic mode
-    if st.session_state.batch_mode == "basic":
-        with st.expander("🔍 Basic Mode Auto-Detection Logic"):
-            st.markdown("""
-            **Product Type Detection from Size:**
-            
-            **Metric Sizes (M10, M12, M16):**
-            - Product Type: Hex Bolt
-            - Series: Metric  
-            - Standard: ISO 4014
-            - Grade: A (default)
-            
-            **Inch Sizes (Fractions):**
-            - **Small sizes (≤ 1/2")**: Hex Bolt
-            - **Medium sizes (1/2" - 1")**: Heavy Hex Bolt  
-            - **Large sizes (> 1")**: Hex Cap Screws
-            - Series: Inch
-            - Standard: ASME B18.2.1
-            
-            **Special Patterns:**
-            - Contains "socket", "cap", "shcs" → Hexagon Socket Head Cap Screws (ASME B18.3)
-            - Contains "rod", "threaded", "stud" → Threaded Rod
-            - Contains "heavy" → Heavy Hex Bolt
-            
-            **Default Fallback:**
-            - Product Type: Hex Bolt
-            - Series: Inch
-            - Standard: ASME B18.2.1
-            - Material: Carbon Steel
-            """)
     
     st.markdown("---")
     
@@ -1162,7 +978,7 @@ def show_batch_weight_calculator():
                     )
                     st.write("**Sample Auto-detected Parameters:**")
                     st.json(inferred_params)
-                    st.caption("The system will automatically determine these parameters for all rows based on size patterns")
+                    st.caption("The system will automatically determine these parameters for all rows")
             
             # Process batch button
             st.markdown("---")
@@ -4447,7 +4263,7 @@ def show_data_quality_indicators():
 # Enhanced Export Functionality
 # ======================================================
 def export_to_excel(df, filename_prefix):
-    """Export dataframe to Excel with PROFESSIONAL FORMATTING"""
+    """Export dataframe to Excel with formatting"""
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
             with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
@@ -4456,35 +4272,6 @@ def export_to_excel(df, filename_prefix):
                 workbook = writer.book
                 worksheet = writer.sheets['Data']
                 
-                # Import openpyxl styles for professional formatting
-                import openpyxl
-                from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-                
-                # Define styles
-                header_font = Font(color='FFFFFF', bold=True, size=12)
-                header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
-                data_font = Font(size=10)
-                border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                              top=Side(style='thin'), bottom=Side(style='thin'))
-                
-                # Format header row
-                for cell in worksheet[1]:
-                    cell.font = header_font
-                    cell.fill = header_fill
-                    cell.alignment = Alignment(horizontal='center', vertical='center')
-                    cell.border = border
-                
-                # Format data rows
-                for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
-                    for cell in row:
-                        cell.font = data_font
-                        cell.border = border
-                        if cell.column in [worksheet.max_column, worksheet.max_column - 1]:  # Last few columns
-                            cell.alignment = Alignment(horizontal='right')
-                        else:
-                            cell.alignment = Alignment(horizontal='left')
-                
-                # Auto-adjust column widths
                 for column in worksheet.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
@@ -4494,17 +4281,8 @@ def export_to_excel(df, filename_prefix):
                                 max_length = len(str(cell.value))
                         except:
                             pass
-                    adjusted_width = min(max_length + 4, 35)  # Reasonable max width
+                    adjusted_width = min(max_length + 2, 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
-                
-                # Add a title row
-                worksheet.insert_rows(1)
-                worksheet.merge_cells('A1:{}1'.format(chr(64 + len(df.columns))))
-                title_cell = worksheet['A1']
-                title_cell.value = f"{filename_prefix} - Generated by JSC Industries Fastener Intelligence Platform"
-                title_cell.font = Font(size=14, bold=True, color='1F4E78')
-                title_cell.alignment = Alignment(horizontal='center')
-                title_cell.fill = PatternFill(start_color='E6F3FF', end_color='E6F3FF', fill_type='solid')
             
             LoadingManager.log_operation("Export to Excel", True, f"Rows: {len(df)}")
             return tmp.name
@@ -4514,16 +4292,16 @@ def export_to_excel(df, filename_prefix):
         return None
 
 def enhanced_export_data(filtered_df, export_format):
-    """Enhanced export with multiple format options and PROFESSIONAL formatting"""
+    """Enhanced export with multiple format options"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     if export_format == "Excel":
-        with LoadingManager.show_loading_spinner("Generating Professional Excel file..."):
+        with LoadingManager.show_loading_spinner("Generating Excel file..."):
             excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
         if excel_file:
             with open(excel_file, 'rb') as f:
                 st.download_button(
-                    label="📊 Download Professional Excel File",
+                    label="Download Excel File",
                     data=f,
                     file_name=f"fastener_data_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4533,7 +4311,7 @@ def enhanced_export_data(filtered_df, export_format):
     else:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            label="📄 Download CSV File",
+            label="Download CSV File",
             data=csv_data,
             file_name=f"fastener_data_{timestamp}.csv",
             mime="text/csv",
@@ -5602,18 +5380,12 @@ def show_help_system():
             **BATCH CALCULATOR FEATURES:**
             
             **Two Input Modes:**
-            - **Basic Mode:** Provide only Size + Length → System auto-detects other parameters including product type
+            - **Basic Mode:** Provide only Size + Length → System auto-detects other parameters
             - **Advanced Mode:** Provide complete specifications for precise control
             
             **Auto-Detection Logic:**
             - **Metric Sizes (M10, M12):** Auto-detects as ISO 4014 Hex Bolt
-            - **Inch Sizes (Fractions):** 
-              - Small sizes (≤ 1/2"): Hex Bolt
-              - Medium sizes (1/2" - 1"): Heavy Hex Bolt
-              - Large sizes (> 1"): Hex Cap Screws
-            - **Special Patterns:**
-              - Contains "socket", "cap", "shcs" → Hexagon Socket Head Cap Screws
-              - Contains "rod", "threaded", "stud" → Threaded Rod
+            - **Inch Sizes (1/4, 5/16):** Auto-detects as ASME B18.2.1 Hex Bolt
             - **Diameter Calculation:** Automatically calculates from size
             - **Material Default:** Carbon Steel (can be overridden)
             
