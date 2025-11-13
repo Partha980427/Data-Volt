@@ -260,6 +260,7 @@ def initialize_session_state():
         "batch_errors": [],
         "batch_processing_complete": False,
         "batch_mode": "basic",  # 'basic' or 'advanced'
+        "batch_diameter_type": "Blank Diameter",  # NEW: Store diameter type for batch
     }
     
     for key, value in defaults.items():
@@ -361,49 +362,82 @@ class ExportTemplateManager:
         return None
 
 # ======================================================
-# BATCH CALCULATOR TEMPLATES - NEW SECTION
+# ENHANCED BATCH CALCULATOR TEMPLATES WITH DIAMETER TYPE SUPPORT
 # ======================================================
 class BatchTemplateManager:
-    """Manage batch calculator templates and processing"""
+    """Manage batch calculator templates with diameter type support"""
     
     @staticmethod
-    def get_basic_template():
-        """Get basic template with only Size and Length"""
-        template_data = {
-            'Size': ['1/4', 'M10', '5/16', '1/2', 'M12'],
-            'Length': [50, 75, 100, 150, 200],
-            'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-            'Material': ['Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel'],
-            'Quantity': [100, 50, 200, 75, 150]
-        }
+    def get_basic_template(diameter_type="Blank Diameter"):
+        """Get basic template with Product_Type column and diameter type support"""
+        if diameter_type == "Blank Diameter":
+            template_data = {
+                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Size': ['1/4', 'M10', '1/2', '5/16'],
+                'Length': [50, 75, 200, 100],
+                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
+                'Diameter_Value': [6.35, 10.0, 12.7, 7.94],
+                'Diameter_Unit': ['mm', 'mm', 'mm', 'mm'],
+                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
+                'Quantity': [100, 50, 25, 200]
+            }
+        else:  # Pitch Diameter
+            template_data = {
+                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Length': [50, 75, 200, 100],
+                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
+                'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
+                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Thread_Class': ['2A', '2A', '2A', '2A'],
+                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
+                'Quantity': [100, 50, 25, 200]
+            }
         return pd.DataFrame(template_data)
     
     @staticmethod
-    def get_advanced_template():
-        """Get advanced template with all parameters"""
-        template_data = {
-            'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hexagon Socket Head Cap Screws', 'Hex Bolt'],
-            'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
-            'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
-            'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
-            'Grade': ['N/A', 'A', 'N/A', 'N/A', 'B'],
-            'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter'],
-            'Diameter_Value': [6.35, 10.0, 12.7, 6.35, 12.0],
-            'Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-            'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1', 'N/A', 'N/A'],
-            'Thread_Size': ['N/A', 'N/A', '1/2', 'N/A', 'N/A'],
-            'Thread_Class': ['N/A', 'N/A', '2A', 'N/A', 'N/A'],
-            'Length': [50, 75, 200, 50, 100],
-            'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-            'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel'],
-            'Quantity': [100, 50, 25, 75, 150]
-        }
+    def get_advanced_template(diameter_type="Blank Diameter"):
+        """Get advanced template with all parameters and diameter type support"""
+        if diameter_type == "Blank Diameter":
+            template_data = {
+                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hexagon Socket Head Cap Screws', 'Hex Bolt'],
+                'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
+                'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
+                'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
+                'Grade': ['N/A', 'A', 'N/A', 'N/A', 'B'],
+                'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
+                'Diameter_Value': [6.35, 10.0, 12.7, 6.35, 12.0],
+                'Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+                'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1', 'N/A', 'N/A'],
+                'Thread_Size': ['N/A', 'N/A', '1/2', 'N/A', 'N/A'],
+                'Thread_Class': ['N/A', 'N/A', '2A', 'N/A', 'N/A'],
+                'Length': [50, 75, 200, 50, 100],
+                'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
+                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel'],
+                'Quantity': [100, 50, 25, 75, 150]
+            }
+        else:  # Pitch Diameter
+            template_data = {
+                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
+                'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
+                'Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Grade': ['N/A', 'N/A', 'N/A', 'N/A'],
+                'Diameter_Type': ['Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter'],
+                'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
+                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Thread_Class': ['2A', '2A', '2A', '2A'],
+                'Length': [50, 75, 200, 100],
+                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
+                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
+                'Quantity': [100, 50, 25, 200]
+            }
         return pd.DataFrame(template_data)
     
     @staticmethod
     def detect_input_mode(row):
         """Detect whether row is in basic or advanced mode"""
-        basic_columns = ['Size', 'Length']
+        basic_columns = ['Product_Type', 'Size', 'Length']
         advanced_columns = ['Product_Type', 'Series', 'Standard', 'Diameter_Type']
         
         # Check if advanced columns are populated
@@ -420,23 +454,25 @@ class BatchTemplateManager:
             return "invalid"
     
     @staticmethod
-    def infer_parameters_basic_mode(size, length, length_unit="mm", material="Carbon Steel"):
-        """Intelligently infer parameters from size and length only"""
+    def infer_parameters_basic_mode(row, diameter_type="Blank Diameter"):
+        """Intelligently infer parameters from basic mode with diameter type support"""
         try:
+            product_type = row.get('Product_Type', 'Hex Bolt')
+            size = row.get('Size')
+            length = row.get('Length', 50.0)
+            length_unit = row.get('Length_Unit', 'mm')
+            material = row.get('Material', 'Carbon Steel')
+            quantity = row.get('Quantity', 1)
+            
             # Initialize default parameters
             params = {
-                'product_type': 'Hex Bolt',
-                'series': 'Inch',
-                'standard': 'ASME B18.2.1',
+                'product_type': product_type,
                 'size': str(size),
-                'grade': 'N/A',
-                'diameter_type': 'Blank Diameter',
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'thread_standard': 'N/A',
-                'thread_size': 'N/A',
-                'thread_class': 'N/A'
+                'quantity': quantity,
+                'diameter_type': diameter_type
             }
             
             # Analyze size pattern
@@ -446,26 +482,23 @@ class BatchTemplateManager:
             if size_str.startswith('M'):
                 params['series'] = 'Metric'
                 params['standard'] = 'ISO 4014'
-                params['product_type'] = 'Hex Bolt'
                 
                 # Extract diameter from metric size (M10 -> 10.0 mm)
                 try:
                     diameter_value = float(size_str[1:])
                     params['diameter_value'] = diameter_value
                     params['diameter_unit'] = 'mm'
-                    
-                    # For metric hex bolts, set appropriate grade
-                    if params['standard'] == 'ISO 4014' and params['product_type'] == 'Hex Bolt':
-                        params['grade'] = 'A'  # Default grade
-                        
+                    params['grade'] = 'A'  # Default grade for metric
                 except ValueError:
                     params['diameter_value'] = 10.0  # Default fallback
                     params['diameter_unit'] = 'mm'
+                    params['grade'] = 'A'
             
             # Inch detection (fractions or numbers)
             elif '/' in size_str or any(char.isdigit() for char in size_str):
                 params['series'] = 'Inch'
                 params['standard'] = 'ASME B18.2.1'
+                params['grade'] = 'N/A'
                 
                 try:
                     # Handle fractions
@@ -491,8 +524,38 @@ class BatchTemplateManager:
             
             else:
                 # Default fallback
+                params['series'] = 'Inch'
+                params['standard'] = 'ASME B18.2.1'
                 params['diameter_value'] = 10.0
                 params['diameter_unit'] = 'mm'
+                params['grade'] = 'N/A'
+            
+            # Handle diameter type specific parameters
+            if diameter_type == "Pitch Diameter":
+                # For pitch diameter, we need thread information
+                params['thread_standard'] = row.get('Thread_Standard', 'ASME B1.1')
+                params['thread_size'] = row.get('Thread_Size', size)
+                params['thread_class'] = row.get('Thread_Class', '2A')
+                
+                # Get pitch diameter from database
+                pitch_diameter = get_pitch_diameter_from_thread_data(
+                    params['thread_standard'],
+                    params['thread_size'],
+                    params['thread_class']
+                )
+                
+                if pitch_diameter is not None:
+                    params['diameter_value'] = pitch_diameter
+                    params['diameter_unit'] = 'inch' if params['series'] == 'Inch' else 'mm'
+                else:
+                    # Fallback to blank diameter calculation
+                    st.warning(f"Pitch diameter not found for {params['thread_size']}, using blank diameter")
+                    params['diameter_type'] = 'Blank Diameter'
+            
+            elif diameter_type == "Blank Diameter":
+                # Use the provided diameter values
+                params['diameter_value'] = row.get('Diameter_Value', params.get('diameter_value', 10.0))
+                params['diameter_unit'] = row.get('Diameter_Unit', params.get('diameter_unit', 'mm'))
             
             return params
             
@@ -505,26 +568,24 @@ class BatchTemplateManager:
                 'standard': 'ASME B18.2.1',
                 'size': str(size),
                 'grade': 'N/A',
-                'diameter_type': 'Blank Diameter',
+                'diameter_type': diameter_type,
                 'diameter_value': 10.0,
                 'diameter_unit': 'mm',
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'thread_standard': 'N/A',
-                'thread_size': 'N/A',
-                'thread_class': 'N/A'
+                'quantity': quantity
             }
 
 # ======================================================
-# BATCH PROCESSING ENGINE - NEW SECTION
+# BATCH PROCESSING ENGINE WITH DIAMETER TYPE SUPPORT
 # ======================================================
 class BatchProcessor:
-    """Handle batch weight calculations"""
+    """Handle batch weight calculations with diameter type support"""
     
     @staticmethod
-    def validate_batch_file(df, mode="basic"):
-        """Validate batch file structure and data"""
+    def validate_batch_file(df, mode="basic", diameter_type="Blank Diameter"):
+        """Validate batch file structure and data with diameter type support"""
         errors = []
         warnings = []
         
@@ -534,10 +595,16 @@ class BatchProcessor:
         
         # Basic mode validation
         if mode == "basic":
-            required_columns = ['Size', 'Length']
+            required_columns = ['Product_Type', 'Size', 'Length']
+            
+            if diameter_type == "Blank Diameter":
+                required_columns.extend(['Diameter_Value', 'Diameter_Unit'])
+            else:  # Pitch Diameter
+                required_columns.extend(['Thread_Standard', 'Thread_Size', 'Thread_Class'])
+            
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
-                errors.append(f"Missing required columns for basic mode: {', '.join(missing_columns)}")
+                errors.append(f"Missing required columns for basic mode with {diameter_type}: {', '.join(missing_columns)}")
             
             # Check for empty values in required columns
             for col in required_columns:
@@ -565,11 +632,17 @@ class BatchProcessor:
             except:
                 warnings.append("Quantity column contains non-numeric values - will use default of 1")
         
+        if 'Diameter_Value' in df.columns:
+            try:
+                pd.to_numeric(df['Diameter_Value'], errors='coerce')
+            except:
+                errors.append("Diameter_Value column contains non-numeric values")
+        
         return len(errors) == 0, errors, warnings
     
     @staticmethod
-    def process_batch_calculations(batch_df, progress_callback=None):
-        """Process batch calculations for all rows"""
+    def process_batch_calculations(batch_df, diameter_type="Blank Diameter", progress_callback=None):
+        """Process batch calculations for all rows with diameter type support"""
         results = []
         errors = []
         summary = {
@@ -578,7 +651,8 @@ class BatchProcessor:
             'failed_calculations': 0,
             'total_weight_kg': 0.0,
             'total_weight_lb': 0.0,
-            'start_time': datetime.now()
+            'start_time': datetime.now(),
+            'diameter_type_used': diameter_type
         }
         
         for index, row in batch_df.iterrows():
@@ -597,12 +671,7 @@ class BatchProcessor:
                 
                 # Prepare calculation parameters based on mode
                 if input_mode == "basic":
-                    params = BatchTemplateManager.infer_parameters_basic_mode(
-                        size=row.get('Size'),
-                        length=row.get('Length'),
-                        length_unit=row.get('Length_Unit', 'mm'),
-                        material=row.get('Material', 'Carbon Steel')
-                    )
+                    params = BatchTemplateManager.infer_parameters_basic_mode(row, diameter_type)
                 else:  # advanced mode
                     params = {
                         'product_type': row.get('Product_Type', 'Hex Bolt'),
@@ -610,7 +679,7 @@ class BatchProcessor:
                         'standard': row.get('Standard', 'ASME B18.2.1'),
                         'size': row.get('Size'),
                         'grade': row.get('Grade', 'N/A'),
-                        'diameter_type': row.get('Diameter_Type', 'Blank Diameter'),
+                        'diameter_type': row.get('Diameter_Type', diameter_type),
                         'diameter_value': row.get('Diameter_Value', 10.0),
                         'diameter_unit': row.get('Diameter_Unit', 'mm'),
                         'thread_standard': row.get('Thread_Standard', 'N/A'),
@@ -618,23 +687,32 @@ class BatchProcessor:
                         'thread_class': row.get('Thread_Class', 'N/A'),
                         'length': row.get('Length'),
                         'length_unit': row.get('Length_Unit', 'mm'),
-                        'material': row.get('Material', 'Carbon Steel')
+                        'material': row.get('Material', 'Carbon Steel'),
+                        'quantity': row.get('Quantity', 1)
                     }
                 
                 # Handle pitch diameter thread data
-                if params['diameter_type'] == 'Pitch Diameter' and params['thread_standard'] != 'N/A':
-                    with st.session_state.thread_data_cache as cache:
-                        thread_key = f"{params['thread_standard']}_{params['thread_size']}_{params['thread_class']}"
-                        if thread_key not in cache:
-                            pitch_diameter = get_pitch_diameter_from_thread_data(
-                                params['thread_standard'],
-                                params['thread_size'],
-                                params['thread_class']
-                            )
-                            cache[thread_key] = pitch_diameter
-                        params['pitch_diameter_value'] = cache[thread_key]
+                if params['diameter_type'] == 'Pitch Diameter' and params.get('thread_standard') != 'N/A':
+                    pitch_diameter = get_pitch_diameter_from_thread_data(
+                        params['thread_standard'],
+                        params['thread_size'],
+                        params['thread_class']
+                    )
+                    
+                    if pitch_diameter is not None:
+                        params['diameter_value'] = pitch_diameter
+                        params['diameter_unit'] = 'inch' if params.get('series') == 'Inch' else 'mm'
+                    else:
+                        errors.append({
+                            'row_index': index,
+                            'input_data': row.to_dict(),
+                            'error': f"Pitch diameter not found for {params['thread_size']}",
+                            'status': 'failed'
+                        })
+                        summary['failed_calculations'] += 1
+                        continue
                 
-                # Perform calculation using existing function
+                # Perform calculation
                 calculation_result = calculate_weight_rectified(params)
                 
                 if calculation_result:
@@ -645,7 +723,7 @@ class BatchProcessor:
                         'calculation_result': calculation_result,
                         'status': 'success',
                         'input_mode': input_mode,
-                        'quantity': row.get('Quantity', 1)
+                        'quantity': params.get('quantity', 1)
                     }
                     
                     results.append(result_record)
@@ -684,7 +762,7 @@ class BatchProcessor:
         return results, errors, summary
 
 # ======================================================
-# BATCH RESULTS DISPLAY - NEW SECTION
+# BATCH RESULTS DISPLAY
 # ======================================================
 class BatchResultsDisplay:
     """Display batch calculation results"""
@@ -699,13 +777,14 @@ class BatchResultsDisplay:
         with col1:
             st.metric("Total Records", summary['total_rows'])
         with col2:
-            success_rate = (summary['successful_calculations'] / summary['total_rows']) * 100
+            success_rate = (summary['successful_calculations'] / summary['total_rows']) * 100 if summary['total_rows'] > 0 else 0
             st.metric("Successful", f"{summary['successful_calculations']} ({success_rate:.1f}%)")
         with col3:
             st.metric("Failed", summary['failed_calculations'])
         with col4:
             st.metric("Processing Time", f"{summary['processing_time']:.2f}s")
         
+        st.markdown(f"**Diameter Type Used:** {summary.get('diameter_type_used', 'Blank Diameter')}")
         st.markdown("---")
     
     @staticmethod
@@ -743,6 +822,7 @@ class BatchResultsDisplay:
                 'Size': input_data.get('Size', 'N/A'),
                 'Length': f"{input_data.get('Length', 'N/A')} {input_data.get('Length_Unit', 'mm')}",
                 'Material': input_data.get('Material', 'Carbon Steel'),
+                'Diameter Type': input_data.get('Diameter_Type', 'Blank Diameter'),
                 'Input Mode': result.get('input_mode', 'basic').title(),
                 'Weight (kg)': f"{calc['weight_kg']:.4f}",
                 'Weight (lb)': f"{calc['weight_lb']:.4f}",
@@ -834,7 +914,8 @@ class BatchResultsDisplay:
                         'Success_Rate': [f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%"],
                         'Total_Weight_kg': [summary['total_weight_kg']],
                         'Total_Weight_lb': [summary['total_weight_lb']],
-                        'Processing_Time_seconds': [summary['processing_time']]
+                        'Processing_Time_seconds': [summary['processing_time']],
+                        'Diameter_Type': [summary.get('diameter_type_used', 'Blank Diameter')]
                     }
                     log_df = pd.DataFrame(log_data)
                     log_df.to_excel(writer, sheet_name='Processing_Log', index=False)
@@ -846,23 +927,38 @@ class BatchResultsDisplay:
             return None, None
 
 # ======================================================
-# BATCH CALCULATOR UI - NEW SECTION
+# ENHANCED BATCH CALCULATOR UI WITH DIAMETER TYPE SELECTION
 # ======================================================
 def show_batch_weight_calculator():
-    """Main batch weight calculator interface"""
+    """Enhanced Batch Weight Calculator with Diameter Type Selection"""
     
     st.markdown("""
     <div class="oracle11g-header">
         <h1>Industrial Batch Weight Calculator</h1>
-        <p>Process 1000+ products simultaneously • Auto-detection & Manual modes</p>
+        <p>Process 1000+ products simultaneously • Smart Diameter Handling</p>
         <div>
             <span class="oracle11g-badge">Batch Processing</span>
-            <span class="oracle11g-badge-orange">Smart Auto-Detection</span>
-            <span class="oracle11g-badge-green">Advanced Manual Mode</span>
-            <span class="oracle11g-badge-yellow">Enterprise Scale</span>
+            <span class="oracle11g-badge-orange">Smart Diameter Handling</span>
+            <span class="oracle11g-badge-green">Auto Pitch Diameter</span>
+            <span class="oracle11g-badge-yellow">Product Type Column</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Diameter Type Selection - ADDED AT THE TOP
+    st.markdown("### 🎯 Select Diameter Type")
+    diameter_type = st.radio(
+        "Choose how to specify diameters:",
+        ["Blank Diameter", "Pitch Diameter"],
+        horizontal=True,
+        key="batch_diameter_type"
+    )
+    
+    st.info(f"""
+    **{diameter_type} Mode Selected:**
+    - **Blank Diameter**: Provide diameter values directly in the template
+    - **Pitch Diameter**: System automatically fetches pitch diameter values from thread database
+    """)
     
     # Mode selection
     st.markdown("### 🎯 Select Input Mode")
@@ -872,7 +968,7 @@ def show_batch_weight_calculator():
         basic_mode = st.checkbox(
             "Basic Mode (Auto-Detection)", 
             value=st.session_state.batch_mode == "basic",
-            help="Provide only Size and Length - system auto-detects other parameters"
+            help="Provide Product Type, Size and Length - system auto-detects other parameters"
         )
     
     with mode_col2:
@@ -892,39 +988,42 @@ def show_batch_weight_calculator():
     
     st.markdown("---")
     
-    # Template download section
+    # Template download section - UPDATED WITH DIAMETER TYPE
     st.markdown("### 📥 Download Template")
+    
+    st.info(f"**Template will include:** Product_Type, Size, Length, and {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} columns")
     
     col1, col2 = st.columns(2)
     
     with col1:
         if st.button("Download Basic Template", use_container_width=True):
-            template_df = BatchTemplateManager.get_basic_template()
+            template_df = BatchTemplateManager.get_basic_template(diameter_type)
             csv_data = template_df.to_csv(index=False)
             st.download_button(
                 label="Download CSV Template",
                 data=csv_data,
-                file_name="batch_weight_calculator_basic_template.csv",
+                file_name=f"batch_weight_basic_{diameter_type.lower().replace(' ', '_')}_template.csv",
                 mime="text/csv",
                 use_container_width=True
             )
     
     with col2:
         if st.button("Download Advanced Template", use_container_width=True):
-            template_df = BatchTemplateManager.get_advanced_template()
+            template_df = BatchTemplateManager.get_advanced_template(diameter_type)
             csv_data = template_df.to_csv(index=False)
             st.download_button(
                 label="Download CSV Template", 
                 data=csv_data,
-                file_name="batch_weight_calculator_advanced_template.csv",
+                file_name=f"batch_weight_advanced_{diameter_type.lower().replace(' ', '_')}_template.csv",
                 mime="text/csv",
                 use_container_width=True
             )
     
     st.info(f"""
-    **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected:**
-    - **Basic Mode**: Upload CSV with Size, Length, Material, Quantity → System auto-detects other parameters
+    **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected with {diameter_type}:**
+    - **Basic Mode**: Upload CSV with Product_Type, Size, Length, {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} → System auto-detects other parameters
     - **Advanced Mode**: Upload CSV with complete product specifications for precise control
+    - **Diameter Type**: {diameter_type} - {'Provide diameter values directly' if diameter_type == 'Blank Diameter' else 'System fetches pitch diameter from database'}
     """)
     
     st.markdown("---")
@@ -954,10 +1053,11 @@ def show_batch_weight_calculator():
             with st.expander("📋 Preview Uploaded Data"):
                 st.dataframe(batch_df.head(10), use_container_width=True)
                 st.write(f"Total rows: {len(batch_df)}")
+                st.write(f"Columns: {list(batch_df.columns)}")
             
-            # Validate file
+            # Validate file with diameter type
             is_valid, validation_errors, validation_warnings = BatchProcessor.validate_batch_file(
-                batch_df, st.session_state.batch_mode
+                batch_df, st.session_state.batch_mode, diameter_type
             )
             
             if validation_warnings:
@@ -973,9 +1073,7 @@ def show_batch_weight_calculator():
             if st.session_state.batch_mode == "basic" and len(batch_df) > 0:
                 with st.expander("🔍 Auto-Detection Preview"):
                     sample_row = batch_df.iloc[0]
-                    inferred_params = BatchTemplateManager.infer_parameters_basic_mode(
-                        sample_row['Size'], sample_row['Length']
-                    )
+                    inferred_params = BatchTemplateManager.infer_parameters_basic_mode(sample_row, diameter_type)
                     st.write("**Sample Auto-detected Parameters:**")
                     st.json(inferred_params)
                     st.caption("The system will automatically determine these parameters for all rows")
@@ -993,8 +1091,8 @@ def show_batch_weight_calculator():
                 st.session_state.batch_processing = True
                 st.session_state.batch_processing_complete = False
                 
-                # Process batch calculations
-                with st.spinner(f"Processing {len(batch_df)} records..."):
+                # Process batch calculations with diameter type
+                with st.spinner(f"Processing {len(batch_df)} records with {diameter_type}..."):
                     progress_bar = st.progress(0)
                     status_text = st.empty()
                     
@@ -1003,7 +1101,7 @@ def show_batch_weight_calculator():
                         status_text.text(status)
                     
                     results, errors, summary = BatchProcessor.process_batch_calculations(
-                        batch_df, update_progress
+                        batch_df, diameter_type, update_progress
                     )
                     
                     # Store results in session state
@@ -1071,10 +1169,11 @@ def show_batch_weight_calculator():
             if st.session_state.batch_results:
                 successful_df = pd.DataFrame([
                     {
-                        'Product': r['input_data'].get('Product_Type', 'Auto-detected'),
+                        'Product_Type': r['input_data'].get('Product_Type', 'Auto-detected'),
                         'Size': r['input_data'].get('Size', 'N/A'),
                         'Length': f"{r['input_data'].get('Length', 'N/A')} {r['input_data'].get('Length_Unit', 'mm')}",
                         'Material': r['input_data'].get('Material', 'Carbon Steel'),
+                        'Diameter_Type': r['input_data'].get('Diameter_Type', 'Blank Diameter'),
                         'Weight_kg': r['calculation_result']['weight_kg'],
                         'Weight_lb': r['calculation_result']['weight_lb'],
                         'Quantity': r.get('quantity', 1),
@@ -5027,7 +5126,7 @@ def show_enhanced_product_database():
                     st.session_state.section_b_results = apply_section_b_filters()
                 st.rerun()
         
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>', unsafe_allow_html=True)
         
         # Show Section B Results
         show_section_b_results()
@@ -5127,7 +5226,7 @@ def show_enhanced_product_database():
                     
                     st.rerun()
         
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Show Section C Results
         show_section_c_results()
