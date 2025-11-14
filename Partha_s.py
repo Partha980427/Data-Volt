@@ -4900,6 +4900,7 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section A - Dimensional Specifications</h3>
             <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
+        </div>
         """, unsafe_allow_html=True)
         
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -5013,8 +5014,6 @@ def show_enhanced_product_database():
                     st.session_state.section_a_results = apply_section_a_filters()
                 st.rerun()
         
-        st.markdown("</div>", unsafe_allow_html=True)
-        
         # Show Section A Results
         show_section_a_results()
     
@@ -5024,6 +5023,7 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section B - Thread Specifications</h3>
             <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
+        </div>
         """, unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
@@ -5126,8 +5126,6 @@ def show_enhanced_product_database():
                     st.session_state.section_b_results = apply_section_b_filters()
                 st.rerun()
         
-        st.markdown("</div>', unsafe_allow_html=True)
-        
         # Show Section B Results
         show_section_b_results()
     
@@ -5137,6 +5135,7 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section C - Material Properties</h3>
             <p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>
+        </div>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
@@ -5225,8 +5224,6 @@ def show_enhanced_product_database():
                         st.success(f"Found {len(st.session_state.section_c_results)} records for {property_class}")
                     
                     st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
         
         # Show Section C Results
         show_section_c_results()
