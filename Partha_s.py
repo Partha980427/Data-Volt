@@ -16,6 +16,9 @@ import warnings
 import logging
 from typing import Dict, List, Optional, Any, Tuple
 import io
+import requests
+from io import BytesIO
+import openpyxl.styles
 warnings.filterwarnings('ignore')
 
 # ======================================================
@@ -84,7 +87,7 @@ class LoadingManager:
     def log_operation(operation_name, success=True, details=""):
         """Log operations with details"""
         status = "SUCCESS" if success else "FAILED"
-        logger.info(f"{operation_name} - {STATUS} - {details}")
+        logger.info(f"{operation_name} - {status} - {details}")
 
 # ======================================================
 # ENHANCED CONFIGURATION & ERROR HANDLING
@@ -95,9 +98,6 @@ def safe_load_excel_file_enhanced(path_or_url, max_retries=3, timeout=30):
     for attempt in range(max_retries):
         try:
             if path_or_url.startswith('http'):
-                import requests
-                from io import BytesIO
-                
                 headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
