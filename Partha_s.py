@@ -13,23 +13,7 @@ import json
 import numpy as np
 import math
 import warnings
-import logging
-from typing import Dict, List, Optional, Any, Tuple
-import io
 warnings.filterwarnings('ignore')
-
-# ======================================================
-# LOGGING CONFIGURATION
-# ======================================================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('fastener_app.log')
-    ]
-)
-logger = logging.getLogger(__name__)
 
 # ======================================================
 # PATHS & FILES - UPDATED WITH GOOGLE SHEETS LINKS
@@ -59,32 +43,6 @@ thread_files = {
     "ISO 965-2-98 Coarse": "https://docs.google.com/spreadsheets/d/1be5eEy9hbVfMg2sl1-Cz1NNCGGF8EB-L/export?format=xlsx",
     "ISO 965-2-98 Fine": "https://docs.google.com/spreadsheets/d/1QGQ6SMWBSTsah-vq3zYnhOC3NXaBdKPe/export?format=xlsx",
 }
-
-# ======================================================
-# LOADING INDICATORS MANAGEMENT
-# ======================================================
-class LoadingManager:
-    """Manage loading states and progress indicators"""
-    
-    @staticmethod
-    def show_loading_spinner(text="Processing..."):
-        """Display a loading spinner"""
-        return st.spinner(text)
-    
-    @staticmethod
-    def show_progress_bar(step, total_steps, text="Processing"):
-        """Display a progress bar"""
-        progress = st.progress(0)
-        for i in range(total_steps):
-            progress.progress((i + 1) / total_steps, text=f"{text}... {i+1}/{total_steps}")
-            time.sleep(0.1)
-        progress.empty()
-    
-    @staticmethod
-    def log_operation(operation_name, success=True, details=""):
-        """Log operations with details"""
-        status = "SUCCESS" if success else "FAILED"
-        logger.info(f"{operation_name} - {status} - {details}")
 
 # ======================================================
 # ENHANCED CONFIGURATION & ERROR HANDLING
@@ -128,13 +86,11 @@ def safe_load_excel_file_enhanced(path_or_url, max_retries=3, timeout=30):
                 st.warning(f"Dataframe has too few columns: {path_or_url}")
                 return pd.DataFrame()
                 
-            LoadingManager.log_operation(f"Load Excel File: {path_or_url}", True, f"Rows: {len(df)}, Columns: {len(df.columns)}")
             return df
             
         except Exception as e:
             if attempt == max_retries - 1:
                 st.error(f"Error loading {path_or_url}: {str(e)}")
-                LoadingManager.log_operation(f"Load Excel File: {path_or_url}", False, str(e))
                 return pd.DataFrame()
             time.sleep(1)
 
@@ -162,7 +118,7 @@ def load_config():
                 'thread_files': thread_files
             },
             'ui': {
-                'theme': 'oracle11g',
+                'theme': 'light',
                 'page_title': 'JSC Industries - Fastener Intelligence'
             },
             'features': {
@@ -180,7 +136,7 @@ def save_user_preferences():
             'preferred_units': 'metric',
             'recent_searches': [],
             'favorite_filters': {},
-            'theme_preference': 'oracle11g'
+            'theme_preference': 'light'
         }
 
 def initialize_session_state():
@@ -249,18 +205,7 @@ def initialize_session_state():
         "weight_calc_result": None,
         "weight_calculation_performed": False,
         "pitch_diameter_value": None,
-        "weight_form_submitted": False,
-        # Mobile view state
-        "mobile_view_optimized": False,
-        # Batch calculator session states - NEW
-        "batch_uploaded_file": None,
-        "batch_processing": False,
-        "batch_results": None,
-        "batch_summary": None,
-        "batch_errors": [],
-        "batch_processing_complete": False,
-        "batch_mode": "basic",  # 'basic' or 'advanced'
-        "batch_diameter_type": "Blank Diameter",  # NEW: Store diameter type for batch
+        "weight_form_submitted": False
     }
     
     for key, value in defaults.items():
@@ -269,939 +214,6 @@ def initialize_session_state():
     
     load_config()
     save_user_preferences()
-
-# ======================================================
-# MOBILE OPTIMIZATION
-# ======================================================
-def detect_mobile_device():
-    """Detect if the user is on a mobile device"""
-    try:
-        user_agent = st.query_params.get('user_agent', '')
-        mobile_indicators = ['Mobile', 'Android', 'iPhone', 'iPad']
-        return any(indicator in user_agent for indicator in mobile_indicators)
-    except:
-        return False
-
-def optimize_for_mobile():
-    """Apply mobile-specific optimizations"""
-    if detect_mobile_device() or st.session_state.mobile_view_optimized:
-        st.session_state.mobile_view_optimized = True
-        st.markdown("""
-        <style>
-        @media (max-width: 768px) {
-            .oracle11g-header {
-                padding: 1rem !important;
-            }
-            .oracle11g-header h1 {
-                font-size: 1.5rem !important;
-            }
-            .stButton > button {
-                padding: 0.5rem 1rem !important;
-                font-size: 0.9rem !important;
-            }
-            .stSelectbox, .stTextInput, .stNumberInput {
-                font-size: 0.9rem !important;
-            }
-            .metric-card {
-                padding: 1rem !important;
-                margin-bottom: 0.5rem !important;
-            }
-            .quick-action {
-                height: 100px !important;
-                padding: 1rem 0.5rem !important;
-            }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-# ======================================================
-# ENHANCED DATA EXPORT TEMPLATES
-# ======================================================
-class ExportTemplateManager:
-    """Manage export templates for different data types"""
-    
-    @staticmethod
-    def get_weight_calc_template():
-        """Get template for weight calculations"""
-        template_data = {
-            'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
-            'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
-            'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
-            'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
-            'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
-            'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
-            'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
-            'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
-            'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
-            'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
-            'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
-            'Length': [50, 100, 200, 75, 60, 50, 40],
-            'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
-            'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
-        }
-        return pd.DataFrame(template_data)
-    
-    @staticmethod
-    def get_product_database_template():
-        """Get template for product database exports"""
-        template_data = {
-            'Product': ['Hex Bolt', 'Heavy Hex Bolt', 'Hex Cap Screw'],
-            'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'ASME B18.3'],
-            'Size': ['1/4', '5/16', '1/4'],
-            'Thread': ['1/4-20-UNC-2A', '5/16-18-UNC-2A', '1/4-20-UNC-2A'],
-            'Material_Grade': ['N/A', 'N/A', 'N/A'],
-            'Quantity': [100, 50, 200],
-            'Notes': ['Standard hex bolt', 'Heavy hex pattern', 'Socket head cap screw']
-        }
-        return pd.DataFrame(template_data)
-    
-    @staticmethod
-    def export_to_pdf(data, title="Fastener Report"):
-        """Export data to PDF format (placeholder for future implementation)"""
-        st.info("PDF export feature will be available in the next update")
-        return None
-
-# ======================================================
-# ENHANCED BATCH CALCULATOR TEMPLATES WITH DIAMETER TYPE SUPPORT
-# ======================================================
-class BatchTemplateManager:
-    """Manage batch calculator templates with diameter type support"""
-    
-    @staticmethod
-    def get_basic_template(diameter_type="Blank Diameter"):
-        """Get basic template with Product_Type column and diameter type support"""
-        if diameter_type == "Blank Diameter":
-            template_data = {
-                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
-                'Size': ['1/4', 'M10', '1/2', '5/16'],
-                'Length': [50, 75, 200, 100],
-                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
-                'Diameter_Value': [6.35, 10.0, 12.7, 7.94],
-                'Diameter_Unit': ['mm', 'mm', 'mm', 'mm'],
-                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
-                'Quantity': [100, 50, 25, 200]
-            }
-        else:  # Pitch Diameter
-            template_data = {
-                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
-                'Size': ['1/4', '5/16', '1/2', '3/8'],
-                'Length': [50, 75, 200, 100],
-                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
-                'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
-                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
-                'Thread_Class': ['2A', '2A', '2A', '2A'],
-                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
-                'Quantity': [100, 50, 25, 200]
-            }
-        return pd.DataFrame(template_data)
-    
-    @staticmethod
-    def get_advanced_template(diameter_type="Blank Diameter"):
-        """Get advanced template with all parameters and diameter type support"""
-        if diameter_type == "Blank Diameter":
-            template_data = {
-                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hexagon Socket Head Cap Screws', 'Hex Bolt'],
-                'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
-                'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
-                'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
-                'Grade': ['N/A', 'A', 'N/A', 'N/A', 'B'],
-                'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
-                'Diameter_Value': [6.35, 10.0, 12.7, 6.35, 12.0],
-                'Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-                'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1', 'N/A', 'N/A'],
-                'Thread_Size': ['N/A', 'N/A', '1/2', 'N/A', 'N/A'],
-                'Thread_Class': ['N/A', 'N/A', '2A', 'N/A', 'N/A'],
-                'Length': [50, 75, 200, 50, 100],
-                'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
-                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel'],
-                'Quantity': [100, 50, 25, 75, 150]
-            }
-        else:  # Pitch Diameter
-            template_data = {
-                'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
-                'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
-                'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
-                'Size': ['1/4', '5/16', '1/2', '3/8'],
-                'Grade': ['N/A', 'N/A', 'N/A', 'N/A'],
-                'Diameter_Type': ['Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter'],
-                'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
-                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
-                'Thread_Class': ['2A', '2A', '2A', '2A'],
-                'Length': [50, 75, 200, 100],
-                'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
-                'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
-                'Quantity': [100, 50, 25, 200]
-            }
-        return pd.DataFrame(template_data)
-    
-    @staticmethod
-    def detect_input_mode(row):
-        """Detect whether row is in basic or advanced mode"""
-        basic_columns = ['Product_Type', 'Size', 'Length']
-        advanced_columns = ['Product_Type', 'Series', 'Standard', 'Diameter_Type']
-        
-        # Check if advanced columns are populated
-        advanced_mode = any(pd.notna(row.get(col, None)) for col in advanced_columns if col in row)
-        
-        # Check if basic columns are populated
-        basic_mode = all(pd.notna(row.get(col, None)) for col in basic_columns if col in row)
-        
-        if advanced_mode:
-            return "advanced"
-        elif basic_mode:
-            return "basic"
-        else:
-            return "invalid"
-    
-    @staticmethod
-    def infer_parameters_basic_mode(row, diameter_type="Blank Diameter"):
-        """Intelligently infer parameters from basic mode with diameter type support"""
-        try:
-            product_type = row.get('Product_Type', 'Hex Bolt')
-            size = row.get('Size')
-            length = row.get('Length', 50.0)
-            length_unit = row.get('Length_Unit', 'mm')
-            material = row.get('Material', 'Carbon Steel')
-            quantity = row.get('Quantity', 1)
-            
-            # Initialize default parameters
-            params = {
-                'product_type': product_type,
-                'size': str(size),
-                'material': material,
-                'length': length,
-                'length_unit': length_unit,
-                'quantity': quantity,
-                'diameter_type': diameter_type
-            }
-            
-            # Analyze size pattern
-            size_str = str(size).strip().upper()
-            
-            # Metric detection (M10, M12, M16, etc.)
-            if size_str.startswith('M'):
-                params['series'] = 'Metric'
-                params['standard'] = 'ISO 4014'
-                
-                # Extract diameter from metric size (M10 -> 10.0 mm)
-                try:
-                    diameter_value = float(size_str[1:])
-                    params['diameter_value'] = diameter_value
-                    params['diameter_unit'] = 'mm'
-                    params['grade'] = 'A'  # Default grade for metric
-                except ValueError:
-                    params['diameter_value'] = 10.0  # Default fallback
-                    params['diameter_unit'] = 'mm'
-                    params['grade'] = 'A'
-            
-            # Inch detection (fractions or numbers)
-            elif '/' in size_str or any(char.isdigit() for char in size_str):
-                params['series'] = 'Inch'
-                params['standard'] = 'ASME B18.2.1'
-                params['grade'] = 'N/A'
-                
-                try:
-                    # Handle fractions
-                    if '/' in size_str:
-                        if '-' in size_str:
-                            # Handle cases like "1-1/2"
-                            parts = size_str.split('-')
-                            whole = float(parts[0]) if parts[0] else 0
-                            fraction = float(Fraction(parts[1]))
-                            decimal_inches = whole + fraction
-                        else:
-                            decimal_inches = float(Fraction(size_str))
-                    else:
-                        decimal_inches = float(size_str)
-                    
-                    # Convert inches to mm for calculation
-                    params['diameter_value'] = decimal_inches * 25.4
-                    params['diameter_unit'] = 'mm'
-                    
-                except (ValueError, ZeroDivisionError):
-                    params['diameter_value'] = 6.35  # 1/4" default
-                    params['diameter_unit'] = 'mm'
-            
-            else:
-                # Default fallback
-                params['series'] = 'Inch'
-                params['standard'] = 'ASME B18.2.1'
-                params['diameter_value'] = 10.0
-                params['diameter_unit'] = 'mm'
-                params['grade'] = 'N/A'
-            
-            # Handle diameter type specific parameters
-            if diameter_type == "Pitch Diameter":
-                # For pitch diameter, we need thread information
-                params['thread_standard'] = row.get('Thread_Standard', 'ASME B1.1')
-                params['thread_size'] = row.get('Thread_Size', size)
-                params['thread_class'] = row.get('Thread_Class', '2A')
-                
-                # Get pitch diameter from database
-                pitch_diameter = get_pitch_diameter_from_thread_data(
-                    params['thread_standard'],
-                    params['thread_size'],
-                    params['thread_class']
-                )
-                
-                if pitch_diameter is not None:
-                    params['diameter_value'] = pitch_diameter
-                    params['diameter_unit'] = 'inch' if params['series'] == 'Inch' else 'mm'
-                else:
-                    # Fallback to blank diameter calculation
-                    st.warning(f"Pitch diameter not found for {params['thread_size']}, using blank diameter")
-                    params['diameter_type'] = 'Blank Diameter'
-            
-            elif diameter_type == "Blank Diameter":
-                # Use the provided diameter values
-                params['diameter_value'] = row.get('Diameter_Value', params.get('diameter_value', 10.0))
-                params['diameter_unit'] = row.get('Diameter_Unit', params.get('diameter_unit', 'mm'))
-            
-            return params
-            
-        except Exception as e:
-            st.error(f"Error inferring parameters for size {size}: {str(e)}")
-            # Return safe defaults
-            return {
-                'product_type': 'Hex Bolt',
-                'series': 'Inch',
-                'standard': 'ASME B18.2.1',
-                'size': str(size),
-                'grade': 'N/A',
-                'diameter_type': diameter_type,
-                'diameter_value': 10.0,
-                'diameter_unit': 'mm',
-                'material': material,
-                'length': length,
-                'length_unit': length_unit,
-                'quantity': quantity
-            }
-
-# ======================================================
-# BATCH PROCESSING ENGINE WITH DIAMETER TYPE SUPPORT
-# ======================================================
-class BatchProcessor:
-    """Handle batch weight calculations with diameter type support"""
-    
-    @staticmethod
-    def validate_batch_file(df, mode="basic", diameter_type="Blank Diameter"):
-        """Validate batch file structure and data with diameter type support"""
-        errors = []
-        warnings = []
-        
-        if df.empty:
-            errors.append("Uploaded file is empty")
-            return False, errors, warnings
-        
-        # Basic mode validation
-        if mode == "basic":
-            required_columns = ['Product_Type', 'Size', 'Length']
-            
-            if diameter_type == "Blank Diameter":
-                required_columns.extend(['Diameter_Value', 'Diameter_Unit'])
-            else:  # Pitch Diameter
-                required_columns.extend(['Thread_Standard', 'Thread_Size', 'Thread_Class'])
-            
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                errors.append(f"Missing required columns for basic mode with {diameter_type}: {', '.join(missing_columns)}")
-            
-            # Check for empty values in required columns
-            for col in required_columns:
-                if col in df.columns and df[col].isna().any():
-                    empty_count = df[col].isna().sum()
-                    warnings.append(f"Column '{col}' has {empty_count} empty values")
-        
-        # Advanced mode validation
-        elif mode == "advanced":
-            required_columns = ['Product_Type', 'Size', 'Length', 'Diameter_Type']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                errors.append(f"Missing required columns for advanced mode: {', '.join(missing_columns)}")
-        
-        # Check data types
-        if 'Length' in df.columns:
-            try:
-                pd.to_numeric(df['Length'], errors='coerce')
-            except:
-                errors.append("Length column contains non-numeric values")
-        
-        if 'Quantity' in df.columns:
-            try:
-                pd.to_numeric(df['Quantity'], errors='coerce')
-            except:
-                warnings.append("Quantity column contains non-numeric values - will use default of 1")
-        
-        if 'Diameter_Value' in df.columns:
-            try:
-                pd.to_numeric(df['Diameter_Value'], errors='coerce')
-            except:
-                errors.append("Diameter_Value column contains non-numeric values")
-        
-        return len(errors) == 0, errors, warnings
-    
-    @staticmethod
-    def process_batch_calculations(batch_df, diameter_type="Blank Diameter", progress_callback=None):
-        """Process batch calculations for all rows with diameter type support"""
-        results = []
-        errors = []
-        summary = {
-            'total_rows': len(batch_df),
-            'successful_calculations': 0,
-            'failed_calculations': 0,
-            'total_weight_kg': 0.0,
-            'total_weight_lb': 0.0,
-            'start_time': datetime.now(),
-            'diameter_type_used': diameter_type
-        }
-        
-        for index, row in batch_df.iterrows():
-            try:
-                # Determine input mode and prepare parameters
-                input_mode = BatchTemplateManager.detect_input_mode(row)
-                
-                if input_mode == "invalid":
-                    errors.append({
-                        'row_index': index,
-                        'input_data': row.to_dict(),
-                        'error': 'Invalid input - missing required columns',
-                        'status': 'failed'
-                    })
-                    continue
-                
-                # Prepare calculation parameters based on mode
-                if input_mode == "basic":
-                    params = BatchTemplateManager.infer_parameters_basic_mode(row, diameter_type)
-                else:  # advanced mode
-                    params = {
-                        'product_type': row.get('Product_Type', 'Hex Bolt'),
-                        'series': row.get('Series', 'Inch'),
-                        'standard': row.get('Standard', 'ASME B18.2.1'),
-                        'size': row.get('Size'),
-                        'grade': row.get('Grade', 'N/A'),
-                        'diameter_type': row.get('Diameter_Type', diameter_type),
-                        'diameter_value': row.get('Diameter_Value', 10.0),
-                        'diameter_unit': row.get('Diameter_Unit', 'mm'),
-                        'thread_standard': row.get('Thread_Standard', 'N/A'),
-                        'thread_size': row.get('Thread_Size', 'N/A'),
-                        'thread_class': row.get('Thread_Class', 'N/A'),
-                        'length': row.get('Length'),
-                        'length_unit': row.get('Length_Unit', 'mm'),
-                        'material': row.get('Material', 'Carbon Steel'),
-                        'quantity': row.get('Quantity', 1)
-                    }
-                
-                # Handle pitch diameter thread data
-                if params['diameter_type'] == 'Pitch Diameter' and params.get('thread_standard') != 'N/A':
-                    pitch_diameter = get_pitch_diameter_from_thread_data(
-                        params['thread_standard'],
-                        params['thread_size'],
-                        params['thread_class']
-                    )
-                    
-                    if pitch_diameter is not None:
-                        params['diameter_value'] = pitch_diameter
-                        params['diameter_unit'] = 'inch' if params.get('series') == 'Inch' else 'mm'
-                    else:
-                        errors.append({
-                            'row_index': index,
-                            'input_data': row.to_dict(),
-                            'error': f"Pitch diameter not found for {params['thread_size']}",
-                            'status': 'failed'
-                        })
-                        summary['failed_calculations'] += 1
-                        continue
-                
-                # Perform calculation
-                calculation_result = calculate_weight_rectified(params)
-                
-                if calculation_result:
-                    # Add batch-specific information
-                    result_record = {
-                        'row_index': index,
-                        'input_data': row.to_dict(),
-                        'calculation_result': calculation_result,
-                        'status': 'success',
-                        'input_mode': input_mode,
-                        'quantity': params.get('quantity', 1)
-                    }
-                    
-                    results.append(result_record)
-                    summary['successful_calculations'] += 1
-                    summary['total_weight_kg'] += calculation_result['weight_kg'] * result_record['quantity']
-                    summary['total_weight_lb'] += calculation_result['weight_lb'] * result_record['quantity']
-                    
-                    # Update progress
-                    if progress_callback and index % max(1, len(batch_df) // 10) == 0:
-                        progress = (index + 1) / len(batch_df)
-                        progress_callback(progress, f"Processed {index + 1}/{len(batch_df)} rows")
-                
-                else:
-                    errors.append({
-                        'row_index': index,
-                        'input_data': row.to_dict(),
-                        'error': 'Calculation returned no result',
-                        'status': 'failed',
-                        'input_mode': input_mode
-                    })
-                    summary['failed_calculations'] += 1
-                    
-            except Exception as e:
-                errors.append({
-                    'row_index': index,
-                    'input_data': row.to_dict(),
-                    'error': str(e),
-                    'status': 'failed',
-                    'input_mode': input_mode if 'input_mode' in locals() else 'unknown'
-                })
-                summary['failed_calculations'] += 1
-        
-        summary['end_time'] = datetime.now()
-        summary['processing_time'] = (summary['end_time'] - summary['start_time']).total_seconds()
-        
-        return results, errors, summary
-
-# ======================================================
-# BATCH RESULTS DISPLAY
-# ======================================================
-class BatchResultsDisplay:
-    """Display batch calculation results"""
-    
-    @staticmethod
-    def show_processing_summary(summary):
-        """Show batch processing summary"""
-        st.markdown("### 📊 Batch Processing Summary")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Records", summary['total_rows'])
-        with col2:
-            success_rate = (summary['successful_calculations'] / summary['total_rows']) * 100 if summary['total_rows'] > 0 else 0
-            st.metric("Successful", f"{summary['successful_calculations']} ({success_rate:.1f}%)")
-        with col3:
-            st.metric("Failed", summary['failed_calculations'])
-        with col4:
-            st.metric("Processing Time", f"{summary['processing_time']:.2f}s")
-        
-        st.markdown(f"**Diameter Type Used:** {summary.get('diameter_type_used', 'Blank Diameter')}")
-        st.markdown("---")
-    
-    @staticmethod
-    def show_weight_summary(summary):
-        """Show weight summary"""
-        st.markdown("### ⚖️ Total Weight Summary")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Weight (kg)", f"{summary['total_weight_kg']:.4f}")
-        with col2:
-            st.metric("Total Weight (lb)", f"{summary['total_weight_lb']:.4f}")
-        with col3:
-            st.metric("Total Weight (grams)", f"{summary['total_weight_kg'] * 1000:.2f}")
-    
-    @staticmethod
-    def show_detailed_results(results):
-        """Show detailed results table"""
-        if not results:
-            return
-        
-        st.markdown("### 📋 Detailed Results")
-        
-        # Prepare data for display
-        display_data = []
-        for result in results:
-            calc = result['calculation_result']
-            input_data = result['input_data']
-            quantity = result.get('quantity', 1)
-            
-            display_record = {
-                'Row': result['row_index'] + 1,
-                'Product': input_data.get('Product_Type', 'Auto-detected'),
-                'Size': input_data.get('Size', 'N/A'),
-                'Length': f"{input_data.get('Length', 'N/A')} {input_data.get('Length_Unit', 'mm')}",
-                'Material': input_data.get('Material', 'Carbon Steel'),
-                'Diameter Type': input_data.get('Diameter_Type', 'Blank Diameter'),
-                'Input Mode': result.get('input_mode', 'basic').title(),
-                'Weight (kg)': f"{calc['weight_kg']:.4f}",
-                'Weight (lb)': f"{calc['weight_lb']:.4f}",
-                'Quantity': quantity,
-                'Total Weight (kg)': f"{calc['weight_kg'] * quantity:.4f}",
-                'Total Weight (lb)': f"{calc['weight_lb'] * quantity:.4f}",
-                'Status': '✅ Success'
-            }
-            display_data.append(display_record)
-        
-        results_df = pd.DataFrame(display_data)
-        st.dataframe(results_df, use_container_width=True)
-    
-    @staticmethod
-    def show_error_report(errors):
-        """Show error report"""
-        if not errors:
-            return
-        
-        st.markdown("### ❌ Error Report")
-        st.warning(f"Found {len(errors)} calculation errors")
-        
-        for error in errors[:10]:  # Show first 10 errors
-            with st.expander(f"Row {error['row_index'] + 1} - {error['error']}"):
-                st.write("**Input Data:**", error['input_data'])
-                st.write("**Error:**", error['error'])
-        
-        if len(errors) > 10:
-            st.info(f"Showing first 10 of {len(errors)} errors. Download full report for complete details.")
-    
-    @staticmethod
-    def export_batch_results(results, errors, summary, filename_prefix="batch_weight_results"):
-        """Export batch results to Excel"""
-        try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{filename_prefix}_{timestamp}.xlsx"
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
-                    # Sheet 1: Summary
-                    summary_df = pd.DataFrame([summary])
-                    summary_df.to_excel(writer, sheet_name='Summary', index=False)
-                    
-                    # Sheet 2: Detailed Results
-                    if results:
-                        detailed_data = []
-                        for result in results:
-                            calc = result['calculation_result']
-                            input_data = result['input_data']
-                            quantity = result.get('quantity', 1)
-                            
-                            detailed_record = {
-                                'Row_Index': result['row_index'] + 1,
-                                'Product_Type': input_data.get('Product_Type', 'Auto-detected'),
-                                'Series': input_data.get('Series', 'Auto-detected'),
-                                'Standard': input_data.get('Standard', 'Auto-detected'),
-                                'Size': input_data.get('Size', 'N/A'),
-                                'Grade': input_data.get('Grade', 'N/A'),
-                                'Diameter_Type': input_data.get('Diameter_Type', 'Auto-detected'),
-                                'Diameter_Value': input_data.get('Diameter_Value', 'Auto-calculated'),
-                                'Diameter_Unit': input_data.get('Diameter_Unit', 'mm'),
-                                'Length': input_data.get('Length', 'N/A'),
-                                'Length_Unit': input_data.get('Length_Unit', 'mm'),
-                                'Material': input_data.get('Material', 'Carbon Steel'),
-                                'Input_Mode': result.get('input_mode', 'basic'),
-                                'Weight_kg': calc['weight_kg'],
-                                'Weight_lb': calc['weight_lb'],
-                                'Quantity': quantity,
-                                'Total_Weight_kg': calc['weight_kg'] * quantity,
-                                'Total_Weight_lb': calc['weight_lb'] * quantity,
-                                'Status': 'Success'
-                            }
-                            detailed_data.append(detailed_record)
-                        
-                        detailed_df = pd.DataFrame(detailed_data)
-                        detailed_df.to_excel(writer, sheet_name='Detailed_Results', index=False)
-                    
-                    # Sheet 3: Error Report
-                    if errors:
-                        error_df = pd.DataFrame(errors)
-                        error_df.to_excel(writer, sheet_name='Error_Report', index=False)
-                    
-                    # Sheet 4: Processing Log
-                    log_data = {
-                        'Timestamp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                        'Total_Rows': [summary['total_rows']],
-                        'Successful': [summary['successful_calculations']],
-                        'Failed': [summary['failed_calculations']],
-                        'Success_Rate': [f"{(summary['successful_calculations']/summary['total_rows'])*100:.2f}%"],
-                        'Total_Weight_kg': [summary['total_weight_kg']],
-                        'Total_Weight_lb': [summary['total_weight_lb']],
-                        'Processing_Time_seconds': [summary['processing_time']],
-                        'Diameter_Type': [summary.get('diameter_type_used', 'Blank Diameter')]
-                    }
-                    log_df = pd.DataFrame(log_data)
-                    log_df.to_excel(writer, sheet_name='Processing_Log', index=False)
-                
-                return tmp.name, filename
-                
-        except Exception as e:
-            st.error(f"Error exporting results: {str(e)}")
-            return None, None
-
-# ======================================================
-# ENHANCED BATCH CALCULATOR UI WITH DIAMETER TYPE SELECTION
-# ======================================================
-def show_batch_weight_calculator():
-    """Enhanced Batch Weight Calculator with Diameter Type Selection"""
-    
-    st.markdown("""
-    <div class="oracle11g-header">
-        <h1>Industrial Batch Weight Calculator</h1>
-        <p>Process 1000+ products simultaneously • Smart Diameter Handling</p>
-        <div>
-            <span class="oracle11g-badge">Batch Processing</span>
-            <span class="oracle11g-badge-orange">Smart Diameter Handling</span>
-            <span class="oracle11g-badge-green">Auto Pitch Diameter</span>
-            <span class="oracle11g-badge-yellow">Product Type Column</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Diameter Type Selection - ADDED AT THE TOP
-    st.markdown("### 🎯 Select Diameter Type")
-    diameter_type = st.radio(
-        "Choose how to specify diameters:",
-        ["Blank Diameter", "Pitch Diameter"],
-        horizontal=True,
-        key="batch_diameter_type"
-    )
-    
-    st.info(f"""
-    **{diameter_type} Mode Selected:**
-    - **Blank Diameter**: Provide diameter values directly in the template
-    - **Pitch Diameter**: System automatically fetches pitch diameter values from thread database
-    """)
-    
-    # Mode selection
-    st.markdown("### 🎯 Select Input Mode")
-    mode_col1, mode_col2 = st.columns(2)
-    
-    with mode_col1:
-        basic_mode = st.checkbox(
-            "Basic Mode (Auto-Detection)", 
-            value=st.session_state.batch_mode == "basic",
-            help="Provide Product Type, Size and Length - system auto-detects other parameters"
-        )
-    
-    with mode_col2:
-        advanced_mode = st.checkbox(
-            "Advanced Mode (Manual Specification)", 
-            value=st.session_state.batch_mode == "advanced",
-            help="Provide complete product specifications for precise control"
-        )
-    
-    # Set mode
-    if basic_mode and not advanced_mode:
-        st.session_state.batch_mode = "basic"
-    elif advanced_mode and not basic_mode:
-        st.session_state.batch_mode = "advanced"
-    elif not basic_mode and not advanced_mode:
-        st.session_state.batch_mode = "basic"  # Default
-    
-    st.markdown("---")
-    
-    # Template download section - UPDATED WITH DIAMETER TYPE
-    st.markdown("### 📥 Download Template")
-    
-    st.info(f"**Template will include:** Product_Type, Size, Length, and {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} columns")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("Download Basic Template", use_container_width=True):
-            template_df = BatchTemplateManager.get_basic_template(diameter_type)
-            csv_data = template_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV Template",
-                data=csv_data,
-                file_name=f"batch_weight_basic_{diameter_type.lower().replace(' ', '_')}_template.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-    
-    with col2:
-        if st.button("Download Advanced Template", use_container_width=True):
-            template_df = BatchTemplateManager.get_advanced_template(diameter_type)
-            csv_data = template_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV Template", 
-                data=csv_data,
-                file_name=f"batch_weight_advanced_{diameter_type.lower().replace(' ', '_')}_template.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-    
-    st.info(f"""
-    **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected with {diameter_type}:**
-    - **Basic Mode**: Upload CSV with Product_Type, Size, Length, {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} → System auto-detects other parameters
-    - **Advanced Mode**: Upload CSV with complete product specifications for precise control
-    - **Diameter Type**: {diameter_type} - {'Provide diameter values directly' if diameter_type == 'Blank Diameter' else 'System fetches pitch diameter from database'}
-    """)
-    
-    st.markdown("---")
-    
-    # File upload section
-    st.markdown("### 📤 Upload Batch File")
-    
-    uploaded_file = st.file_uploader(
-        f"Upload your {'Basic' if st.session_state.batch_mode == 'basic' else 'Advanced'} CSV file",
-        type=['csv', 'xlsx'],
-        key="batch_file_uploader"
-    )
-    
-    if uploaded_file:
-        st.session_state.batch_uploaded_file = uploaded_file
-        
-        try:
-            # Load the file
-            if uploaded_file.name.endswith('.xlsx'):
-                batch_df = pd.read_excel(uploaded_file)
-            else:
-                batch_df = pd.read_csv(uploaded_file)
-            
-            st.success(f"✅ File uploaded successfully! Loaded {len(batch_df)} records")
-            
-            # Show preview
-            with st.expander("📋 Preview Uploaded Data"):
-                st.dataframe(batch_df.head(10), use_container_width=True)
-                st.write(f"Total rows: {len(batch_df)}")
-                st.write(f"Columns: {list(batch_df.columns)}")
-            
-            # Validate file with diameter type
-            is_valid, validation_errors, validation_warnings = BatchProcessor.validate_batch_file(
-                batch_df, st.session_state.batch_mode, diameter_type
-            )
-            
-            if validation_warnings:
-                for warning in validation_warnings:
-                    st.warning(warning)
-            
-            if not is_valid:
-                for error in validation_errors:
-                    st.error(error)
-                st.stop()
-            
-            # Show inferred parameters example for basic mode
-            if st.session_state.batch_mode == "basic" and len(batch_df) > 0:
-                with st.expander("🔍 Auto-Detection Preview"):
-                    sample_row = batch_df.iloc[0]
-                    inferred_params = BatchTemplateManager.infer_parameters_basic_mode(sample_row, diameter_type)
-                    st.write("**Sample Auto-detected Parameters:**")
-                    st.json(inferred_params)
-                    st.caption("The system will automatically determine these parameters for all rows")
-            
-            # Process batch button
-            st.markdown("---")
-            st.markdown("### ⚙️ Process Batch Calculations")
-            
-            if st.button(
-                f"🚀 Process {len(batch_df)} Records", 
-                type="primary", 
-                use_container_width=True,
-                key="process_batch_calculations"
-            ):
-                st.session_state.batch_processing = True
-                st.session_state.batch_processing_complete = False
-                
-                # Process batch calculations with diameter type
-                with st.spinner(f"Processing {len(batch_df)} records with {diameter_type}..."):
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    def update_progress(progress, status):
-                        progress_bar.progress(progress)
-                        status_text.text(status)
-                    
-                    results, errors, summary = BatchProcessor.process_batch_calculations(
-                        batch_df, diameter_type, update_progress
-                    )
-                    
-                    # Store results in session state
-                    st.session_state.batch_results = results
-                    st.session_state.batch_errors = errors
-                    st.session_state.batch_summary = summary
-                    st.session_state.batch_processing = False
-                    st.session_state.batch_processing_complete = True
-                
-                progress_bar.empty()
-                status_text.empty()
-                
-                st.rerun()
-        
-        except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
-            LoadingManager.log_operation("Batch File Processing", False, str(e))
-    
-    # Display results if processing is complete
-    if st.session_state.batch_processing_complete and st.session_state.batch_summary:
-        st.markdown("---")
-        st.markdown("## 📊 Batch Processing Results")
-        
-        # Show summary
-        BatchResultsDisplay.show_processing_summary(st.session_state.batch_summary)
-        
-        # Show weight summary
-        BatchResultsDisplay.show_weight_summary(st.session_state.batch_summary)
-        
-        # Show detailed results
-        if st.session_state.batch_results:
-            BatchResultsDisplay.show_detailed_results(st.session_state.batch_results)
-        
-        # Show errors
-        if st.session_state.batch_errors:
-            BatchResultsDisplay.show_error_report(st.session_state.batch_errors)
-        
-        # Export section
-        st.markdown("---")
-        st.markdown("### 💾 Export Results")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("📥 Export to Excel", use_container_width=True):
-                with st.spinner("Generating Excel report..."):
-                    file_path, filename = BatchResultsDisplay.export_batch_results(
-                        st.session_state.batch_results,
-                        st.session_state.batch_errors,
-                        st.session_state.batch_summary
-                    )
-                    
-                    if file_path:
-                        with open(file_path, 'rb') as f:
-                            st.download_button(
-                                label="Download Excel Report",
-                                data=f,
-                                file_name=filename,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                use_container_width=True
-                            )
-        
-        with col2:
-            # Export successful results only
-            if st.session_state.batch_results:
-                successful_df = pd.DataFrame([
-                    {
-                        'Product_Type': r['input_data'].get('Product_Type', 'Auto-detected'),
-                        'Size': r['input_data'].get('Size', 'N/A'),
-                        'Length': f"{r['input_data'].get('Length', 'N/A')} {r['input_data'].get('Length_Unit', 'mm')}",
-                        'Material': r['input_data'].get('Material', 'Carbon Steel'),
-                        'Diameter_Type': r['input_data'].get('Diameter_Type', 'Blank Diameter'),
-                        'Weight_kg': r['calculation_result']['weight_kg'],
-                        'Weight_lb': r['calculation_result']['weight_lb'],
-                        'Quantity': r.get('quantity', 1),
-                        'Total_Weight_kg': r['calculation_result']['weight_kg'] * r.get('quantity', 1),
-                        'Total_Weight_lb': r['calculation_result']['weight_lb'] * r.get('quantity', 1)
-                    }
-                    for r in st.session_state.batch_results
-                ])
-                
-                csv_data = successful_df.to_csv(index=False)
-                st.download_button(
-                    label="📊 Download CSV Summary",
-                    data=csv_data,
-                    file_name="batch_weight_results.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-        
-        with col3:
-            if st.button("🔄 Process New Batch", use_container_width=True):
-                # Reset batch state
-                st.session_state.batch_uploaded_file = None
-                st.session_state.batch_processing = False
-                st.session_state.batch_results = None
-                st.session_state.batch_errors = []
-                st.session_state.batch_summary = None
-                st.session_state.batch_processing_complete = False
-                st.rerun()
 
 # ======================================================
 # FIXED THREAD DATA LOADING - PROPER DATA TYPES
@@ -1281,12 +293,10 @@ def load_thread_data_enhanced(standard_name):
         # Add standard identifier
         df_thread['Standard'] = standard_name
         
-        LoadingManager.log_operation(f"Load Thread Data: {standard_name}", True, f"Records: {len(df_thread)}")
         return df_thread
         
     except Exception as e:
         st.error(f"Error loading thread data for {standard_name}: {str(e)}")
-        LoadingManager.log_operation(f"Load Thread Data: {standard_name}", False, str(e))
         return pd.DataFrame()
 
 def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
@@ -1357,7 +367,7 @@ def get_thread_classes_enhanced(standard):
         return ["All"]
 
 # ======================================================
-# ORACLE 11G STYLING - COMPLETE UI TRANSFORMATION
+# ENHANCED PAGE SETUP WITH JSC GROUP STYLING
 # ======================================================
 st.set_page_config(
     page_title="JSC Industries - Fastener Intelligence", 
@@ -1366,158 +376,147 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Oracle 11g Professional CSS
+# JSC Group Professional CSS with Enhanced Card Design
 st.markdown("""
 <style>
     :root {
-        --oracle11g-blue: #1F4E78;
-        --oracle11g-blue-dark: #0D2B4A;
-        --oracle11g-blue-light: #2E75B6;
-        --oracle11g-gray-dark: #333333;
-        --oracle11g-gray: #666666;
-        --oracle11g-gray-light: #F5F5F5;
-        --oracle11g-gray-border: #CCCCCC;
-        --oracle11g-orange: #E66C37;
-        --oracle11g-green: #4CAF50;
-        --oracle11g-yellow: #FFC107;
-        --oracle11g-red: #D32F2F;
+        --jsc-primary: #0066b3;
+        --jsc-primary-dark: #003366;
+        --jsc-secondary: #00a0e3;
+        --jsc-accent: #ff6b00;
+        --jsc-light: #f8f9fa;
+        --jsc-dark: #343a40;
+        --jsc-success: #28a745;
+        --jsc-warning: #ffc107;
+        --jsc-danger: #dc3545;
+        --jsc-gradient: linear-gradient(135deg, #0066b3 0%, #003366 100%);
+        --jsc-gradient-light: linear-gradient(135deg, #00a0e3 0%, #0066b3 100%);
     }
     
     .stApp {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    .oracle11g-header {
-        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-dark) 100%);
+    .jsc-header {
+        background: var(--jsc-gradient);
         padding: 2.5rem;
-        border-radius: 8px;
+        border-radius: 15px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 6px 18px rgba(31, 78, 120, 0.3);
-        border: 1px solid var(--oracle11g-blue-light);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
         position: relative;
         overflow: hidden;
     }
     
-    .oracle11g-header::before {
+    .jsc-header::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, var(--oracle11g-orange) 0%, var(--oracle11g-yellow) 100%);
+        background: var(--jsc-accent);
     }
     
-    .oracle11g-header h1 {
+    .jsc-header h1 {
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
-        color: white;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    .oracle11g-header p {
+    .jsc-header p {
         font-size: 1.2rem;
         opacity: 0.95;
         margin-bottom: 1rem;
-        color: white;
-        font-weight: 300;
     }
     
-    .oracle11g-card {
+    .jsc-card {
         background: white;
-        padding: 1.8rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        border-left: 5px solid var(--oracle11g-blue);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
         transition: all 0.3s ease;
-        margin-bottom: 1.2rem;
-        border: 1px solid var(--oracle11g-gray-border);
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
         position: relative;
         overflow: hidden;
     }
     
-    .oracle11g-card::before {
+    .jsc-card::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 3px;
-        background: var(--oracle11g-blue);
+        background: var(--jsc-gradient);
     }
     
-    .oracle11g-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(31, 78, 120, 0.15);
-        border-left-color: var(--oracle11g-blue-light);
+    .jsc-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 102, 179, 0.15);
+        border-left-color: var(--jsc-accent);
     }
     
     .metric-card {
         background: white;
-        padding: 1.8rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        border-left: 5px solid var(--oracle11g-blue);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid var(--jsc-primary);
         transition: transform 0.3s ease;
-        border: 1px solid var(--oracle11g-gray-border);
+        border: 1px solid #e9ecef;
         text-align: center;
     }
     
     .metric-card:hover {
         transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(31, 78, 120, 0.15);
+        box-shadow: 0 8px 20px rgba(0, 102, 179, 0.15);
     }
     
-    .oracle11g-badge {
-        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
+    .jsc-badge {
+        background: var(--jsc-gradient);
         color: white;
         padding: 0.4rem 1rem;
         border-radius: 20px;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         font-weight: 600;
         margin: 0.2rem;
         display: inline-block;
-        box-shadow: 0 2px 6px rgba(31, 78, 120, 0.3);
-        border: 1px solid var(--oracle11g-blue-light);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .oracle11g-badge-orange {
-        background: linear-gradient(135deg, var(--oracle11g-orange) 0%, #F57C00 100%);
-        border: 1px solid var(--oracle11g-orange);
+    .jsc-badge-accent {
+        background: var(--jsc-accent);
     }
     
-    .oracle11g-badge-green {
-        background: linear-gradient(135deg, var(--oracle11g-green) 0%, #388E3C 100%);
-        border: 1px solid var(--oracle11g-green);
+    .jsc-badge-secondary {
+        background: var(--jsc-secondary);
     }
     
-    .oracle11g-badge-yellow {
-        background: linear-gradient(135deg, var(--oracle11g-yellow) 0%, #FFA000 100%);
-        color: #333;
-        border: 1px solid var(--oracle11g-yellow);
+    .jsc-badge-success {
+        background: var(--jsc-success);
     }
     
     .stButton>button {
-        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
+        background: var(--jsc-gradient);
         color: white;
         border: none;
-        padding: 0.8rem 1.5rem;
-        border-radius: 6px;
+        padding: 0.7rem 1.5rem;
+        border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(31, 78, 120, 0.3);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        border: 1px solid var(--oracle11g-blue-light);
+        box-shadow: 0 2px 4px rgba(0, 102, 179, 0.2);
     }
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(31, 78, 120, 0.4);
-        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
+        box-shadow: 0 6px 15px rgba(0, 102, 179, 0.3);
+        background: var(--jsc-primary-dark);
     }
     
     .stButton>button:active {
@@ -1525,98 +524,90 @@ st.markdown("""
     }
     
     .stButton>button[kind="primary"] {
-        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
+        background: var(--jsc-gradient);
         color: white;
     }
     
     .stButton>button[kind="primary"]:hover {
-        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
+        background: var(--jsc-primary-dark);
     }
     
     .stButton>button[kind="secondary"] {
         background: white;
-        color: var(--oracle11g-blue);
-        border: 2px solid var(--oracle11g-blue);
+        color: var(--jsc-primary);
+        border: 2px solid var(--jsc-primary);
     }
     
     .stButton>button[kind="secondary"]:hover {
-        background: var(--oracle11g-blue);
+        background: var(--jsc-primary);
         color: white;
     }
     
     .css-1d391kg, .css-1lcbmhc {
-        background: linear-gradient(180deg, var(--oracle11g-gray-light) 0%, white 100%);
-        border-right: 2px solid var(--oracle11g-gray-border);
+        background: white;
+        border-right: 1px solid #e9ecef;
     }
     
     .sidebar .sidebar-content {
-        background: linear-gradient(180deg, white 0%, var(--oracle11g-gray-light) 100%);
+        background: linear-gradient(180deg, white 0%, #f8f9fa 100%);
     }
     
     .stTextInput>div>div>input, 
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select {
-        border: 2px solid var(--oracle11g-gray-border);
-        border-radius: 6px;
-        padding: 0.7rem 1rem;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
         transition: all 0.3s ease;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: white;
     }
     
     .stTextInput>div>div>input:focus, 
     .stNumberInput>div>div>input:focus,
     .stSelectbox>div>div>select:focus {
-        border-color: var(--oracle11g-blue);
-        box-shadow: 0 0 0 3px rgba(31, 78, 120, 0.1);
-        background: white;
+        border-color: var(--jsc-primary);
+        box-shadow: 0 0 0 2px rgba(0, 102, 179, 0.1);
     }
     
     .dataframe {
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 1px solid var(--oracle11g-gray-border);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
     }
     
     .streamlit-expanderHeader {
-        background: var(--oracle11g-gray-light);
-        border-radius: 6px;
-        border: 2px solid var(--oracle11g-gray-border);
+        background: var(--jsc-light);
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
         font-weight: 600;
-        color: var(--oracle11g-blue);
-        padding: 1rem;
+        color: var(--jsc-primary);
     }
     
     .stTabs [data-baseweb="tab-list"] {
-        gap: 1rem;
+        gap: 2rem;
     }
     
     .stTabs [data-baseweb="tab"] {
         background: white;
-        border-radius: 6px 6px 0 0;
+        border-radius: 8px 8px 0 0;
         padding: 1rem 2rem;
-        border: 2px solid var(--oracle11g-gray-border);
+        border: 1px solid #e9ecef;
         border-bottom: none;
         font-weight: 600;
-        color: var(--oracle11g-gray);
-        transition: all 0.3s ease;
     }
     
     .stTabs [aria-selected="true"] {
-        background: var(--oracle11g-blue);
+        background: var(--jsc-primary);
         color: white;
-        border-color: var(--oracle11g-blue);
     }
     
     .stProgress > div > div > div {
-        background: linear-gradient(90deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
+        background: var(--jsc-gradient);
     }
     
     .stAlert {
         border-radius: 8px;
-        border: 2px solid;
-        padding: 1rem;
+        border: 1px solid;
     }
     
     .stAlert [data-testid="stMarkdownContainer"] {
@@ -1624,24 +615,23 @@ st.markdown("""
     }
     
     .section-header {
-        border-left: 5px solid var(--oracle11g-blue);
-        padding-left: 1.2rem;
-        margin: 2rem 0 1.5rem 0;
-        color: var(--oracle11g-blue);
-        font-weight: 700;
-        font-size: 1.5rem;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        border-left: 5px solid var(--jsc-primary);
+        padding-left: 1rem;
+        margin: 2rem 0 1rem 0;
+        color: var(--jsc-primary-dark);
+        font-weight: 600;
+        font-size: 1.4rem;
     }
     
     .quick-action {
         background: white;
         padding: 1.5rem 1rem;
-        border-radius: 8px;
+        border-radius: 12px;
         text-align: center;
         cursor: pointer;
         transition: all 0.3s ease;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border: 2px solid var(--oracle11g-gray-border);
+        border: 1px solid #e9ecef;
         height: 120px;
         display: flex;
         flex-direction: column;
@@ -1657,23 +647,22 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
-        background: var(--oracle11g-blue);
+        height: 3px;
+        background: var(--jsc-gradient);
     }
     
     .quick-action:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        border-color: var(--oracle11g-blue);
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     
     .professional-card {
-        background: linear-gradient(135deg, #ffffff 0%, var(--oracle11g-gray-light) 100%);
-        border: 2px solid var(--oracle11g-blue);
-        border-radius: 10px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid var(--jsc-primary);
+        border-radius: 15px;
         padding: 2rem;
         margin: 2rem 0;
-        box-shadow: 0 8px 30px rgba(31, 78, 120, 0.2);
+        box-shadow: 0 10px 30px rgba(0, 102, 179, 0.2);
         position: relative;
         overflow: hidden;
     }
@@ -1685,7 +674,7 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, var(--oracle11g-blue) 0%, var(--oracle11g-orange) 100%);
+        background: var(--jsc-gradient);
     }
     
     .card-header {
@@ -1693,33 +682,30 @@ st.markdown("""
         justify-content: space-between;
         align-items: flex-start;
         margin-bottom: 2rem;
-        padding-bottom: 1.5rem;
-        border-bottom: 2px solid var(--oracle11g-gray-border);
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
     }
     
     .card-title {
         font-size: 1.8rem;
         font-weight: 700;
-        color: var(--oracle11g-blue);
+        color: var(--jsc-primary-dark);
         margin: 0;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     .card-subtitle {
-        font-size: 1.1rem;
-        color: var(--oracle11g-gray);
+        font-size: 1.2rem;
+        color: #6c757d;
         margin: 0.5rem 0 0 0;
-        font-weight: 400;
     }
     
     .card-company {
-        background: var(--oracle11g-blue);
+        background: var(--jsc-gradient);
         color: white;
-        padding: 0.6rem 1.2rem;
-        border-radius: 6px;
-        font-weight: 700;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
         font-size: 0.9rem;
-        box-shadow: 0 2px 8px rgba(31, 78, 120, 0.3);
     }
     
     .spec-row {
@@ -1728,39 +714,36 @@ st.markdown("""
         gap: 1rem;
         align-items: center;
         margin: 0.8rem 0;
-        padding: 0.8rem;
+        padding: 0.5rem;
         border-radius: 6px;
-        background: var(--oracle11g-gray-light);
-        border: 1px solid var(--oracle11g-gray-border);
+        background: #f8f9fa;
     }
     
     .spec-label-min, .spec-label-max {
-        font-size: 0.9rem;
-        color: var(--oracle11g-gray);
+        font-size: 0.85rem;
+        color: #6c757d;
         text-align: center;
-        font-weight: 600;
+        font-weight: 500;
     }
     
     .spec-dimension {
-        font-weight: 700;
-        color: var(--oracle11g-blue);
+        font-weight: 600;
+        color: var(--jsc-primary-dark);
         text-align: center;
-        padding: 0.5rem 1rem;
+        padding: 0.3rem 1rem;
         background: white;
         border-radius: 4px;
-        border: 2px solid var(--oracle11g-gray-border);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
     }
     
     .spec-value {
-        font-weight: 700;
-        color: var(--oracle11g-blue);
+        font-weight: 600;
+        color: var(--jsc-primary);
         text-align: center;
-        padding: 0.5rem;
+        padding: 0.3rem;
         background: white;
         border-radius: 4px;
-        border: 2px solid var(--oracle11g-gray-border);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #dee2e6;
     }
     
     .card-footer {
@@ -1768,10 +751,10 @@ st.markdown("""
         justify-content: space-between;
         align-items: center;
         margin-top: 2rem;
-        padding-top: 1.5rem;
-        border-top: 2px solid var(--oracle11g-gray-border);
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
         font-size: 0.9rem;
-        color: var(--oracle11g-gray);
+        color: #6c757d;
     }
     
     .card-actions {
@@ -1782,42 +765,39 @@ st.markdown("""
     }
     
     .action-button {
-        background: linear-gradient(135deg, var(--oracle11g-blue) 0%, var(--oracle11g-blue-light) 100%);
+        background: var(--jsc-gradient);
         color: white;
         border: none;
-        padding: 0.8rem 1.5rem;
+        padding: 0.7rem 1.5rem;
         border-radius: 6px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(31, 78, 120, 0.3);
-        border: 1px solid var(--oracle11g-blue-light);
     }
     
     .action-button:hover {
-        background: linear-gradient(135deg, var(--oracle11g-blue-light) 0%, var(--oracle11g-blue) 100%);
+        background: var(--jsc-primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(31, 78, 120, 0.4);
     }
     
     .action-button.secondary {
         background: white;
-        color: var(--oracle11g-blue);
-        border: 2px solid var(--oracle11g-blue);
+        color: var(--jsc-primary);
+        border: 2px solid var(--jsc-primary);
     }
     
     .action-button.secondary:hover {
-        background: var(--oracle11g-blue);
+        background: var(--jsc-primary);
         color: white;
     }
     
     .filter-section {
         background: white;
         padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         margin-bottom: 1.5rem;
-        border: 2px solid var(--oracle11g-gray-border);
+        border: 1px solid #e9ecef;
         position: relative;
         overflow: hidden;
     }
@@ -1828,25 +808,25 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
-        background: var(--oracle11g-blue);
+        height: 3px;
+        background: var(--jsc-gradient);
     }
     
     .filter-header {
-        border-left: 4px solid var(--oracle11g-blue);
+        border-left: 4px solid var(--jsc-primary);
         padding-left: 1rem;
         margin-bottom: 1rem;
-        color: var(--oracle11g-blue);
-        font-weight: 700;
-        font-size: 1.3rem;
+        color: var(--jsc-primary-dark);
+        font-weight: 600;
+        font-size: 1.2rem;
     }
     
     .independent-section {
-        border: 2px solid var(--oracle11g-blue);
-        border-radius: 8px;
+        border: 2px solid var(--jsc-primary);
+        border-radius: 12px;
         padding: 1.5rem;
         margin-bottom: 2rem;
-        background: linear-gradient(135deg, var(--oracle11g-gray-light) 0%, #ffffff 100%);
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
         position: relative;
         overflow: hidden;
     }
@@ -1857,61 +837,58 @@ st.markdown("""
         top: 0;
         left: 0;
         width: 100%;
-        height: 4px;
-        background: var(--oracle11g-blue);
+        height: 3px;
+        background: var(--jsc-gradient);
     }
     
     .section-results {
-        border: 2px solid var(--oracle11g-green);
-        border-radius: 8px;
+        border: 2px solid var(--jsc-success);
+        border-radius: 12px;
         padding: 1.5rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         background: linear-gradient(135deg, #f0f8f0 0%, #ffffff 100%);
     }
     
     .combined-results {
-        border: 2px solid var(--oracle11g-orange);
-        border-radius: 8px;
+        border: 2px solid var(--jsc-secondary);
+        border-radius: 12px;
         padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #fff8f0 0%, #ffffff 100%);
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
     }
     
     .data-quality-indicator {
         padding: 0.8rem;
-        border-radius: 6px;
+        border-radius: 8px;
         margin: 0.3rem 0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         border-left: 4px solid;
-        background: white;
-        border: 1px solid var(--oracle11g-gray-border);
     }
     
     .quality-good {
-        background: #e8f5e8;
-        color: #2e7d32;
-        border-left-color: var(--oracle11g-green);
+        background: #d4edda;
+        color: #155724;
+        border-left-color: var(--jsc-success);
     }
     
     .quality-warning {
-        background: #fff8e1;
-        color: #f57c00;
-        border-left-color: var(--oracle11g-yellow);
+        background: #fff3cd;
+        color: #856404;
+        border-left-color: var(--jsc-warning);
     }
     
     .quality-error {
-        background: #ffebee;
-        color: #c62828;
-        border-left-color: var(--oracle11g-red);
+        background: #f8d7da;
+        color: #721c24;
+        border-left-color: var(--jsc-danger);
     }
     
     .calculation-card {
-        background: linear-gradient(135deg, var(--oracle11g-gray-light) 0%, #e9ecef 100%);
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 10px;
         margin: 0.5rem 0;
-        border-left: 4px solid var(--oracle11g-green);
-        border: 1px solid var(--oracle11g-gray-border);
+        border-left: 4px solid var(--jsc-success);
     }
     
     .spec-grid {
@@ -1935,39 +912,20 @@ st.markdown("""
         margin: 1.5rem 0;
     }
     
-    .oracle11g-footer {
+    .jsc-footer {
         text-align: center;
-        color: var(--oracle11g-gray);
+        color: #6c757d;
         padding: 2rem;
         margin-top: 3rem;
-        border-top: 2px solid var(--oracle11g-gray-border);
-        background: var(--oracle11g-gray-light);
-        border-radius: 8px;
+        border-top: 1px solid #e9ecef;
     }
     
-    /* Loading spinner enhancements */
-    .stSpinner > div {
-        border: 4px solid #f3f3f3;
-        border-radius: 50%;
-        border-top: 4px solid var(--oracle11g-blue);
-        width: 40px;
-        height: 40px;
-        animation: spin 2s linear infinite;
-        margin: 0 auto;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
-    /* Mobile optimizations */
     @media (max-width: 768px) {
-        .oracle11g-header {
+        .jsc-header {
             padding: 1.5rem !important;
         }
         
-        .oracle11g-header h1 {
+        .jsc-header h1 {
             font-size: 2rem !important;
         }
         
@@ -1995,68 +953,43 @@ st.markdown("""
         .card-actions {
             flex-direction: column;
         }
-        
-        .stButton > button {
-            padding: 0.7rem 1.2rem !important;
-            font-size: 0.9rem !important;
-        }
-        
-        .metric-card {
-            padding: 1.2rem !important;
-            margin-bottom: 0.8rem !important;
-        }
-        
-        .quick-action {
-            height: 100px !important;
-            padding: 1rem 0.6rem !important;
-        }
-        
-        .stSelectbox, .stTextInput, .stNumberInput {
-            font-size: 0.9rem !important;
-        }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
 initialize_session_state()
-optimize_for_mobile()
 
 # ======================================================
 # ENHANCED DATA LOADING WITH PRODUCT MAPPING
 # ======================================================
 
 # Load main data
-with LoadingManager.show_loading_spinner("Loading main fastener data..."):
-    df = safe_load_excel_file_enhanced(url) if url else safe_load_excel_file_enhanced(local_excel_path)
+df = safe_load_excel_file_enhanced(url) if url else safe_load_excel_file_enhanced(local_excel_path)
 
 # Load Mechanical and Chemical data
-with LoadingManager.show_loading_spinner("Loading mechanical & chemical data..."):
-    df_mechem = safe_load_excel_file_enhanced(me_chem_google_url)
-    if df_mechem.empty:
-        st.info("Online Mechanical & Chemical file not accessible, trying local version...")
-        df_mechem = safe_load_excel_file_enhanced(me_chem_path)
+df_mechem = safe_load_excel_file_enhanced(me_chem_google_url)
+if df_mechem.empty:
+    st.info("Online Mechanical & Chemical file not accessible, trying local version...")
+    df_mechem = safe_load_excel_file_enhanced(me_chem_path)
 
 # Load ISO 4014 data
-with LoadingManager.show_loading_spinner("Loading ISO 4014 data..."):
-    df_iso4014 = safe_load_excel_file_enhanced(iso4014_file_url)
-    if df_iso4014.empty:
-        st.info("Online ISO 4014 file not accessible, trying local version...")
-        df_iso4014 = safe_load_excel_file_enhanced(iso4014_local_path)
+df_iso4014 = safe_load_excel_file_enhanced(iso4014_file_url)
+if df_iso4014.empty:
+    st.info("Online ISO 4014 file not accessible, trying local version...")
+    df_iso4014 = safe_load_excel_file_enhanced(iso4014_local_path)
 
 # Load DIN-7991 data
-with LoadingManager.show_loading_spinner("Loading DIN-7991 data..."):
-    df_din7991 = safe_load_excel_file_enhanced(din7991_file_url)
-    if df_din7991.empty:
-        st.info("Online DIN-7991 file not accessible, trying local version...")
-        df_din7991 = safe_load_excel_file_enhanced(din7991_local_path)
+df_din7991 = safe_load_excel_file_enhanced(din7991_file_url)
+if df_din7991.empty:
+    st.info("Online DIN-7991 file not accessible, trying local version...")
+    df_din7991 = safe_load_excel_file_enhanced(din7991_local_path)
 
 # Load ASME B18.3 data
-with LoadingManager.show_loading_spinner("Loading ASME B18.3 data..."):
-    df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_file_url)
-    if df_asme_b18_3.empty:
-        st.info("Online ASME B18.3 file not accessible, trying local version...")
-        df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_local_path)
+df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_file_url)
+if df_asme_b18_3.empty:
+    st.info("Online ASME B18.3 file not accessible, trying local version...")
+    df_asme_b18_3 = safe_load_excel_file_enhanced(asme_b18_3_local_path)
 
 # ======================================================
 # FIXED DATA PROCESSING - CORRECT PRODUCT NAMES
@@ -2142,8 +1075,7 @@ def process_standard_data():
     return standard_products, standard_series
 
 # Process all standards data
-with LoadingManager.show_loading_spinner("Processing standards data..."):
-    standard_products, standard_series = process_standard_data()
+standard_products, standard_series = process_standard_data()
 
 # Process DIN-7991 data if loaded
 if not df_din7991.empty:
@@ -2240,12 +1172,10 @@ def process_mechanical_chemical_data():
             st.sidebar.write(f"Found {len(property_classes)} property classes")
             st.sidebar.write(f"Property class columns: {property_class_cols}")
         
-        LoadingManager.log_operation("Process Mechanical & Chemical Data", True, f"Property Classes: {len(property_classes)}")
         return me_chem_columns, property_classes
         
     except Exception as e:
         st.error(f"Error processing Mechanical & Chemical data: {str(e)}")
-        LoadingManager.log_operation("Process Mechanical & Chemical Data", False, str(e))
         return [], []
 
 def get_standards_for_property_class(property_class):
@@ -2416,8 +1346,7 @@ def show_mechanical_chemical_details(property_class):
         st.error(f"Error displaying mechanical/chemical details: {str(e)}")
 
 # Initialize Mechanical & Chemical data processing
-with LoadingManager.show_loading_spinner("Processing mechanical & chemical properties..."):
-    me_chem_columns, property_classes = process_mechanical_chemical_data()
+me_chem_columns, property_classes = process_mechanical_chemical_data()
 
 # ======================================================
 # COMPLETELY BULLETPROOF SIZE HANDLING - FIXED VERSION
@@ -2613,7 +1542,7 @@ def get_asme_b18_3_dimensions(product, size):
         
         if 'Size' in temp_df.columns and size != "All":
             # Normalize size comparison - handle different formats
-            temp_df['Size_Normalized'] = temp_df['Size'].ast(str).str.strip()
+            temp_df['Size_Normalized'] = temp_df['Size'].astype(str).str.strip()
             size_normalized = str(size).strip()
             temp_df = temp_df[temp_df['Size_Normalized'] == size_normalized]
         
@@ -2742,12 +1671,10 @@ def get_asme_b18_3_dimensions(product, size):
             st.sidebar.write(f"Head Diameter Column Used: {head_dia_col}")
             st.sidebar.write(f"Head Height Column Used: {head_height_col}")
         
-        LoadingManager.log_operation(f"Get ASME B18.3 Dimensions", True, f"Head Dia: {head_diameter}, Head Height: {head_height}")
         return head_diameter, head_height, original_unit
             
     except Exception as e:
         st.error(f"Error getting ASME B18.3 dimensions: {str(e)}")
-        LoadingManager.log_operation("Get ASME B18.3 Dimensions", False, str(e))
         return None, None, "inch"
 
 def get_din7991_dimensions(product, size):
@@ -2826,12 +1753,10 @@ def get_din7991_dimensions(product, size):
             st.sidebar.write(f"Head Height Column: {head_height_col}, Value: {head_height}")
             st.sidebar.write(f"Available columns: {temp_df.columns.tolist()}")
         
-        LoadingManager.log_operation(f"Get DIN-7991 Dimensions", True, f"Head Dia: {head_diameter}, Head Height: {head_height}")
         return head_diameter, head_height, original_unit
         
     except Exception as e:
         st.warning(f"Error getting DIN-7991 dimensions: {str(e)}")
-        LoadingManager.log_operation("Get DIN-7991 Dimensions", False, str(e))
         return None, None, "mm"
 
 def get_socket_head_dimensions(standard, product, size, grade="All"):
@@ -2914,12 +1839,10 @@ def get_hex_head_dimensions(standard, product, size, grade="All"):
             if pd.notna(head_height):
                 head_height = float(head_height)
         
-        LoadingManager.log_operation(f"Get Hex Head Dimensions", True, f"Width: {width_across_flats}, Height: {head_height}")
         return width_across_flats, head_height, original_unit
         
     except Exception as e:
         st.warning(f"Error getting hex head dimensions: {str(e)}")
-        LoadingManager.log_operation("Get Hex Head Dimensions", False, str(e))
         return None, None, "unknown"
 
 # ======================================================
@@ -2989,7 +1912,7 @@ def calculate_socket_product_weight_rectified(parameters, head_diameter, head_he
         weight_kg = weight_g / 1000
         weight_lb = weight_kg * 2.20462
         
-        result = {
+        return {
             'weight_kg': weight_kg,
             'weight_g': weight_g,
             'weight_lb': weight_lb,
@@ -3031,12 +1954,8 @@ def calculate_socket_product_weight_rectified(parameters, head_diameter, head_he
             }
         }
         
-        LoadingManager.log_operation("Socket Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
-        return result
-        
     except Exception as e:
         st.error(f"Socket product calculation error: {str(e)}")
-        LoadingManager.log_operation("Socket Product Weight Calculation", False, str(e))
         return None
 
 def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_height, original_unit):
@@ -3087,7 +2006,7 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
         weight_kg = weight_g / 1000
         weight_lb = weight_kg * 2.20462
         
-        result = {
+        return {
             'weight_kg': weight_kg,
             'weight_g': weight_g,
             'weight_lb': weight_lb,
@@ -3132,12 +2051,8 @@ def calculate_hex_product_weight_rectified(parameters, width_across_flats, head_
             }
         }
         
-        LoadingManager.log_operation("Hex Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
-        return result
-        
     except Exception as e:
         st.error(f"Hex product calculation error: {str(e)}")
-        LoadingManager.log_operation("Hex Product Weight Calculation", False, str(e))
         return None
 
 # ======================================================
@@ -3367,7 +2282,7 @@ def calculate_weight_rectified(parameters):
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
             
-            result = {
+            return {
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
@@ -3389,9 +2304,6 @@ def calculate_weight_rectified(parameters):
                     'density_g_cm3': f"{density_g_cm3:.4f}"
                 }
             }
-            
-            LoadingManager.log_operation("Threaded Rod Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
-            return result
         
         # For hex products, use rectified hex product formula in mm³
         elif product_type in hex_products:
@@ -3405,7 +2317,7 @@ def calculate_weight_rectified(parameters):
             weight_kg = weight_g / 1000
             weight_lb = weight_kg * 2.20462
             
-            result = {
+            return {
                 'weight_kg': weight_kg,
                 'weight_g': weight_g,
                 'weight_lb': weight_lb,
@@ -3428,12 +2340,8 @@ def calculate_weight_rectified(parameters):
                 }
             }
             
-            LoadingManager.log_operation("Standard Product Weight Calculation", True, f"Weight: {weight_kg:.4f} kg")
-            return result
-            
     except Exception as e:
         st.error(f"Calculation error: {str(e)}")
-        LoadingManager.log_operation("Weight Calculation", False, str(e))
         import traceback
         st.error(f"Detailed error: {traceback.format_exc()}")
         return None
@@ -3702,14 +2610,14 @@ def show_weight_calculator_rectified():
     """FIXED weight calculator with proper data fetching for ALL products"""
     
     st.markdown("""
-    <div class="oracle11g-header">
+    <div class="jsc-header">
         <h1>Weight Calculator - FIXED WORKFLOW</h1>
         <p>SEPARATE data fetching for Socket Head products with SAME formula</p>
         <div>
-            <span class="oracle11g-badge">FIXED</span>
-            <span class="oracle11g-badge-orange">Separate Data Fetching</span>
-            <span class="oracle11g-badge-green">Same Formula</span>
-            <span class="oracle11g-badge-yellow">Different Standards</span>
+            <span class="jsc-badge">FIXED</span>
+            <span class="jsc-badge-accent">Separate Data Fetching</span>
+            <span class="jsc-badge-secondary">Same Formula</span>
+            <span class="jsc-badge-success">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3899,8 +2807,7 @@ def show_weight_calculator_rectified():
                     
                     # Show pitch diameter information for ALL products using Pitch Diameter
                     if selected_diameter_type == "Pitch Diameter" and thread_size != "All":
-                        with LoadingManager.show_loading_spinner("Fetching thread data..."):
-                            pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
+                        pitch_diameter = get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class)
                         if pitch_diameter is not None:
                             # Store the pitch diameter in session state for calculation
                             st.session_state.pitch_diameter_value = pitch_diameter
@@ -4033,8 +2940,7 @@ def show_weight_calculator_rectified():
                     return
             
             # Perform calculation using FIXED function
-            with LoadingManager.show_loading_spinner("Calculating weight..."):
-                result = calculate_weight_rectified(calculation_params)
+            result = calculate_weight_rectified(calculation_params)
             
             if result:
                 st.session_state.weight_calc_result = result
@@ -4248,7 +3154,23 @@ def show_batch_calculator_rectified():
     
     # Download template
     st.markdown("### Download FIXED Batch Template")
-    template_df = ExportTemplateManager.get_weight_calc_template()
+    template_data = {
+        'Product_Type': ['Hex Bolt', 'Heavy Hex Bolt', 'Threaded Rod', 'Hex Cap Screws', 'Hex Bolt', 'Hexagon Socket Head Cap Screws', 'Hexagon Socket Countersunk Head Cap Screw'],
+        'Series': ['Inch', 'Inch', 'Inch', 'Inch', 'Metric', 'Inch', 'Metric'],
+        'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1', 'ISO 4014', 'ASME B18.3', 'DIN-7991'],
+        'Size': ['1/4', '5/16', 'Not Required', '3/8', 'M10', '1/4', 'M6'],
+        'Grade': ['N/A', 'N/A', 'N/A', 'N/A', 'A', 'N/A', 'N/A'],
+        'Diameter_Type': ['Blank Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
+        'Blank_Diameter': [6.35, 0, 0, 9.525, 10.0, 6.35, 6.0],
+        'Blank_Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm', 'mm', 'mm'],
+        'Thread_Standard': ['N/A', 'ASME B1.1', 'ASME B1.1', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Thread_Size': ['N/A', '1/4', '1/2', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Thread_Class': ['N/A', '2A', '2A', 'N/A', 'N/A', 'N/A', 'N/A'],
+        'Length': [50, 100, 200, 75, 60, 50, 40],
+        'Length_Unit': ['mm', 'mm', 'ft', 'mm', 'mm', 'mm', 'mm'],
+        'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel', 'Carbon Steel']
+    }
+    template_df = pd.DataFrame(template_data)
     csv_template = template_df.to_csv(index=False)
     st.download_button(
         label="Download FIXED Batch Template (CSV)",
@@ -4281,25 +3203,22 @@ def show_batch_calculator_rectified():
                 st.error(f"Missing required columns: {missing_cols}")
             else:
                 if st.button("Process Batch Calculation", use_container_width=True, key="process_batch_fixed"):
-                    with LoadingManager.show_loading_spinner("Processing batch calculations..."):
-                        LoadingManager.show_progress_bar(1, 5, "Processing batch")
-                        st.info("FIXED batch processing with separate data fetching ready for implementation")
-                        st.write(f"Records to process: {len(batch_df)}")
+                    st.info("FIXED batch processing with separate data fetching ready for implementation")
+                    st.write(f"Records to process: {len(batch_df)}")
                     
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
-            LoadingManager.log_operation("Batch File Upload", False, str(e))
 
 def show_rectified_calculations():
     """Fixed calculations page with proper data fetching for ALL products"""
     
-    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Calculator", "Analytics"])
+    tab1, tab2, tab3 = st.tabs(["Single Calculator", "Batch Processor", "Analytics"])
     
     with tab1:
         show_weight_calculator_rectified()
     
     with tab2:
-        show_batch_weight_calculator()
+        show_batch_calculator_rectified()
     
     with tab3:
         st.markdown("### Calculation Analytics - FIXED")
@@ -4383,11 +3302,9 @@ def export_to_excel(df, filename_prefix):
                     adjusted_width = min(max_length + 2, 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
             
-            LoadingManager.log_operation("Export to Excel", True, f"Rows: {len(df)}")
             return tmp.name
     except Exception as e:
         st.error(f"Export error: {str(e)}")
-        LoadingManager.log_operation("Export to Excel", False, str(e))
         return None
 
 def enhanced_export_data(filtered_df, export_format):
@@ -4395,8 +3312,7 @@ def enhanced_export_data(filtered_df, export_format):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     if export_format == "Excel":
-        with LoadingManager.show_loading_spinner("Generating Excel file..."):
-            excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
+        excel_file = export_to_excel(filtered_df, f"fastener_data_{timestamp}")
         if excel_file:
             with open(excel_file, 'rb') as f:
                 st.download_button(
@@ -4431,8 +3347,6 @@ def save_calculation_history(calculation_data):
     
     if len(st.session_state.calculation_history) > 20:
         st.session_state.calculation_history = st.session_state.calculation_history[-20:]
-    
-    LoadingManager.log_operation("Save Calculation History", True, f"Total calculations: {len(st.session_state.calculation_history)}")
 
 def show_calculation_history():
     """Display calculation history"""
@@ -4451,157 +3365,16 @@ def show_calculation_history():
                 """, unsafe_allow_html=True)
 
 # ======================================================
-# COMPLETELY FIXED: PROFESSIONAL PRODUCT CARD DISPLAY
+# COMPLETED: PROFESSIONAL PRODUCT CARD DISPLAY
 # ======================================================
-def extract_product_details(row):
-    """Extract product details from dataframe row and map to card format - COMPLETELY FIXED VERSION"""
-    try:
-        # Convert row to dictionary if it's a Series
-        if hasattr(row, 'to_dict'):
-            row_dict = row.to_dict()
-        else:
-            row_dict = dict(row)
-        
-        # Safely extract basic product information with multiple fallbacks
-        details = {
-            'Product': row_dict.get('Product', 'Hex Bolt'),
-            'Size': row_dict.get('Size', 'N/A'),
-            'Standards': row_dict.get('Standards', row_dict.get('Standard', 'ASME B18.2.1')),
-            'Thread': row_dict.get('Thread', row_dict.get('Thread_Size', 'N/A')),
-            'Product Grade': row_dict.get('Product Grade', row_dict.get('Grade', 'N/A')),
-        }
-        
-        # Helper function to safely get values with multiple possible column names
-        def get_value(row_dict, possible_keys, default='N/A'):
-            for key in possible_keys:
-                value = row_dict.get(key)
-                if value is not None and pd.notna(value) and str(value).strip() != '':
-                    return str(value).strip()
-            return default
-        
-        # Map ALL possible dimensional specifications with comprehensive column name variations
-        details.update({
-            # Body Diameter - comprehensive column name variations
-            'Body_Dia_Min': get_value(row_dict, [
-                'Body_Diameter_Min', 'Body_Dia_Min', 'Basic_Major_Diameter_Min', 'Major_Dia_Min',
-                'Body Diameter Min', 'Body Dia Min', 'Body_D_Min', 'Body_Dia_Min'
-            ]),
-            'Body_Dia_Max': get_value(row_dict, [
-                'Body_Diameter_Max', 'Body_Dia_Max', 'Basic_Major_Diameter_Max', 'Major_Dia_Max',
-                'Body Diameter Max', 'Body Dia Max', 'Body_D_Max', 'Body_Dia_Max'
-            ]),
-            
-            # Width Across Flats - comprehensive column name variations
-            'Width_Across_Flats_Min': get_value(row_dict, [
-                'Width_Across_Flats_Min', 'W_Across_Flats_Min', 'Width_Min', 'W_Min',
-                'Width Across Flats Min', 'W Across Flats Min', 'Width_Flats_Min', 'W_Flats_Min',
-                'Width_Across_Flats', 'W_Across_Flats', 'Width_Flats', 'W_Flats'
-            ]),
-            'Width_Across_Flats_Max': get_value(row_dict, [
-                'Width_Across_Flats_Max', 'W_Across_Flats_Max', 'Width_Max', 'W_Max',
-                'Width Across Flats Max', 'W Across Flats Max', 'Width_Flats_Max', 'W_Flats_Max'
-            ]),
-            
-            # Width Across Corners - comprehensive column name variations
-            'Width_Across_Corners_Min': get_value(row_dict, [
-                'Width_Across_Corners_Min', 'W_Across_Corners_Min', 'Width_Across_Corners_Min',
-                'Width Across Corners Min', 'W Across Corners Min', 'Width_Corners_Min', 'W_Corners_Min',
-                'Width_Across_Corners', 'W_Across_Corners', 'Width_Corners', 'W_Corners'
-            ]),
-            'Width_Across_Corners_Max': get_value(row_dict, [
-                'Width_Across_Corners_Max', 'W_Across_Corners_Max', 'Width_Across_Corners_Max',
-                'Width Across Corners Max', 'W Across Corners Max', 'Width_Corners_Max', 'W_Corners_Max'
-            ]),
-            
-            # Head Height - comprehensive column name variations
-            'Head_Height_Min': get_value(row_dict, [
-                'Head_Height_Min', 'Head_Ht_Min', 'Head_Height', 'k_min', 'Head Height Min',
-                'Head_H_Min', 'Head_Ht', 'Head_Height_Min', 'Head_H_Min', 'k'
-            ]),
-            'Head_Height_Max': get_value(row_dict, [
-                'Head_Height_Max', 'Head_Ht_Max', 'Head_Height_Max', 'k_max',
-                'Head Height Max', 'Head_H_Max', 'Head_Ht_Max'
-            ]),
-            
-            # Radius of Fillet - comprehensive column name variations
-            'Radius_Fillet_Min': get_value(row_dict, [
-                'Radius_Fillet_Min', 'Fillet_Radius_Min', 'Radius_Fillet', 'Fillet_Radius',
-                'Radius Fillet Min', 'Fillet Radius Min', 'Radius_F_Min', 'Fillet_R_Min',
-                'Radius_Fillet', 'Fillet_Radius', 'Radius_F', 'Fillet_R'
-            ]),
-            'Radius_Fillet_Max': get_value(row_dict, [
-                'Radius_Fillet_Max', 'Fillet_Radius_Max', 'Radius_Fillet_Max',
-                'Radius Fillet Max', 'Fillet Radius Max', 'Radius_F_Max', 'Fillet_R_Max'
-            ]),
-            
-            # Washer Face Thickness - comprehensive column name variations
-            'Washer_Face_Thickness_Min': get_value(row_dict, [
-                'Washer_Face_Thickness_Min', 'Washer_Face_Min', 'Washer_Thickness_Min',
-                'Washer Face Thickness Min', 'Washer Face Min', 'Washer_Thickness_Min',
-                'Washer_Face_Thickness', 'Washer_Face', 'Washer_Thickness'
-            ]),
-            'Washer_Face_Thickness_Max': get_value(row_dict, [
-                'Washer_Face_Thickness_Max', 'Washer_Face_Max', 'Washer_Thickness_Max',
-                'Washer Face Thickness Max', 'Washer Face Max', 'Washer_Thickness_Max'
-            ]),
-            
-            # Wrenching Height - comprehensive column name variations
-            'Wrenching_Height_Min': get_value(row_dict, [
-                'Wrenching_Height_Min', 'Wrenching_Ht_Min', 'Wrenching_Height',
-                'Wrenching Height Min', 'Wrenching_H_Min', 'Wrenching_Ht',
-                'Wrenching_Height_Min', 'Wrenching_H_Min'
-            ]),
-            
-            # Total Runout - comprehensive column name variations
-            'Total_Runout_Max': get_value(row_dict, [
-                'Total_Runout_Max', 'Runout_Max', 'Total_Runout',
-                'Total Runout Max', 'Runout Max', 'Total_Runout_Max',
-                'Runout', 'Total_Runout'
-            ])
-        })
-        
-        # Debug information
-        if st.session_state.debug_mode:
-            st.sidebar.write("Extracted Product Details:")
-            for key, value in details.items():
-                if value != 'N/A':
-                    st.sidebar.write(f"  {key}: {value}")
-        
-        return details
-        
-    except Exception as e:
-        st.error(f"Error extracting product details: {str(e)}")
-        # Return basic details even if extraction fails
-        return {
-            'Product': 'Hex Bolt',
-            'Size': 'N/A',
-            'Standards': 'ASME B18.2.1',
-            'Thread': 'N/A',
-            'Product Grade': 'N/A',
-            'Body_Dia_Min': 'N/A',
-            'Body_Dia_Max': 'N/A',
-            'Width_Across_Flats_Min': 'N/A',
-            'Width_Across_Flats_Max': 'N/A',
-            'Width_Across_Corners_Min': 'N/A',
-            'Width_Across_Corners_Max': 'N/A',
-            'Head_Height_Min': 'N/A',
-            'Head_Height_Max': 'N/A',
-            'Radius_Fillet_Min': 'N/A',
-            'Radius_Fillet_Max': 'N/A',
-            'Washer_Face_Thickness_Min': 'N/A',
-            'Washer_Face_Thickness_Max': 'N/A',
-            'Wrenching_Height_Min': 'N/A',
-            'Total_Runout_Max': 'N/A'
-        }
-
 def show_professional_product_card(product_details):
-    """Display a beautiful professional product specification card - COMPLETELY FIXED"""
+    """Display a beautiful professional product specification card"""
     
-    # Extract product details with safe defaults
+    # Extract product details
     product_name = product_details.get('Product', 'Hex Bolt')
-    size = product_details.get('Size', 'N/A')
+    size = product_details.get('Size', '1/4 x 10')
     standard = product_details.get('Standards', 'ASME B18.2.1')
-    thread = product_details.get('Thread', 'N/A')
+    thread = product_details.get('Thread', '1/4-20-UNC-2A')
     grade = product_details.get('Product Grade', 'N/A')
     
     # Get current date and user info
@@ -4621,7 +3394,7 @@ def show_professional_product_card(product_details):
         
         <div class="specification-grid">
             <!-- Dimensional Specifications Group -->
-            <div class="oracle11g-card">
+            <div class="jsc-card">
                 <div class="filter-header">Dimensional Specifications</div>
                 
                 <!-- Body Diameter -->
@@ -4710,7 +3483,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Head Specifications Group -->
-            <div class="oracle11g-card">
+            <div class="jsc-card">
                 <div class="filter-header">Head Specifications</div>
                 
                 <!-- Head Height -->
@@ -4751,7 +3524,7 @@ def show_professional_product_card(product_details):
             </div>
             
             <!-- Additional Specifications Group -->
-            <div class="oracle11g-card">
+            <div class="jsc-card">
                 <div class="filter-header">Additional Specifications</div>
                 
                 <!-- Wrenching Height -->
@@ -4768,7 +3541,7 @@ def show_professional_product_card(product_details):
                 
                 <!-- Thread Information -->
                 <div class="spec-row">
-                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--oracle11g-blue); color: white; padding: 0.8rem;">
+                    <div class="spec-dimension" style="grid-column: 1 / span 3; text-align: center; background: var(--jsc-gradient); color: white; padding: 0.8rem;">
                         <strong>Thread: {thread}</strong>
                     </div>
                 </div>
@@ -4780,7 +3553,7 @@ def show_professional_product_card(product_details):
                 <strong>Generation Date:</strong> {current_date}<br>
                 <strong>Generated By:</strong> {generated_by}
             </div>
-            <div class="oracle11g-badge">
+            <div class="jsc-badge">
                 Professional Specification
             </div>
         </div>
@@ -4799,15 +3572,49 @@ def show_professional_product_card(product_details):
     # Add some action buttons below the card
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("View Raw Data", use_container_width=True, key="view_raw_pro_card"):
+        if st.button("View Raw Data", use_container_width=True):
             st.dataframe(pd.DataFrame([product_details]))
     with col2:
-        if st.button("Compare Products", use_container_width=True, key="compare_pro_card"):
+        if st.button("Compare Products", use_container_width=True):
             st.info("Product comparison feature coming soon!")
     with col3:
-        if st.button("Close Card", use_container_width=True, key="close_pro_card"):
+        if st.button("Close Card", use_container_width=True):
             st.session_state.show_professional_card = False
             st.rerun()
+
+def extract_product_details(row):
+    """Extract product details from dataframe row and map to card format"""
+    details = {
+        'Product': row.get('Product', 'Hex Bolt'),
+        'Size': row.get('Size', 'N/A'),
+        'Standards': row.get('Standards', 'ASME B18.2.1'),
+        'Thread': row.get('Thread', '1/4-20-UNC-2A'),
+        'Product Grade': row.get('Product Grade', 'N/A'),
+        
+        # Map dimensional specifications
+        'Body_Dia_Min': row.get('Body_Diameter_Min', row.get('Basic_Major_Diameter_Min', 'N/A')),
+        'Body_Dia_Max': row.get('Body_Diameter_Max', row.get('Basic_Major_Diameter_Max', 'N/A')),
+        
+        'Width_Across_Flats_Min': row.get('Width_Across_Flats_Min', row.get('W_Across_Flats_Min', 'N/A')),
+        'Width_Across_Flats_Max': row.get('Width_Across_Flats_Max', row.get('W_Across_Flats_Max', 'N/A')),
+        
+        'Width_Across_Corners_Min': row.get('Width_Across_Corners_Min', row.get('W_Across_Corners_Min', 'N/A')),
+        'Width_Across_Corners_Max': row.get('Width_Across_Corners_Max', row.get('W_Across_Corners_Max', 'N/A')),
+        
+        'Head_Height_Min': row.get('Head_Height_Min', 'N/A'),
+        'Head_Height_Max': row.get('Head_Height_Max', 'N/A'),
+        
+        'Radius_Fillet_Min': row.get('Radius_Fillet_Min', row.get('Fillet_Radius_Min', 'N/A')),
+        'Radius_Fillet_Max': row.get('Radius_Fillet_Max', row.get('Fillet_Radius_Max', 'N/A')),
+        
+        'Washer_Face_Thickness_Min': row.get('Washer_Face_Thickness_Min', 'N/A'),
+        'Washer_Face_Thickness_Max': row.get('Washer_Face_Thickness_Max', 'N/A'),
+        
+        'Wrenching_Height_Min': row.get('Wrenching_Height_Min', 'N/A'),
+        'Total_Runout_Max': row.get('Total_Runout_Max', 'N/A')
+    }
+    
+    return details
 
 # ======================================================
 # FIXED SECTION A - PROPER PRODUCT-SERIES-STANDARD-SIZE-GRADE RELATIONSHIP
@@ -4860,14 +3667,14 @@ def show_enhanced_product_database():
     """Enhanced Product Intelligence Center with COMPLETELY FIXED Section C material properties"""
     
     st.markdown("""
-    <div class="oracle11g-header">
+    <div class="jsc-header">
         <h1>Product Intelligence Center - Independent Sections</h1>
         <p>Each section works completely independently - No dependencies</p>
         <div>
-            <span class="oracle11g-badge">Enhanced Calculator</span>
-            <span class="oracle11g-badge-orange">Product-Based Workflow</span>
-            <span class="oracle11g-badge-green">Dynamic Standards</span>
-            <span class="oracle11g-badge-yellow">Professional Grade</span>
+            <span class="jsc-badge">Enhanced Calculator</span>
+            <span class="jsc-badge-accent">Product-Based Workflow</span>
+            <span class="jsc-badge-secondary">Dynamic Standards</span>
+            <span class="jsc-badge-success">Professional Grade</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -4900,7 +3707,6 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section A - Dimensional Specifications</h3>
             <p><strong>Relationship:</strong> Product -> Series -> Standards -> Size -> Grade (ISO 4014 only)</p>
-        </div>
         """, unsafe_allow_html=True)
         
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -5002,17 +3808,18 @@ def show_enhanced_product_database():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("APPLY SECTION A FILTERS", use_container_width=True, type="primary", key="apply_section_a"):
-                with LoadingManager.show_loading_spinner("Applying filters..."):
-                    st.session_state.section_a_filters = {
-                        'product': dimensional_product,
-                        'series': dimensional_series,
-                        'standard': dimensional_standard,
-                        'size': dimensional_size,
-                        'grade': dimensional_grade if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt" else "All"
-                    }
-                    # Apply filters and store results
-                    st.session_state.section_a_results = apply_section_a_filters()
+                st.session_state.section_a_filters = {
+                    'product': dimensional_product,
+                    'series': dimensional_series,
+                    'standard': dimensional_standard,
+                    'size': dimensional_size,
+                    'grade': dimensional_grade if dimensional_standard == "ISO 4014" and dimensional_product == "Hex Bolt" else "All"
+                }
+                # Apply filters and store results
+                st.session_state.section_a_results = apply_section_a_filters()
                 st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section A Results
         show_section_a_results()
@@ -5023,7 +3830,6 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section B - Thread Specifications</h3>
             <p><strong>FIXED:</strong> Proper data loading from Excel files with correct tolerance classes</p>
-        </div>
         """, unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
@@ -5116,15 +3922,16 @@ def show_enhanced_product_database():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("APPLY SECTION B FILTERS", use_container_width=True, type="primary", key="apply_section_b"):
-                with LoadingManager.show_loading_spinner("Applying thread filters..."):
-                    st.session_state.section_b_filters = {
-                        'standard': thread_standard,
-                        'size': thread_size,
-                        'class': tolerance_class
-                    }
-                    # Apply filters and store results
-                    st.session_state.section_b_results = apply_section_b_filters()
+                st.session_state.section_b_filters = {
+                    'standard': thread_standard,
+                    'size': thread_size,
+                    'class': tolerance_class
+                }
+                # Apply filters and store results
+                st.session_state.section_b_results = apply_section_b_filters()
                 st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section B Results
         show_section_b_results()
@@ -5135,7 +3942,6 @@ def show_enhanced_product_database():
         <div class="independent-section">
             <h3 class="filter-header">Section C - Material Properties</h3>
             <p><strong>COMPLETELY FIXED:</strong> Works with ALL property classes including 10.9, 6.8, 8.8, 304, A, B, B7</p>
-        </div>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
@@ -5209,13 +4015,12 @@ def show_enhanced_product_database():
                 if property_class == "All" or property_class == "No data available":
                     st.warning("Please select a valid property class")
                 else:
-                    with LoadingManager.show_loading_spinner("Applying material filters..."):
-                        st.session_state.section_c_filters = {
-                            'property_class': property_class,
-                            'standard': material_standard
-                        }
-                        # Apply filters and store results
-                        st.session_state.section_c_results = apply_section_c_filters()
+                    st.session_state.section_c_filters = {
+                        'property_class': property_class,
+                        'standard': material_standard
+                    }
+                    # Apply filters and store results
+                    st.session_state.section_c_results = apply_section_c_filters()
                     
                     # Show immediate feedback
                     if st.session_state.section_c_results.empty:
@@ -5224,6 +4029,8 @@ def show_enhanced_product_database():
                         st.success(f"Found {len(st.session_state.section_c_results)} records for {property_class}")
                     
                     st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show Section C Results
         show_section_c_results()
@@ -5235,8 +4042,7 @@ def show_enhanced_product_database():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("COMBINE ALL SECTION RESULTS", use_container_width=True, type="secondary", key="combine_all"):
-            with LoadingManager.show_loading_spinner("Combining results..."):
-                st.session_state.combined_results = combine_all_results()
+            st.session_state.combined_results = combine_all_results()
             st.rerun()
     
     # Show Combined Results
@@ -5304,14 +4110,14 @@ def show_rectified_home():
     """Show professional engineering dashboard"""
     
     st.markdown("""
-    <div class="oracle11g-header">
+    <div class="jsc-header">
         <h1>JSC Industries</h1>
         <p>Professional Fastener Intelligence Platform v4.0 - FIXED</p>
         <div>
-            <span class="oracle11g-badge">FIXED Calculator</span>
-            <span class="oracle11g-badge-orange">Separate Data Fetching</span>
-            <span class="oracle11g-badge-green">Same Formula</span>
-            <span class="oracle11g-badge-yellow">Different Standards</span>
+            <span class="jsc-badge">FIXED Calculator</span>
+            <span class="jsc-badge-accent">Separate Data Fetching</span>
+            <span class="jsc-badge-secondary">Same Formula</span>
+            <span class="jsc-badge-success">Different Standards</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -5326,36 +4132,36 @@ def show_rectified_home():
     with col1:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle11g-blue); margin:0;">Products</h3>
-            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_products}</h2>
-            <p style="color: var(--oracle11g-gray); margin:0;">Total Records</p>
+            <h3 style="color: var(--jsc-primary); margin:0;">Products</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_products}</h2>
+            <p style="color: #7f8c8d; margin:0;">Total Records</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle11g-blue); margin:0;">Dimensional Standards</h3>
-            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
-            <p style="color: var(--oracle11g-gray); margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
+            <h3 style="color: var(--jsc-primary); margin:0;">Dimensional Standards</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_dimensional_standards}</h2>
+            <p style="color: #7f8c8d; margin:0;">ASME B18.2.1, ASME B18.3, ISO 4014, DIN-7991</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle11g-blue); margin:0;">Thread Types</h3>
-            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_threads}</h2>
-            <p style="color: var(--oracle11g-gray); margin:0;">Available</p>
+            <h3 style="color: var(--jsc-primary); margin:0;">Thread Types</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_threads}</h2>
+            <p style="color: #7f8c8d; margin:0;">Available</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: var(--oracle11g-blue); margin:0;">ME&CERT</h3>
-            <h2 style="color: var(--oracle11g-blue-dark); margin:0.5rem 0;">{total_mecert}</h2>
-            <p style="color: var(--oracle11g-gray); margin:0;">Properties</p>
+            <h3 style="color: var(--jsc-primary); margin:0;">ME&CERT</h3>
+            <h2 style="color: var(--jsc-primary-dark); margin:0.5rem 0;">{total_mecert}</h2>
+            <p style="color: #7f8c8d; margin:0;">Properties</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -5365,7 +4171,7 @@ def show_rectified_home():
     actions = [
         ("Product Database", "Professional product discovery with engineering filters", "database"),
         ("Engineering Calculator", "FIXED weight calculations with separate data fetching", "calculator"),
-        ("Batch Calculator", "Industrial-scale processing for 1000+ products", "batch"),
+        ("Analytics Dashboard", "Visual insights and performance metrics", "analytics"),
         ("Compare Products", "Side-by-side technical comparison", "compare"),
         ("Export Reports", "Generate professional engineering reports", "export")
     ]
@@ -5375,8 +4181,7 @@ def show_rectified_home():
             if st.button(f"**{title}**\n\n{description}", key=f"home_{key}"):
                 section_map = {
                     "database": "Product Database",
-                    "calculator": "Calculations",
-                    "batch": "Batch Calculator"
+                    "calculator": "Calculations"
                 }
                 st.session_state.selected_section = section_map.get(key, "Product Database")
                 st.rerun()
@@ -5387,22 +4192,21 @@ def show_rectified_home():
         st.markdown('<h3 class="section-header">System Status - FIXED</h3>', unsafe_allow_html=True)
         
         status_items = [
-            ("ASME B18.2.1 Data", not df.empty, "oracle11g-badge"),
-            ("ISO 4014 Data", not df_iso4014.empty, "oracle11g-badge-orange"),
-            ("DIN-7991 Data", st.session_state.din7991_loaded, "oracle11g-badge-green"),
-            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "oracle11g-badge-yellow"),
-            ("ME&CERT Data", not df_mechem.empty, "oracle11g-badge"),
-            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "oracle11g-badge-orange"),
-            ("Weight Calculations", True, "oracle11g-badge-green"),
-            ("FIXED Calculator", True, "oracle11g-badge-yellow"),
-            ("Batch Calculator", True, "oracle11g-badge"),
+            ("ASME B18.2.1 Data", not df.empty, "jsc-badge"),
+            ("ISO 4014 Data", not df_iso4014.empty, "jsc-badge-accent"),
+            ("DIN-7991 Data", st.session_state.din7991_loaded, "jsc-badge-secondary"),
+            ("ASME B18.3 Data", st.session_state.asme_b18_3_loaded, "jsc-badge-success"),
+            ("ME&CERT Data", not df_mechem.empty, "jsc-badge"),
+            ("Thread Data", any(not load_thread_data_enhanced(url).empty for url in thread_files.values()), "jsc-badge-accent"),
+            ("Weight Calculations", True, "jsc-badge-secondary"),
+            ("FIXED Calculator", True, "jsc-badge-success"),
         ]
         
         for item_name, status, badge_class in status_items:
             if status:
                 st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0;">{item_name} - Active</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: var(--oracle11g-gray);">{item_name} - Limited</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="{badge_class}" style="margin: 0.3rem 0; background: #6c757d;">{item_name} - Limited</div>', unsafe_allow_html=True)
     
     with col2:
         st.markdown('<h3 class="section-header">FIXED Features</h3>', unsafe_allow_html=True)
@@ -5425,7 +4229,7 @@ def show_rectified_home():
         ]
         
         for feature in features:
-            st.markdown(f'<div class="oracle11g-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="jsc-card" style="padding: 0.5rem; margin: 0.2rem 0;">• {feature}</div>', unsafe_allow_html=True)
     
     show_calculation_history()
 
@@ -5471,34 +4275,6 @@ def show_help_system():
             - Volume calculations for each component
             """)
 
-        with st.expander("Batch Calculator Guide"):
-            st.markdown("""
-            **BATCH CALCULATOR FEATURES:**
-            
-            **Two Input Modes:**
-            - **Basic Mode:** Provide only Size + Length → System auto-detects other parameters
-            - **Advanced Mode:** Provide complete specifications for precise control
-            
-            **Auto-Detection Logic:**
-            - **Metric Sizes (M10, M12):** Auto-detects as ISO 4014 Hex Bolt
-            - **Inch Sizes (1/4, 5/16):** Auto-detects as ASME B18.2.1 Hex Bolt
-            - **Diameter Calculation:** Automatically calculates from size
-            - **Material Default:** Carbon Steel (can be overridden)
-            
-            **Processing Capabilities:**
-            - Process 1000+ records simultaneously
-            - Real-time progress tracking
-            - Continue processing on errors
-            - Comprehensive error reporting
-            - Multiple export formats
-            
-            **Output Features:**
-            - Individual item weights
-            - Total weight summaries
-            - Error diagnostics
-            - Professional Excel reports
-            """)
-
 # ======================================================
 # SECTION DISPATCHER
 # ======================================================
@@ -5507,8 +4283,6 @@ def show_section(title):
         show_enhanced_product_database()
     elif title == "Calculations":
         show_rectified_calculations()
-    elif title == "Batch Calculator":
-        show_batch_weight_calculator()
     else:
         st.info(f"Section {title} is coming soon!")
     
@@ -5534,8 +4308,7 @@ def main():
         sections = [
             "Home Dashboard",
             "Product Database", 
-            "Calculations",
-            "Batch Calculator"
+            "Calculations"
         ]
         
         for section in sections:
@@ -5549,59 +4322,6 @@ def main():
         # Debug mode toggle
         st.markdown("---")
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
-        
-        # Mobile optimization toggle
-        st.session_state.mobile_view_optimized = st.checkbox("Mobile Optimized View", value=st.session_state.mobile_view_optimized)
-        
-        # Export templates section
-        st.markdown("---")
-        with st.expander("Export Templates"):
-            st.markdown("### Download Templates")
-            
-            if st.button("Weight Calculator Template"):
-                template_df = ExportTemplateManager.get_weight_calc_template()
-                csv_template = template_df.to_csv(index=False)
-                st.download_button(
-                    label="Download CSV Template",
-                    data=csv_template,
-                    file_name="weight_calculator_template.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            
-            if st.button("Product Database Template"):
-                template_df = ExportTemplateManager.get_product_database_template()
-                csv_template = template_df.to_csv(index=False)
-                st.download_button(
-                    label="Download CSV Template",
-                    data=csv_template,
-                    file_name="product_database_template.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            
-            if st.button("Batch Calculator Template"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    basic_template = BatchTemplateManager.get_basic_template()
-                    csv_basic = basic_template.to_csv(index=False)
-                    st.download_button(
-                        label="Basic Template",
-                        data=csv_basic,
-                        file_name="batch_calculator_basic_template.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                with col2:
-                    advanced_template = BatchTemplateManager.get_advanced_template()
-                    csv_advanced = advanced_template.to_csv(index=False)
-                    st.download_button(
-                        label="Advanced Template",
-                        data=csv_advanced,
-                        file_name="batch_calculator_advanced_template.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
     
     if st.session_state.selected_section is None:
         show_rectified_home()
@@ -5610,12 +4330,12 @@ def main():
     
     st.markdown("""
         <hr>
-        <div class="oracle11g-footer">
+        <div class="jsc-footer">
             <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem;">
-                <span class="oracle11g-badge">FIXED Calculator</span>
-                <span class="oracle11g-badge-orange">Separate Data Fetching</span>
-                <span class="oracle11g-badge-green">Same Formula</span>
-                <span class="oracle11g-badge-yellow">Batch Processing</span>
+                <span class="jsc-badge">FIXED Calculator</span>
+                <span class="jsc-badge-accent">Separate Data Fetching</span>
+                <span class="jsc-badge-secondary">Same Formula</span>
+                <span class="jsc-badge-success">Different Standards</span>
             </div>
             <p><strong>© 2024 JSC Industries Pvt Ltd</strong> | Born to Perform • Engineered for Excellence</p>
             <p style="font-size: 0.8rem;">Professional Fastener Intelligence Platform v4.0 - FIXED Weight Calculator with SEPARATE data fetching and SAME formula for socket head products</p>
