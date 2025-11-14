@@ -84,7 +84,7 @@ class LoadingManager:
     def log_operation(operation_name, success=True, details=""):
         """Log operations with details"""
         status = "SUCCESS" if success else "FAILED"
-        logger.info(f"{operation_name} - {status} - {details}")
+        logger.info(f"{operation_name} - {STATUS} - {details}")
 
 # ======================================================
 # ENHANCED CONFIGURATION & ERROR HANDLING
@@ -373,6 +373,7 @@ class BatchTemplateManager:
         if diameter_type == "Blank Diameter":
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
                 'Size': ['1/4', 'M10', '1/2', '5/16'],
                 'Length': [50, 75, 200, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
@@ -384,11 +385,12 @@ class BatchTemplateManager:
         else:  # Pitch Diameter
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
                 'Size': ['1/4', '5/16', '1/2', '3/8'],
                 'Length': [50, 75, 200, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
                 'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
-                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Product_Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
                 'Thread_Class': ['2A', '2A', '2A', '2A'],
                 'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
                 'Quantity': [100, 50, 25, 200]
@@ -401,6 +403,7 @@ class BatchTemplateManager:
         if diameter_type == "Blank Diameter":
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hexagon Socket Head Cap Screws', 'Hex Bolt'],
+                'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'SHS-001', 'HB-003'],
                 'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
                 'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
                 'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
@@ -419,6 +422,7 @@ class BatchTemplateManager:
         else:  # Pitch Diameter
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
+                'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
                 'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
                 'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
                 'Size': ['1/4', '5/16', '1/2', '3/8'],
@@ -458,21 +462,29 @@ class BatchTemplateManager:
         """Intelligently infer parameters from basic mode with diameter type support"""
         try:
             product_type = row.get('Product_Type', 'Hex Bolt')
+            product_code = row.get('Product_Code', '')
             size = row.get('Size')
             length = row.get('Length', 50.0)
             length_unit = row.get('Length_Unit', 'mm')
             material = row.get('Material', 'Carbon Steel')
             quantity = row.get('Quantity', 1)
+            thread_standard = row.get('Thread_Standard', 'ASME B1.1')
+            product_standard = row.get('Product_Standard', 'ASME B18.2.1')
+            thread_class = row.get('Thread_Class', '2A')
             
             # Initialize default parameters
             params = {
                 'product_type': product_type,
+                'product_code': product_code,
                 'size': str(size),
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
                 'quantity': quantity,
-                'diameter_type': diameter_type
+                'diameter_type': diameter_type,
+                'thread_standard': thread_standard,
+                'product_standard': product_standard,
+                'thread_class': thread_class
             }
             
             # Analyze size pattern
@@ -481,7 +493,7 @@ class BatchTemplateManager:
             # Metric detection (M10, M12, M16, etc.)
             if size_str.startswith('M'):
                 params['series'] = 'Metric'
-                params['standard'] = 'ISO 4014'
+                params['standard'] = 'ISO 4014' if product_standard == 'All' else product_standard
                 
                 # Extract diameter from metric size (M10 -> 10.0 mm)
                 try:
@@ -497,7 +509,7 @@ class BatchTemplateManager:
             # Inch detection (fractions or numbers)
             elif '/' in size_str or any(char.isdigit() for char in size_str):
                 params['series'] = 'Inch'
-                params['standard'] = 'ASME B18.2.1'
+                params['standard'] = 'ASME B18.2.1' if product_standard == 'All' else product_standard
                 params['grade'] = 'N/A'
                 
                 try:
@@ -564,6 +576,7 @@ class BatchTemplateManager:
             # Return safe defaults
             return {
                 'product_type': 'Hex Bolt',
+                'product_code': product_code,
                 'series': 'Inch',
                 'standard': 'ASME B18.2.1',
                 'size': str(size),
@@ -574,7 +587,10 @@ class BatchTemplateManager:
                 'material': material,
                 'length': length,
                 'length_unit': length_unit,
-                'quantity': quantity
+                'quantity': quantity,
+                'thread_standard': thread_standard,
+                'product_standard': product_standard,
+                'thread_class': thread_class
             }
 
 # ======================================================
@@ -600,7 +616,7 @@ class BatchProcessor:
             if diameter_type == "Blank Diameter":
                 required_columns.extend(['Diameter_Value', 'Diameter_Unit'])
             else:  # Pitch Diameter
-                required_columns.extend(['Thread_Standard', 'Thread_Size', 'Thread_Class'])
+                required_columns.extend(['Thread_Standard', 'Product_Standard', 'Thread_Class'])
             
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
@@ -675,6 +691,7 @@ class BatchProcessor:
                 else:  # advanced mode
                     params = {
                         'product_type': row.get('Product_Type', 'Hex Bolt'),
+                        'product_code': row.get('Product_Code', ''),
                         'series': row.get('Series', 'Inch'),
                         'standard': row.get('Standard', 'ASME B18.2.1'),
                         'size': row.get('Size'),
@@ -819,6 +836,7 @@ class BatchResultsDisplay:
             display_record = {
                 'Row': result['row_index'] + 1,
                 'Product': input_data.get('Product_Type', 'Auto-detected'),
+                'Product_Code': input_data.get('Product_Code', ''),
                 'Size': input_data.get('Size', 'N/A'),
                 'Length': f"{input_data.get('Length', 'N/A')} {input_data.get('Length_Unit', 'mm')}",
                 'Material': input_data.get('Material', 'Carbon Steel'),
@@ -877,6 +895,7 @@ class BatchResultsDisplay:
                             detailed_record = {
                                 'Row_Index': result['row_index'] + 1,
                                 'Product_Type': input_data.get('Product_Type', 'Auto-detected'),
+                                'Product_Code': input_data.get('Product_Code', ''),
                                 'Series': input_data.get('Series', 'Auto-detected'),
                                 'Standard': input_data.get('Standard', 'Auto-detected'),
                                 'Size': input_data.get('Size', 'N/A'),
@@ -940,7 +959,7 @@ def show_batch_weight_calculator():
             <span class="oracle11g-badge">Batch Processing</span>
             <span class="oracle11g-badge-orange">Smart Diameter Handling</span>
             <span class="oracle11g-badge-green">Auto Pitch Diameter</span>
-            <span class="oracle11g-badge-yellow">Product Type Column</span>
+            <span class="oracle11g-badge-yellow">Product Code Column</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -989,41 +1008,145 @@ def show_batch_weight_calculator():
     st.markdown("---")
     
     # Template download section - UPDATED WITH DIAMETER TYPE
-    st.markdown("### 📥 Download Template")
+    st.markdown("### 📥 Download Professional Template")
     
-    st.info(f"**Template will include:** Product_Type, Size, Length, and {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} columns")
+    st.info(f"**Template will include:** Product_Type, Product_Code, Size, Length, and {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Product_Standard, Thread_Class'} columns")
     
     col1, col2 = st.columns(2)
     
     with col1:
         if st.button("Download Basic Template", use_container_width=True):
             template_df = BatchTemplateManager.get_basic_template(diameter_type)
-            csv_data = template_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV Template",
-                data=csv_data,
-                file_name=f"batch_weight_basic_{diameter_type.lower().replace(' ', '_')}_template.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            
+            # Create professional Excel file with formatting
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+                    template_df.to_excel(writer, sheet_name='Batch Template', index=False)
+                    
+                    # Get workbook and worksheet
+                    workbook = writer.book
+                    worksheet = writer.sheets['Batch Template']
+                    
+                    # Set column widths for better readability
+                    column_widths = {
+                        'A': 20,  # Product_Type
+                        'B': 15,  # Product_Code
+                        'C': 12,  # Size
+                        'D': 12,  # Length
+                        'E': 12,  # Length_Unit
+                    }
+                    
+                    if diameter_type == "Blank Diameter":
+                        column_widths.update({
+                            'F': 15,  # Diameter_Value
+                            'G': 15,  # Diameter_Unit
+                            'H': 15,  # Material
+                            'I': 12   # Quantity
+                        })
+                    else:  # Pitch Diameter
+                        column_widths.update({
+                            'F': 18,  # Thread_Standard
+                            'G': 18,  # Product_Standard
+                            'H': 15,  # Thread_Class
+                            'I': 15,  # Material
+                            'J': 12   # Quantity
+                        })
+                    
+                    for col, width in column_widths.items():
+                        worksheet.column_dimensions[col].width = width
+                    
+                    # Add header formatting
+                    header_fill = openpyxl.styles.PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    header_font = openpyxl.styles.Font(color="FFFFFF", bold=True)
+                    
+                    for cell in worksheet[1]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                
+                # Read the file and create download button
+                with open(tmp.name, 'rb') as f:
+                    st.download_button(
+                        label="Download Professional Excel Template",
+                        data=f.read(),
+                        file_name=f"batch_weight_basic_{diameter_type.lower().replace(' ', '_')}_template.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
     
     with col2:
         if st.button("Download Advanced Template", use_container_width=True):
             template_df = BatchTemplateManager.get_advanced_template(diameter_type)
-            csv_data = template_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV Template", 
-                data=csv_data,
-                file_name=f"batch_weight_advanced_{diameter_type.lower().replace(' ', '_')}_template.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            
+            # Create professional Excel file with formatting
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+                    template_df.to_excel(writer, sheet_name='Batch Template', index=False)
+                    
+                    # Get workbook and worksheet
+                    workbook = writer.book
+                    worksheet = writer.sheets['Batch Template']
+                    
+                    # Set column widths for better readability
+                    column_widths = {
+                        'A': 20,  # Product_Type
+                        'B': 15,  # Product_Code
+                        'C': 12,  # Series
+                        'D': 18,  # Standard
+                        'E': 12,  # Size
+                        'F': 12,  # Grade
+                        'G': 15,  # Diameter_Type
+                    }
+                    
+                    if diameter_type == "Blank Diameter":
+                        column_widths.update({
+                            'H': 15,  # Diameter_Value
+                            'I': 15,  # Diameter_Unit
+                            'J': 18,  # Thread_Standard
+                            'K': 15,  # Thread_Size
+                            'L': 15,  # Thread_Class
+                            'M': 12,  # Length
+                            'N': 12,  # Length_Unit
+                            'O': 15,  # Material
+                            'P': 12   # Quantity
+                        })
+                    else:  # Pitch Diameter
+                        column_widths.update({
+                            'H': 18,  # Thread_Standard
+                            'I': 18,  # Thread_Size
+                            'J': 15,  # Thread_Class
+                            'K': 12,  # Length
+                            'L': 12,  # Length_Unit
+                            'M': 15,  # Material
+                            'N': 12   # Quantity
+                        })
+                    
+                    for col, width in column_widths.items():
+                        worksheet.column_dimensions[col].width = width
+                    
+                    # Add header formatting
+                    header_fill = openpyxl.styles.PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    header_font = openpyxl.styles.Font(color="FFFFFF", bold=True)
+                    
+                    for cell in worksheet[1]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                
+                # Read the file and create download button
+                with open(tmp.name, 'rb') as f:
+                    st.download_button(
+                        label="Download Professional Excel Template", 
+                        data=f.read(),
+                        file_name=f"batch_weight_advanced_{diameter_type.lower().replace(' ', '_')}_template.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
     
     st.info(f"""
     **{'Basic Mode' if st.session_state.batch_mode == 'basic' else 'Advanced Mode'} Selected with {diameter_type}:**
-    - **Basic Mode**: Upload CSV with Product_Type, Size, Length, {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Thread_Size, Thread_Class'} → System auto-detects other parameters
+    - **Basic Mode**: Upload CSV with Product_Type, Product_Code, Size, Length, {'Diameter_Value, Diameter_Unit' if diameter_type == 'Blank Diameter' else 'Thread_Standard, Product_Standard, Thread_Class'} → System auto-detects other parameters
     - **Advanced Mode**: Upload CSV with complete product specifications for precise control
     - **Diameter Type**: {diameter_type} - {'Provide diameter values directly' if diameter_type == 'Blank Diameter' else 'System fetches pitch diameter from database'}
+    - **New Column**: Product_Code for internal reference
     """)
     
     st.markdown("---")
@@ -1032,7 +1155,7 @@ def show_batch_weight_calculator():
     st.markdown("### 📤 Upload Batch File")
     
     uploaded_file = st.file_uploader(
-        f"Upload your {'Basic' if st.session_state.batch_mode == 'basic' else 'Advanced'} CSV file",
+        f"Upload your {'Basic' if st.session_state.batch_mode == 'basic' else 'Advanced'} CSV/Excel file",
         type=['csv', 'xlsx'],
         key="batch_file_uploader"
     )
@@ -1134,6 +1257,84 @@ def show_batch_weight_calculator():
         # Show detailed results
         if st.session_state.batch_results:
             BatchResultsDisplay.show_detailed_results(st.session_state.batch_results)
+            
+            # Add Weight column to results and create downloadable file
+            st.markdown("### 💾 Download Results with Weight Column")
+            
+            # Prepare results with weight column
+            results_with_weight = []
+            for result in st.session_state.batch_results:
+                input_data = result['input_data']
+                calc = result['calculation_result']
+                quantity = result.get('quantity', 1)
+                
+                result_row = {
+                    'Product_Type': input_data.get('Product_Type', ''),
+                    'Product_Code': input_data.get('Product_Code', ''),
+                    'Size': input_data.get('Size', ''),
+                    'Length': input_data.get('Length', ''),
+                    'Length_Unit': input_data.get('Length_Unit', 'mm'),
+                    'Thread_Standard': input_data.get('Thread_Standard', ''),
+                    'Product_Standard': input_data.get('Product_Standard', ''),
+                    'Thread_Class': input_data.get('Thread_Class', ''),
+                    'Material': input_data.get('Material', 'Carbon Steel'),
+                    'Quantity': quantity,
+                    'Weight_kg': calc['weight_kg'],
+                    'Weight_lb': calc['weight_lb'],
+                    'Total_Weight_kg': calc['weight_kg'] * quantity,
+                    'Total_Weight_lb': calc['weight_lb'] * quantity
+                }
+                results_with_weight.append(result_row)
+            
+            results_df = pd.DataFrame(results_with_weight)
+            
+            # Create professional Excel file with results
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+                    results_df.to_excel(writer, sheet_name='Weight Results', index=False)
+                    
+                    # Get workbook and worksheet
+                    workbook = writer.book
+                    worksheet = writer.sheets['Weight Results']
+                    
+                    # Set column widths for better readability
+                    column_widths = {
+                        'A': 20,  # Product_Type
+                        'B': 15,  # Product_Code
+                        'C': 12,  # Size
+                        'D': 12,  # Length
+                        'E': 12,  # Length_Unit
+                        'F': 18,  # Thread_Standard
+                        'G': 18,  # Product_Standard
+                        'H': 15,  # Thread_Class
+                        'I': 15,  # Material
+                        'J': 12,  # Quantity
+                        'K': 15,  # Weight_kg
+                        'L': 15,  # Weight_lb
+                        'M': 18,  # Total_Weight_kg
+                        'N': 18   # Total_Weight_lb
+                    }
+                    
+                    for col, width in column_widths.items():
+                        worksheet.column_dimensions[col].width = width
+                    
+                    # Add header formatting
+                    header_fill = openpyxl.styles.PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    header_font = openpyxl.styles.Font(color="FFFFFF", bold=True)
+                    
+                    for cell in worksheet[1]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                
+                # Download button for professional results
+                with open(tmp.name, 'rb') as f:
+                    st.download_button(
+                        label="📥 Download Professional Results with Weight Column",
+                        data=f.read(),
+                        file_name="batch_weight_results_professional.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
         
         # Show errors
         if st.session_state.batch_errors:
@@ -1170,6 +1371,7 @@ def show_batch_weight_calculator():
                 successful_df = pd.DataFrame([
                     {
                         'Product_Type': r['input_data'].get('Product_Type', 'Auto-detected'),
+                        'Product_Code': r['input_data'].get('Product_Code', ''),
                         'Size': r['input_data'].get('Size', 'N/A'),
                         'Length': f"{r['input_data'].get('Length', 'N/A')} {r['input_data'].get('Length_Unit', 'mm')}",
                         'Material': r['input_data'].get('Material', 'Carbon Steel'),
@@ -2445,6 +2647,7 @@ def size_to_float(size_str):
         if "/" in size_str:
             try:
                 if "-" in size_str:
+                    # Handle cases like "1-1/2"
                     parts = size_str.split("-")
                     whole = float(parts[0]) if parts[0] else 0
                     fraction = float(Fraction(parts[1]))
