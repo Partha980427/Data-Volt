@@ -368,13 +368,42 @@ class BatchTemplateManager:
     """Manage batch calculator templates with diameter type support"""
     
     @staticmethod
+    def extract_thread_info_from_size(size_str):
+        """PROPERLY extract thread size, pitch, and TPI from formats like '3/8-16'"""
+        if '-' not in size_str:
+            return size_str, None, None
+        
+        try:
+            # Handle formats: "3/8-16", "1/2-13", "M10-1.5"
+            parts = size_str.split('-')
+            thread_size = parts[0].strip()
+            
+            # Extract TPI or pitch
+            pitch_part = parts[1].strip()
+            
+            # Handle metric threads (M10-1.5)
+            if thread_size.startswith('M'):
+                pitch = float(pitch_part) if '.' in pitch_part else None
+                tpi = None
+            else:
+                # Handle inch threads (3/8-16)
+                tpi = int(pitch_part) if pitch_part.isdigit() else None
+                pitch = None
+            
+            return thread_size, tpi, pitch
+            
+        except Exception as e:
+            st.warning(f"Error extracting thread info from '{size_str}': {str(e)}")
+            return size_str, None, None
+    
+    @staticmethod
     def get_basic_template(diameter_type="Blank Diameter"):
         """Get basic template with Product_Type column and diameter type support"""
         if diameter_type == "Blank Diameter":
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
                 'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
-                'Size': ['1/4', 'M10', '1/2', '5/16'],
+                'Size': ['1/4', 'M10', '1/2-13', '5/16'],
                 'Length': [50, 75, 200, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
                 'Diameter_Value': [6.35, 10.0, 12.7, 7.94],
@@ -386,12 +415,12 @@ class BatchTemplateManager:
             template_data = {
                 'Product_Type': ['Hex Bolt', 'Hex Bolt', 'Threaded Rod', 'Hex Bolt'],
                 'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
-                'Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Size': ['1/4-20', '5/16-18', '1/2-13', '3/8-16'],
                 'Length': [50, 75, 200, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
                 'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
                 'Product_Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
-                'Thread_Class': ['2A', '2A', '2A', '2A'],
+                'Thread_Class': ['2A', '3A', '2A', '1A'],  # Different classes for demonstration
                 'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
                 'Quantity': [100, 50, 25, 200]
             }
@@ -406,13 +435,13 @@ class BatchTemplateManager:
                 'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'SHS-001', 'HB-003'],
                 'Series': ['Inch', 'Metric', 'Inch', 'Inch', 'Metric'],
                 'Standard': ['ASME B18.2.1', 'ISO 4014', 'Not Required', 'ASME B18.3', 'ISO 4014'],
-                'Size': ['1/4', 'M10', '1/2', '1/4', 'M12'],
+                'Size': ['1/4', 'M10', '1/2-13', '1/4', 'M12'],
                 'Grade': ['N/A', 'A', 'N/A', 'N/A', 'B'],
                 'Diameter_Type': ['Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter', 'Blank Diameter'],
                 'Diameter_Value': [6.35, 10.0, 12.7, 6.35, 12.0],
                 'Diameter_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
                 'Thread_Standard': ['N/A', 'N/A', 'ASME B1.1', 'N/A', 'N/A'],
-                'Thread_Size': ['N/A', 'N/A', '1/2', 'N/A', 'N/A'],
+                'Thread_Size': ['N/A', 'N/A', '1/2-13', 'N/A', 'N/A'],
                 'Thread_Class': ['N/A', 'N/A', '2A', 'N/A', 'N/A'],
                 'Length': [50, 75, 200, 50, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm', 'mm'],
@@ -425,12 +454,12 @@ class BatchTemplateManager:
                 'Product_Code': ['HB-001', 'HB-002', 'TR-001', 'HB-003'],
                 'Series': ['Inch', 'Inch', 'Inch', 'Inch'],
                 'Standard': ['ASME B18.2.1', 'ASME B18.2.1', 'Not Required', 'ASME B18.2.1'],
-                'Size': ['1/4', '5/16', '1/2', '3/8'],
+                'Size': ['1/4-20', '5/16-18', '1/2-13', '3/8-16'],
                 'Grade': ['N/A', 'N/A', 'N/A', 'N/A'],
                 'Diameter_Type': ['Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter', 'Pitch Diameter'],
                 'Thread_Standard': ['ASME B1.1', 'ASME B1.1', 'ASME B1.1', 'ASME B1.1'],
-                'Thread_Size': ['1/4', '5/16', '1/2', '3/8'],
-                'Thread_Class': ['2A', '2A', '2A', '2A'],
+                'Thread_Size': ['1/4-20', '5/16-18', '1/2-13', '3/8-16'],
+                'Thread_Class': ['2A', '3A', '2A', '1A'],
                 'Length': [50, 75, 200, 100],
                 'Length_Unit': ['mm', 'mm', 'mm', 'mm'],
                 'Material': ['Carbon Steel', 'Carbon Steel', 'Stainless Steel', 'Carbon Steel'],
@@ -470,7 +499,7 @@ class BatchTemplateManager:
             quantity = row.get('Quantity', 1)
             thread_standard = row.get('Thread_Standard', 'ASME B1.1')
             product_standard = row.get('Product_Standard', 'ASME B18.2.1')
-            thread_class = row.get('Thread_Class', '2A')
+            thread_class = row.get('Thread_Class', '2A')  # Use provided thread class, not hardcoded
             
             # Initialize default parameters
             params = {
@@ -484,7 +513,7 @@ class BatchTemplateManager:
                 'diameter_type': diameter_type,
                 'thread_standard': thread_standard,
                 'product_standard': product_standard,
-                'thread_class': thread_class
+                'thread_class': thread_class  # Use the provided thread class
             }
             
             # Analyze size pattern
@@ -514,23 +543,23 @@ class BatchTemplateManager:
                 
                 # SPECIAL HANDLING FOR THREADED ROD WITH THREAD SIZES LIKE "3/8-16"
                 if product_type == "Threaded Rod" and '-' in size_str and diameter_type == "Pitch Diameter":
-                    # Extract thread size for pitch diameter lookup
-                    thread_size = size_str.split('-')[0].strip()  # Get "3/8" from "3/8-16"
-                    params['thread_size'] = thread_size
+                    # Extract thread size for pitch diameter lookup - USE FULL SIZE "3/8-16"
+                    params['thread_size'] = size_str  # Use full size like "3/8-16"
                     
                     try:
                         # Handle fractions for thread size
-                        if '/' in thread_size:
-                            if '-' in thread_size:
+                        thread_size_only = size_str.split('-')[0].strip()  # Get "3/8" from "3/8-16"
+                        if '/' in thread_size_only:
+                            if '-' in thread_size_only:
                                 # Handle cases like "1-1/2"
-                                parts = thread_size.split('-')
+                                parts = thread_size_only.split('-')
                                 whole = float(parts[0]) if parts[0] else 0
                                 fraction = float(Fraction(parts[1]))
                                 decimal_inches = whole + fraction
                             else:
-                                decimal_inches = float(Fraction(thread_size))
+                                decimal_inches = float(Fraction(thread_size_only))
                         else:
-                            decimal_inches = float(thread_size)
+                            decimal_inches = float(thread_size_only)
                         
                         # Convert inches to mm for calculation
                         params['diameter_value'] = decimal_inches * 25.4
@@ -577,19 +606,17 @@ class BatchTemplateManager:
                 # For pitch diameter, we need thread information
                 # For Threaded Rod, extract thread size from Size column if it contains thread info
                 if product_type == "Threaded Rod" and '-' in str(size):
-                    # Extract thread size from "3/8-16" format
-                    thread_parts = str(size).split('-')
-                    if len(thread_parts) >= 2:
-                        params['thread_size'] = thread_parts[0].strip()
-                        # Thread class defaults to 2A for inch series
-                        params['thread_class'] = '2A'
-                        params['thread_standard'] = 'ASME B1.1'
+                    # Use the FULL thread size like "3/8-16" for lookup
+                    params['thread_size'] = str(size)
+                    # Use the provided thread class, not hardcoded
+                    params['thread_class'] = thread_class
+                    params['thread_standard'] = thread_standard
                 
-                # Get pitch diameter from database
+                # Get pitch diameter from database - USE FULL THREAD SIZE
                 pitch_diameter = get_pitch_diameter_from_thread_data(
                     params.get('thread_standard', 'ASME B1.1'),
-                    params.get('thread_size', size),
-                    params.get('thread_class', '2A')
+                    params.get('thread_size', size),  # Use full size like "3/8-16"
+                    params.get('thread_class', thread_class)  # Use provided thread class
                 )
                 
                 if pitch_diameter is not None:
@@ -756,17 +783,16 @@ class BatchProcessor:
                         
                         # Extract thread information from Size column (e.g., "3/8-16")
                         size_str = str(params.get('size', ''))
-                        thread_parts = size_str.split('-')
-                        if len(thread_parts) >= 2:
-                            params['thread_size'] = thread_parts[0].strip()
-                            params['thread_standard'] = 'ASME B1.1'
-                            params['thread_class'] = '2A'  # Default for inch series
+                        params['thread_size'] = size_str  # Use full size like "3/8-16"
+                        params['thread_standard'] = 'ASME B1.1'
+                        # Use the thread class from the row, don't hardcode to '2A'
+                        params['thread_class'] = row.get('Thread_Class', '2A')
                     
-                    # Get pitch diameter from database
+                    # Get pitch diameter from database - USE FULL THREAD SIZE
                     pitch_diameter = get_pitch_diameter_from_thread_data(
                         params.get('thread_standard', 'ASME B1.1'),
                         params.get('thread_size', params.get('size')),
-                        params.get('thread_class', '2A')
+                        params.get('thread_class', row.get('Thread_Class', '2A'))
                     )
                     
                     if pitch_diameter is not None:
@@ -778,7 +804,7 @@ class BatchProcessor:
                         errors.append({
                             'row_index': index,
                             'input_data': row.to_dict(),
-                            'error': f"Pitch diameter not found for thread size: {params.get('thread_size', params.get('size'))}",
+                            'error': f"Pitch diameter not found for thread size: {params.get('thread_size', params.get('size'))} with class: {params.get('thread_class', 'N/A')}",
                             'status': 'failed'
                         })
                         summary['failed_calculations'] += 1
@@ -1033,6 +1059,7 @@ def show_batch_weight_calculator():
     - **Blank Diameter**: Provide diameter values directly in the template
     - **Pitch Diameter**: System automatically fetches pitch diameter values from thread database
     - **Threaded Rod Support**: For Pitch Diameter mode, Threaded Rod can use thread sizes like "3/8-16" from Size column
+    - **Thread Class Support**: Respects Thread_Class values (1A, 2A, 3A) from your template
     """)
     
     # Mode selection
@@ -1203,6 +1230,7 @@ def show_batch_weight_calculator():
     - **Advanced Mode**: Upload CSV with complete product specifications for precise control
     - **Diameter Type**: {diameter_type} - {'Provide diameter values directly' if diameter_type == 'Blank Diameter' else 'System fetches pitch diameter from database'}
     - **Threaded Rod Support**: For Pitch Diameter mode with Threaded Rod, system can extract thread size from Size column (e.g., "3/8-16")
+    - **Thread Class Support**: System respects Thread_Class values (1A, 2A, 3A) from your template
     - **New Column**: Product_Code for internal reference
     """)
     
@@ -1559,6 +1587,7 @@ def get_thread_data_enhanced(standard, thread_size=None, thread_class=None):
     result_df = df_thread.copy()
     
     if thread_size and thread_size != "All" and "Thread" in result_df.columns:
+        # Use exact match for thread size including TPI (e.g., "3/8-16")
         result_df = result_df[result_df["Thread"].astype(str).str.strip() == str(thread_size).strip()]
     
     if thread_class and thread_class != "All" and "Class" in result_df.columns:
@@ -1614,6 +1643,55 @@ def get_thread_classes_enhanced(standard):
     except Exception as e:
         st.warning(f"Thread class processing warning for {standard}: {str(e)}")
         return ["All"]
+
+# ======================================================
+# PITCH DIAMETER LOOKUP - FIXED VERSION
+# ======================================================
+def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
+    """Get pitch diameter from thread data for threaded rod calculation - FIXED VERSION"""
+    try:
+        df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
+        
+        if df_thread.empty:
+            # Try with just the nominal size if full size not found
+            if '-' in str(thread_size):
+                nominal_size = str(thread_size).split('-')[0].strip()
+                df_thread = get_thread_data_enhanced(thread_standard, nominal_size, thread_class)
+            
+            if df_thread.empty:
+                return None
+        
+        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
+        pitch_dia_cols = []
+        
+        # First priority: Pitch diameter minimum columns
+        min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
+        if min_pitch_cols:
+            pitch_dia_cols.extend(min_pitch_cols)
+        
+        # Second priority: Any pitch diameter columns
+        general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
+        if general_pitch_cols:
+            pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
+        
+        # Third priority: Any diameter column that might contain pitch diameter
+        if not pitch_dia_cols:
+            dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
+            for col in dia_cols:
+                if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
+                    pitch_dia_cols.append(col)
+        
+        if pitch_dia_cols:
+            # Get the first pitch diameter value
+            pitch_diameter = df_thread[pitch_dia_cols[0]].iloc[0]
+            if pd.notna(pitch_diameter):
+                return float(pitch_diameter)
+        
+        return None
+        
+    except Exception as e:
+        st.warning(f"Could not retrieve pitch diameter: {str(e)}")
+        return None
 
 # ======================================================
 # ORACLE 11G STYLING - COMPLETE UI TRANSFORMATION
@@ -3489,46 +3567,6 @@ def get_material_density_rectified(material):
         "Nickel": 8.90
     }
     return density_map.get(material, 7.85)  # Default to carbon steel
-
-def get_pitch_diameter_from_thread_data(thread_standard, thread_size, thread_class):
-    """Get pitch diameter from thread data for threaded rod calculation - ENHANCED FOR THREADED ROD"""
-    try:
-        df_thread = get_thread_data_enhanced(thread_standard, thread_size, thread_class)
-        
-        if df_thread.empty:
-            return None
-        
-        # Look for pitch diameter columns - prioritize minimum pitch diameter for threaded rod
-        pitch_dia_cols = []
-        
-        # First priority: Pitch diameter minimum columns
-        min_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower() and 'min' in col.lower()]
-        if min_pitch_cols:
-            pitch_dia_cols.extend(min_pitch_cols)
-        
-        # Second priority: Any pitch diameter columns
-        general_pitch_cols = [col for col in df_thread.columns if 'pitch' in col.lower() and 'diameter' in col.lower()]
-        if general_pitch_cols:
-            pitch_dia_cols.extend([col for col in general_pitch_cols if col not in pitch_dia_cols])
-        
-        # Third priority: Any diameter column that might contain pitch diameter
-        if not pitch_dia_cols:
-            dia_cols = [col for col in df_thread.columns if 'diameter' in col.lower()]
-            for col in dia_cols:
-                if 'pitch' not in col.lower() and 'major' not in col.lower() and 'minor' not in col.lower():
-                    pitch_dia_cols.append(col)
-        
-        if pitch_dia_cols:
-            # Get the first pitch diameter value
-            pitch_diameter = df_thread[pitch_dia_cols[0]].iloc[0]
-            if pd.notna(pitch_diameter):
-                return float(pitch_diameter)
-        
-        return None
-        
-    except Exception as e:
-        st.warning(f"Could not retrieve pitch diameter: {str(e)}")
-        return None
 
 def calculate_weight_rectified(parameters):
     """FIXED: Enhanced weight calculation with proper data fetching for ALL products"""
