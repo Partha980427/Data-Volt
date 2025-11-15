@@ -271,7 +271,7 @@ def initialize_session_state():
     save_user_preferences()
 
 # ======================================================
-# MOBILE OPTIMIZATION
+# MOBILE OPTIMIZATION - FIXED INDENTATION
 # ======================================================
 def detect_mobile_device():
     """Detect if the user is on a mobile device"""
@@ -280,7 +280,7 @@ def detect_mobile_device():
         mobile_indicators = ['Mobile', 'Android', 'iPhone', 'iPad']
         return any(indicator in user_agent for indicator in mobile_indicators)
     except:
-    return False
+        return False
 
 def optimize_for_mobile():
     """Apply mobile-specific optimizations"""
@@ -2873,7 +2873,7 @@ def get_asme_b18_3_dimensions(product, size):
         
         if 'Size' in temp_df.columns and size != "All":
             # Normalize size comparison - handle different formats
-            temp_df['Size_Normalized'] = temp_df['Size'].ast(str).str.strip()
+            temp_df['Size_Normalized'] = temp_df['Size'].astype(str).str.strip()
             size_normalized = str(size).strip()
             temp_df = temp_df[temp_df['Size_Normalized'] == size_normalized]
         
